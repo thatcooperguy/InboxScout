@@ -6,7 +6,24 @@ Connect your personal email accounts (Gmail, Yahoo, Outlook.com, or any IMAP pro
 
 Built for anyone's inbox: **work profiles** adapt the briefs to what you do — a business owner gets a Company Pulse of top projects, a real-estate agent gets a Deal Pipeline, a utility/field professional gets an Operations Pulse — and a default **Simple Mode** makes setup three plain-language steps for non-technical users.
 
-**Status:** design/proposal phase. See **[docs/PROPOSAL.md](docs/PROPOSAL.md)** for the full product proposal and technical design.
+**Status:** v0.1 in development — the core app is built and CI is running. See **[docs/PROPOSAL.md](docs/PROPOSAL.md)** for the full product proposal and technical design.
+
+## Download
+
+Installers (Windows `.exe`, macOS `.dmg`) are published on this repo's **Releases** page whenever a `v*` tag is pushed. The app self-updates from Releases after install.
+
+## Develop
+
+```bash
+npm install
+npm run dev        # launch the app with hot reload
+npm run typecheck  # strict TS across main + renderer
+npm test           # vitest unit suite
+npm run lint
+npm run package    # build local installers (no publish)
+```
+
+Run a headless scan without opening the window: `inbox-intel --sync` (used by schedulers).
 
 ## Highlights (planned v1)
 

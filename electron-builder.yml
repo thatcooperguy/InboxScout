@@ -1,0 +1,25 @@
+appId: com.inboxintel.app
+productName: Inbox Intel
+directories:
+  output: dist
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - "**/*.node"
+win:
+  target:
+    - nsis
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
+mac:
+  target:
+    - dmg
+  category: public.app-category.productivity
+publish:
+  provider: github
+  owner: thatcooperguy
+  repo: email-person-assistant-
+npmRebuild: true

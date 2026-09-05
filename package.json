@@ -1,0 +1,55 @@
+{
+  "name": "inbox-intel",
+  "version": "0.1.0",
+  "description": "AI email intelligence assistant - sorts personal from work mail and delivers daily briefs",
+  "main": "out/main/index.js",
+  "author": "thatcooperguy",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thatcooperguy/email-person-assistant-.git"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "package": "electron-vite build && electron-builder --publish never",
+    "release": "electron-vite build && electron-builder --publish always"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^2.0.0",
+    "@ai-sdk/google": "^2.0.0",
+    "@ai-sdk/groq": "^2.0.0",
+    "@ai-sdk/openai": "^2.0.0",
+    "@ai-sdk/openai-compatible": "^1.0.0",
+    "@ai-sdk/xai": "^2.0.0",
+    "ai": "^5.0.0",
+    "better-sqlite3": "^12.0.0",
+    "electron-updater": "^6.6.0",
+    "imapflow": "^1.0.160",
+    "mailparser": "^3.7.0",
+    "marked": "^15.0.0",
+    "node-cron": "^4.0.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/mailparser": "^3.4.5",
+    "@types/node": "^22.10.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "eslint": "^9.17.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.0",
+    "vitest": "^2.1.8"
+  }
+}
