@@ -24,6 +24,7 @@ The AI analysis runs through the user's choice of provider — Anthropic Claude,
 1. Connect multiple personal email accounts with a guided, secure sign-in; credentials stored encrypted on the machine.
 2. Classify all new mail since the last run into **Personal / Work / Promotions-Noise**, with importance scoring.
 3. Generate the Top Emerging Issues and Company Pulse briefs for work mail.
+   *(3a)* Connect an AI provider through a sign-in-style overlay — no manual key/config editing — with auto-detection of installed AI tools and guided downloads where needed.
 4. Run on demand ("Run now"), or automatically on a **daily or weekly** schedule.
 5. Persist everything locally (SQLite); every run is incremental and idempotent — re-runs update rather than duplicate.
 6. Save reports locally as Markdown/HTML/PDF; optional sync to Google Drive (v1) and OneDrive (v1.1).
@@ -60,20 +61,27 @@ A key research finding: **no major provider permits third-party apps to use cons
 - **OpenAI**'s "Sign in with ChatGPT" covers only OpenAI's own Codex surfaces; ChatGPT Plus has never included API access.
 - **Google** has no consumer-subscription API path — but offers a **free Gemini API tier** (~1,500 requests/day on Flash-class models) with a key from AI Studio, no credit card.
 
-So the design is **bring-your-own API key**, made as painless as possible:
+So the design keeps keys under the hood but wraps them in a **"Connect AI" overlay** that feels like signing in:
 
-| Provider | Onboarding | Est. cost per 1,000 emails* |
+1. User picks a provider from a card grid (Gemini, OpenAI, Claude, Grok, Groq, Ollama), each showing cost, free-tier availability, and a privacy note.
+2. The app opens an embedded sign-in window straight to that provider's key page (AI Studio / platform.openai.com / console.anthropic.com / console.x.ai / console.groq.com). The user signs in with their normal account; most providers show a one-click "Create key" button on that page.
+3. The app watches the clipboard for a key of that provider's format, auto-fills it, validates it with a live test call, encrypts it with DPAPI, and shows "Connected ✓". The user never sees a config file or settings JSON.
+4. **Auto-detect + download suggestions:** on first run the app scans for already-installed AI tooling (Ollama, LM Studio, Claude Code CLI, Gemini CLI, existing environment keys like `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`/`GEMINI_API_KEY`) and offers one-click connect for anything found — and for the privacy tier it offers to download and set up Ollama plus a suitable small model automatically.
+
+| Provider | Onboarding via Connect AI overlay | Est. cost per 1,000 emails* |
 |---|---|---|
-| **Google Gemini** (default) | Free API key from AI Studio, no card required | **$0** (free tier) / ~$0.60 paid |
-| **OpenAI** | API key from platform.openai.com | ~$0.50 (small models) |
-| **Anthropic Claude** | API key from console.anthropic.com | ~$2.25 (Haiku 4.5) |
-| **Ollama (local)** | One-click detect of local Ollama; no account at all | $0 — email never leaves the PC |
+| **Google Gemini** (default) | Sign in with Google → free AI Studio key, no card | **$0** (free tier) / ~$0.60 paid |
+| **Groq** (fast + free tier) | Sign in → free key; OpenAI-compatible; runs open models (Llama/Qwen) at very high speed | **$0** (free tier) / ~$0.10–0.20 paid |
+| **OpenAI** | Sign in → key from platform.openai.com (requires billing setup) | ~$0.50 (small models) |
+| **xAI Grok** | Sign in → key from console.x.ai | ~$0.30 (grok fast models) |
+| **Anthropic Claude** | Sign in → key from console.anthropic.com | ~$2.25 (Haiku 4.5) |
+| **Ollama (local)** | Auto-detected, or one-click guided install; no account at all | $0 — email never leaves the PC |
 
 *\*Classify + summarize, ≈1.5M input / 0.15M output tokens; batch APIs cut cloud costs ~50%. Prices as of Sept 2026 — re-verify at build time.*
 
-The settings screen shows exactly where to get each key (deep links + step-by-step), tests the key live, and displays estimated cost per run. **Gemini free tier is the recommended default** (zero cost, zero card); **Ollama is the privacy tier** (classification runs well on small local models even on an 8–16 GB laptop; summaries are slower/lower-quality locally, so a hybrid "classify local, summarize cloud" mode is offered).
+**Gemini free tier is the recommended default** (zero cost, zero card), with **Groq's free tier** as the fast runner-up; **Ollama is the privacy tier** (classification runs well on small local models even on an 8–16 GB laptop; summaries are slower/lower-quality locally, so a hybrid "classify local, summarize cloud" mode is offered).
 
-The AI layer is built on the **Vercel AI SDK** (TypeScript): one `generateObject`/`generateText` interface across Anthropic, OpenAI, Google, and OpenAI-compatible endpoints (which covers Ollama). Swapping providers is a model-string change.
+The AI layer is built on the **Vercel AI SDK** (TypeScript): one `generateObject`/`generateText` interface across Anthropic, OpenAI, Google, xAI, and OpenAI-compatible endpoints (which covers Groq and Ollama). Swapping providers is a model-string change. If any provider later ships a legitimate desktop OAuth flow for third-party apps, the overlay absorbs it without UI changes — the "sign in" step just gets shorter.
 
 ### 3.3 Application stack
 
@@ -107,8 +115,8 @@ Supporting choices:
 │                                     │ Mail layer│ AI layer         │     │
 │                                     │ IMAP      │ Vercel AI SDK    │     │
 │                                     │ (Gmail/   │  · Gemini        │     │
-│                                     │  Yahoo/   │  · OpenAI        │     │
-│                                     │  generic) │  · Claude        │     │
+│                                     │  Yahoo/   │  · OpenAI · Grok │     │
+│                                     │  generic) │  · Claude · Groq │     │
 │                                     │ MS Graph  │  · Ollama local  │     │
 │                                     ├───────────┴──────────────────┤     │
 │                                     │ SQLite (better-sqlite3+FTS5) │     │
@@ -179,7 +187,7 @@ Weekly runs produce the same structure over a 7-day window plus a "resolved this
 |---|---|---|
 | **M1 — Skeleton** | Electron+React+TS scaffold, SQLite schema, tray + scheduler, settings storage w/ DPAPI | ~1 week |
 | **M2 — Mail ingest** | IMAP backend (Gmail/Yahoo/generic app-password), account wizard, delta sync, FTS | ~1–2 weeks |
-| **M3 — AI core** | Provider layer (Gemini/OpenAI/Claude/Ollama), classification pipeline, cost meter | ~1 week |
+| **M3 — AI core** | Provider layer (Gemini/OpenAI/Claude/Grok/Groq/Ollama), Connect AI sign-in overlay with auto-detect, classification pipeline, cost meter | ~1–2 weeks |
 | **M4 — Tracking & briefs** | Project/issue entity tracking, Top Emerging Issues + Company Pulse generation, report renderer (MD/HTML/PDF) | ~1–2 weeks |
 | **M5 — Polish** | Dashboard UI, correction loop, Google Drive sync, notifications, installer + auto-update | ~1–2 weeks |
 | **M6 (v1.1)** | Microsoft Graph backend for Outlook.com, OneDrive sync, optional Gmail-API BYO-client mode | later |
@@ -188,7 +196,7 @@ Milestones are independently demoable; M2+M3 already delivers a usable "classify
 
 ## 8. Open questions before we build
 
-1. **Default AI provider:** OK to make Gemini free tier the default recommendation (zero cost), with Claude/OpenAI/Ollama as options?
+1. **Default AI provider:** OK to make Gemini free tier the default recommendation (zero cost), with Claude/OpenAI/Grok/Groq/Ollama as options?
 2. **Volume:** roughly how many emails/day across your accounts? (Only affects free-tier fit and run duration.)
 3. **Retention:** default to metadata + snippets only (recommended), or store full bodies locally for richer re-analysis?
 4. **Name:** "Inbox Intel" is a placeholder — happy to change.

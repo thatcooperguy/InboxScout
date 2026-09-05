@@ -11,7 +11,7 @@ Connect your personal email accounts (Gmail, Yahoo, Outlook.com, or any IMAP pro
 - Multi-account: Gmail / Yahoo / Outlook.com / generic IMAP, read-only, credentials encrypted with Windows DPAPI
 - AI-powered classification: Personal / Work / Promotions-Noise with importance scoring
 - Top Emerging Issues brief + Company Pulse project tracking that updates across runs
-- Bring-your-own AI: Google Gemini (free tier default), OpenAI, Anthropic Claude, or fully local via Ollama
+- Connect AI with a sign-in-style overlay (no manual key wrangling): Google Gemini (free tier default), OpenAI, Anthropic Claude, xAI Grok, Groq, or fully local via Ollama — with auto-detection of installed AI tools and guided downloads
 - Daily/weekly scheduled runs from the system tray, plus run-on-demand
 - Local-first SQLite storage with full-text search; Markdown/HTML/PDF reports; optional Drive/OneDrive sync
 
