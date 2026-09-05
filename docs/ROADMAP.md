@@ -36,14 +36,20 @@
 - **Simple Mode UI** — Today screen, Setup hub, three tabs, text-size control, advanced tabs behind a toggle.
 - Structured brief stored per report (powers the Today screen).
 
-## 🟠 Gaps — v0.4 (promised in proposal, not yet wired)
+## ✅ v0.4 — shipped (friends & family rollout)
 
-7. **Outlook.com via Microsoft Graph** — Outlook users currently cannot connect at all (Microsoft killed app passwords in 2024). Needs Entra app registration + MSAL device/loopback flow + `Mail.Read`.
+- **Outlook.com / Hotmail / Live via Microsoft Graph** — device-code sign-in, read-only `Mail.Read`, inbox + sent sync, silent token refresh. Setup in `docs/OUTLOOK.md`.
+- **"Done ✓" on the Today screen** + "Done since last time" recap in briefs.
+- **Save as PDF** for any brief.
+- **Filters in Inbox review** (category and type chips).
+- **Intel Mac build** (`x64` dmg) alongside Apple Silicon; README install steps for unsigned builds.
+- README makeover with logo and badges.
+
+## 🟠 Gaps — v0.5
+
 8. **Google Drive report sync** — designed (`drive.file` scope, hand-rolled REST), not implemented. OneDrive after.
-9. **PDF export** — reports are MD/HTML; wire `webContents.printToPDF`.
 10. **Token/cost meter** — the `runs` table doesn't record token usage or cost estimates; the proposal promised per-run cost visibility.
-11. **Screening filters in the UI** — needs-reply / newsletter / cold-pitch labels are stored but the Review tab can't filter by them.
-12. **"Resolved this week" recap** — weekly briefs should list issues closed since the last weekly run.
+13. **Ship a default Microsoft app ID** in official builds (via `INBOXSCOUT_MS_CLIENT_ID` at release time) so family members never see the registration step.
 
 ## 🟡 Gaps — v1.x features (proposal roadmap)
 

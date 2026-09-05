@@ -12,6 +12,27 @@ export default function Accounts(): JSX.Element {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
+  const [deviceCode, setDeviceCode] = useState<{ userCode: string; verificationUri: string } | null>(null)
+
+  useEffect(() => window.inboxScout.onOutlookDeviceCode((info: any) => setDeviceCode(info)), [])
+
+  const signInOutlook = async (): Promise<void> => {
+    setBusy(true)
+    setError('')
+    setOk('')
+    setDeviceCode(null)
+    try {
+      const account = await window.inboxScout.outlookSignIn()
+      setOk(`Connected ${account.email} ✓`)
+      setAdding(false)
+      load()
+    } catch (err: any) {
+      setError(String(err?.message ?? err).replace(/^Error invoking remote method[^:]*:\s*/, ''))
+    } finally {
+      setBusy(false)
+      setDeviceCode(null)
+    }
+  }
 
   const load = (): void => {
     void window.inboxScout.listAccounts().then(setAccounts)
@@ -96,9 +117,39 @@ export default function Accounts(): JSX.Element {
               <option value="gmail">Gmail</option>
               <option value="yahoo">Yahoo Mail</option>
               <option value="icloud">iCloud Mail</option>
+              <option value="outlook">Outlook.com / Hotmail / Live</option>
               <option value="imap">Other (IMAP)</option>
             </select>
           </label>
+          {provider === 'outlook' ? (
+            <div>
+              <p className="hint">
+                Microsoft accounts sign in with a short code — no passwords to copy. Press the button, then type the code
+                on the Microsoft page that opens.
+              </p>
+              {deviceCode && (
+                <div className="success" style={{ fontSize: 16 }}>
+                  Your code: <strong style={{ fontSize: 22, letterSpacing: 2 }}>{deviceCode.userCode}</strong>
+                  <div style={{ marginTop: 8 }}>
+                    <button className="primary" onClick={() => void window.inboxScout.openExternal(deviceCode.verificationUri)}>
+                      Open the Microsoft sign-in page
+                    </button>
+                  </div>
+                  <p className="hint">Waiting for you to finish signing in…</p>
+                </div>
+              )}
+              {error && <div className="error">{error}</div>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="primary" onClick={() => void signInOutlook()} disabled={busy}>
+                  {busy ? 'Waiting for Microsoft…' : 'Sign in with Microsoft'}
+                </button>
+                <button className="ghost" onClick={() => setAdding(false)}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+          <>
           {preset.help && <p className="hint">{preset.help}</p>}
           <label className="field">
             <span>Email address</span>
@@ -134,6 +185,8 @@ export default function Accounts(): JSX.Element {
               Cancel
             </button>
           </div>
+          </>
+          )}
         </div>
       )}
     </div>

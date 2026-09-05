@@ -112,6 +112,8 @@ export interface ReportRecord {
 }
 
 export interface BriefIssue {
+  /** Present when the issue is tracked in the database (enables "Done"). */
+  issueId?: string
   title: string
   severity: IssueSeverity
   whyNow: string
@@ -144,6 +146,8 @@ export interface Brief {
   sensitiveNotices: string[]
   /** Sections contributed by enabled skills (bills, appointments, deals...). */
   skillSections: BriefSection[]
+  /** Issues closed since the last brief of this period (weekly recap). */
+  resolvedRecently?: string[]
 }
 
 export interface ScheduleSettings {
@@ -179,6 +183,8 @@ export interface AppSettings {
   /** Senders to always file as noise. */
   mutedSenders: string[]
   textSize: 'normal' | 'large' | 'xlarge'
+  /** Microsoft Entra app (client) ID used for Outlook.com sign-in. */
+  microsoftClientId: string
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -193,7 +199,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   enabledSkillIds: null,
   vipSenders: [],
   mutedSenders: [],
-  textSize: 'normal'
+  textSize: 'normal',
+  microsoftClientId: ''
 }
 
 export interface RunProgress {

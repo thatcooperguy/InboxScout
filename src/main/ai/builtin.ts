@@ -168,6 +168,7 @@ export function buildBasicBrief(inputs: BriefInputs): Brief {
   return {
     headline,
     topIssues: sortedIssues.slice(0, 7).map((i) => ({
+      issueId: i.id,
       title: i.title,
       severity: i.severity,
       whyNow: i.deadline ? `Mentions ${i.deadline}.` : `Flagged ${i.severity} from recent mail.`,
@@ -182,6 +183,7 @@ export function buildBasicBrief(inputs: BriefInputs): Brief {
     waitingOnThem: replies.waitingOnThem.map((t) => `${t.subject} - ${t.counterpart} (${t.daysWaiting}d)`),
     deadlines: deadlines.slice(0, 10),
     skillSections,
+    resolvedRecently: inputs.resolvedRecently ?? [],
     personal: personalMessages.slice(0, 10).map(({ message }) => `${message.subject} (${message.fromName || message.fromAddress})`),
     sensitiveNotices: sensitiveMessages
       .slice(0, 10)

@@ -12,15 +12,27 @@ interface Props {
 export default function Today({ running, onRun }: Props): JSX.Element {
   const [latest, setLatest] = useState<any | null | undefined>(undefined)
   const [accounts, setAccounts] = useState<any[]>([])
+  const [doneIds, setDoneIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     void window.inboxScout.latestBrief().then(setLatest)
     void window.inboxScout.listAccounts().then(setAccounts)
+    void window.inboxScout
+      .listIssues()
+      .then((issues) => setDoneIds(new Set(issues.filter((i) => i.state === 'resolved').map((i) => i.id))))
   }, [])
+
+  const markDone = async (id: string): Promise<void> => {
+    await window.inboxScout.resolveIssue(id)
+    setDoneIds((prev) => new Set([...prev, id]))
+  }
 
   if (latest === undefined) return <div />
 
-  const brief = latest?.brief
+  const rawBrief = latest?.brief
+  const brief = rawBrief
+    ? { ...rawBrief, topIssues: rawBrief.topIssues.filter((i: any) => !i.issueId || !doneIds.has(i.issueId)) }
+    : null
   const when = latest ? new Date(latest.createdAt) : null
   const hasAnything =
     brief &&
@@ -68,9 +80,16 @@ export default function Today({ running, onRun }: Props): JSX.Element {
               <h3>⚠ Needs you</h3>
               <ul>
                 {brief.topIssues.map((i: any, idx: number) => (
-                  <li key={idx}>
-                    <strong>{i.title}</strong>
-                    <div className="next">→ {i.nextStep}</div>
+                  <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                    <span>
+                      <strong>{i.title}</strong>
+                      <div className="next">→ {i.nextStep}</div>
+                    </span>
+                    {i.issueId && (
+                      <button className="ghost" style={{ alignSelf: 'center', whiteSpace: 'nowrap' }} onClick={() => void markDone(i.issueId)}>
+                        Done ✓
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -129,6 +148,16 @@ export default function Today({ running, onRun }: Props): JSX.Element {
               <ul>
                 {brief.waitingOnThem.map((t: string, idx: number) => (
                   <li key={idx}>{t}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {(brief.resolvedRecently ?? []).length > 0 && (
+            <div className="today-card">
+              <h3>✅ Done recently</h3>
+              <ul>
+                {brief.resolvedRecently.map((r: string, idx: number) => (
+                  <li key={idx}>{r}</li>
                 ))}
               </ul>
             </div>

@@ -113,7 +113,8 @@ async function bootstrap(): Promise<void> {
     secrets,
     runNow: () => runNow('manual'),
     isRunning: () => running,
-    skillsDir: join(app.getPath('userData'), 'skills')
+    skillsDir: join(app.getPath('userData'), 'skills'),
+    broadcast
   })
   createWindow()
   createTray()

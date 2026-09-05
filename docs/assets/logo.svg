@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-label="InboxScout logo">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2f6bd1"/>
+      <stop offset="1" stop-color="#1d4585"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="144" height="144" rx="32" fill="url(#g)"/>
+  <!-- envelope -->
+  <rect x="34" y="54" width="92" height="62" rx="8" fill="#fff"/>
+  <path d="M34 62 L80 96 L126 62" fill="none" stroke="#2456a6" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>
+  <!-- scout compass needle -->
+  <circle cx="118" cy="46" r="20" fill="#c0392f" stroke="#fff" stroke-width="5"/>
+  <path d="M118 33 L124 46 L118 59 L112 46 Z" fill="#fff"/>
+</svg>

@@ -213,6 +213,17 @@ export function listIssues(db: DB, openOnly = false): IssueRecord[] {
   }))
 }
 
+export function resolveIssue(db: DB, id: string): void {
+  db.prepare(`UPDATE issues SET state = 'resolved', updated_at = ? WHERE id = ?`).run(new Date().toISOString(), id)
+}
+
+/** Titles of issues resolved since `sinceIso`, newest first. */
+export function resolvedSince(db: DB, sinceIso: string): string[] {
+  return (
+    db.prepare(`SELECT title FROM issues WHERE state = 'resolved' AND updated_at >= ? ORDER BY updated_at DESC LIMIT 20`).all(sinceIso) as any[]
+  ).map((r) => r.title)
+}
+
 export function insertRun(db: DB, r: RunRecord): void {
   db.prepare(
     `INSERT INTO runs (id, started_at, finished_at, status, trigger_kind, messages_scanned, error)

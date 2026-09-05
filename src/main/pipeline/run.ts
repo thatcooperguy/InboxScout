@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { DB } from '../db/index'
 import * as repo from '../db/repo'
 import { syncFolder } from '../mail/imap'
+import { getAccessToken, syncGraphFolder } from '../mail/graph'
 import { classifyBatch, chunk, BATCH_SIZE } from '../ai/classify'
 import { decideTracking, applyTrackingDecisions } from '../ai/track'
 import { generateBrief } from '../ai/brief'
@@ -79,13 +80,29 @@ export async function runPipeline(
     const newMessages: MessageRecord[] = []
     const syncErrors: string[] = custom.errors.map((e) => `Custom skill problem: ${e}`)
     for (const account of accounts) {
-      const password = secrets.get(accountSecretName(account.id))
-      if (!password) {
-        syncErrors.push(`${account.email}: no saved password — reconnect this account.`)
-        continue
-      }
       // One broken account must never block the others.
       try {
+        if (account.provider === 'outlook') {
+          const homeAccountId = repo.getMeta(db, `graph-home:${account.id}`) ?? ''
+          const clientId = settings.microsoftClientId || process.env['INBOXSCOUT_MS_CLIENT_ID'] || ''
+          const store = {
+            load: () => secrets.get(accountSecretName(account.id)),
+            save: (v: string) => secrets.set(accountSecretName(account.id), v)
+          }
+          const token = await getAccessToken(clientId, store, homeAccountId)
+          for (const folder of account.folders) {
+            onProgress({ phase: 'fetch', detail: `${account.email} — ${folder}` })
+            const state = repo.getSyncState(db, account.id, folder)
+            const result = await syncGraphFolder(token, account, folder, state.lastUid, settings.storeFullBodies)
+            for (const m of result.messages) {
+              if (repo.insertMessage(db, m)) newMessages.push(m)
+            }
+            repo.setSyncState(db, account.id, folder, 1, result.lastMs)
+          }
+          continue
+        }
+        const password = secrets.get(accountSecretName(account.id))
+        if (!password) throw new Error('no saved password — reconnect this account.')
         for (const folder of account.folders) {
           onProgress({ phase: 'fetch', detail: `${account.email} — ${folder}` })
           const state = repo.getSyncState(db, account.id, folder)
@@ -195,6 +212,8 @@ export async function runPipeline(
       .map((c) => `${c.deadline} — ${messageById.get(c.messageId)!.subject}`)
     const periodType = settings.schedule.frequency === 'weekly' ? ('weekly' as const) : ('daily' as const)
     const skillSections = buildSkillSections(allMatches, messageById, skills)
+    const recapWindowMs = periodType === 'weekly' ? 7 * 86400000 : 86400000
+    const resolvedRecently = repo.resolvedSince(db, new Date(Date.now() - recapWindowMs).toISOString())
     // Hand matched items to any custom agents before writing the brief so failures are visible in it.
     syncErrors.push(...(await dispatchAgents(allMatches, messageById, skills)))
     const briefInputs = {
@@ -207,7 +226,8 @@ export async function runPipeline(
       deadlines,
       replies,
       skillSections,
-      promptHints
+      promptHints,
+      resolvedRecently
     }
     const brief = model ? await generateBrief(model, briefInputs) : buildBasicBrief(briefInputs)
 

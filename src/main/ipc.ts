@@ -1,4 +1,7 @@
-import { ipcMain, shell } from 'electron'
+import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { signInWithDeviceCode } from './mail/graph'
 import { randomUUID } from 'node:crypto'
 import type { DB } from './db/index'
 import * as repo from './db/repo'
@@ -17,6 +20,7 @@ export interface IpcContext {
   runNow: () => Promise<unknown>
   isRunning: () => boolean
   skillsDir: string
+  broadcast: (channel: string, payload: unknown) => void
 }
 
 export function registerIpc(ctx: IpcContext): void {
@@ -54,6 +58,34 @@ export function registerIpc(ctx: IpcContext): void {
       return account
     }
   )
+  ipcMain.handle('accounts:outlookSignIn', async () => {
+    const settings = loadSettings(db)
+    const clientId = settings.microsoftClientId || process.env['INBOXSCOUT_MS_CLIENT_ID'] || ''
+    const id = randomUUID()
+    let cache: string | null = null
+    const store = { load: () => cache, save: (v: string) => void (cache = v) }
+    const { email, homeAccountId } = await signInWithDeviceCode(clientId, store, (info) =>
+      ctx.broadcast('outlook:deviceCode', info)
+    )
+    const account: AccountConfig = {
+      id,
+      label: email,
+      email,
+      provider: 'outlook',
+      host: 'graph.microsoft.com',
+      port: 443,
+      folders: ['inbox', 'sentitems'],
+      createdAt: new Date().toISOString()
+    }
+    repo.upsertAccount(db, account)
+    if (cache) secrets.set(accountSecretName(id), cache)
+    repo.setMeta(db, `graph-home:${id}`, homeAccountId)
+    return account
+  })
+  ipcMain.handle('shell:openExternal', (_e, url: string) => {
+    if (/^https?:\/\//.test(url)) void shell.openExternal(url)
+    return true
+  })
   ipcMain.handle('accounts:remove', (_e, id: string) => {
     repo.deleteAccount(db, id)
     secrets.delete(accountSecretName(id))
@@ -158,6 +190,33 @@ export function registerIpc(ctx: IpcContext): void {
   ipcMain.handle('reports:list', () => repo.listReports(db, 30))
   ipcMain.handle('reports:get', (_e, id: string) => repo.getReport(db, id))
   ipcMain.handle('reports:openFile', (_e, path: string) => shell.openPath(path))
+  ipcMain.handle('reports:exportPdf', async (_e, id: string) => {
+    const report = repo.getReport(db, id)
+    if (!report) return { ok: false, error: 'Report not found.' }
+    const settings = loadSettings(db)
+    const stamp = report.createdAt.slice(0, 10)
+    const { filePath, canceled } = await dialog.showSaveDialog({
+      title: 'Save brief as PDF',
+      defaultPath: join(settings.reportsDir || '', `InboxScout-brief-${stamp}.pdf`),
+      filters: [{ name: 'PDF', extensions: ['pdf'] }]
+    })
+    if (canceled || !filePath) return { ok: false }
+    const win = new BrowserWindow({ show: false, webPreferences: { sandbox: true } })
+    try {
+      await win.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(report.html)}`)
+      const pdf = await win.webContents.printToPDF({ printBackground: true })
+      writeFileSync(filePath, pdf)
+      return { ok: true, filePath }
+    } catch (err: any) {
+      return { ok: false, error: String(err?.message ?? err) }
+    } finally {
+      win.destroy()
+    }
+  })
+  ipcMain.handle('issues:resolve', (_e, id: string) => {
+    repo.resolveIssue(db, id)
+    return true
+  })
 
   ipcMain.handle('issues:list', () => repo.listIssues(db, false))
   ipcMain.handle('projects:list', () => repo.listProjects(db, false))

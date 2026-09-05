@@ -7,6 +7,11 @@ export interface InboxScoutApi {
   accountPresets: () => Promise<Record<string, { host: string; port: number; sentFolder: string; help: string }>>
   addAccount: (input: unknown) => Promise<any>
   removeAccount: (id: string) => Promise<boolean>
+  outlookSignIn: () => Promise<any>
+  openExternal: (url: string) => Promise<boolean>
+  onOutlookDeviceCode: (cb: (info: { userCode: string; verificationUri: string; message: string }) => void) => () => void
+  exportReportPdf: (id: string) => Promise<{ ok: boolean; filePath?: string; error?: string }>
+  resolveIssue: (id: string) => Promise<boolean>
 
   aiProviders: () => Promise<any[]>
   aiDetect: () => Promise<{ provider: string; kind: string; detail: string; hasKey: boolean }[]>

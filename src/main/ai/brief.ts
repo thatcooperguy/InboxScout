@@ -17,6 +17,7 @@ export interface BriefInputs {
   skillSections: BriefSection[]
   /** Guidance from enabled skills for the AI. */
   promptHints?: string
+  resolvedRecently?: string[]
 }
 
 export function buildBriefPrompt(inputs: BriefInputs): string {
@@ -75,6 +76,7 @@ export async function generateBrief(model: LanguageModel, inputs: BriefInputs): 
     deadlines: object.deadlines,
     personal: object.personal,
     sensitiveNotices: object.sensitiveNotices,
-    skillSections: inputs.skillSections
+    skillSections: inputs.skillSections,
+    resolvedRecently: inputs.resolvedRecently ?? []
   }
 }

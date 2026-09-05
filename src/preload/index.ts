@@ -9,6 +9,15 @@ const api = {
   accountPresets: () => ipcRenderer.invoke('accounts:presets'),
   addAccount: (input: unknown) => ipcRenderer.invoke('accounts:add', input),
   removeAccount: (id: string) => ipcRenderer.invoke('accounts:remove', id),
+  outlookSignIn: () => ipcRenderer.invoke('accounts:outlookSignIn'),
+  openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
+  onOutlookDeviceCode: (cb: (info: unknown) => void) => {
+    const listener = (_e: unknown, info: unknown): void => cb(info)
+    ipcRenderer.on('outlook:deviceCode', listener)
+    return () => ipcRenderer.removeListener('outlook:deviceCode', listener)
+  },
+  exportReportPdf: (id: string) => ipcRenderer.invoke('reports:exportPdf', id),
+  resolveIssue: (id: string) => ipcRenderer.invoke('issues:resolve', id),
 
   aiProviders: () => ipcRenderer.invoke('ai:providers'),
   aiDetect: () => ipcRenderer.invoke('ai:detect'),

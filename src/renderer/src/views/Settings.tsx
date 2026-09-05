@@ -154,6 +154,14 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
             />
           </label>
           <label className="field">
+            <span>Microsoft app ID (for Outlook.com / Hotmail sign-in — see docs/OUTLOOK.md)</span>
+            <input
+              value={settings.microsoftClientId}
+              onChange={(e) => update({ microsoftClientId: e.target.value })}
+              placeholder="00000000-0000-0000-0000-000000000000"
+            />
+          </label>
+          <label className="field">
             <span>Ollama URL (local AI)</span>
             <input
               value={settings.ai.ollamaBaseUrl}

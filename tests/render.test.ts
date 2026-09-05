@@ -71,6 +71,14 @@ describe('renderMarkdown sync errors', () => {
   })
 })
 
+describe('renderMarkdown recap', () => {
+  it('lists issues resolved since the last brief', () => {
+    const md = renderMarkdown({ ...brief, resolvedRecently: ['Paid the electric bill'] }, PROFILES.general, 'weekly', new Date())
+    expect(md).toContain('Done since last time')
+    expect(md).toContain('Paid the electric bill')
+  })
+})
+
 describe('renderMarkdown edge cases', () => {
   it('handles a completely empty brief', () => {
     const empty: Brief = {

@@ -1,6 +1,6 @@
 {
   "name": "inboxscout",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "AI email intelligence assistant - sorts personal from work mail and delivers daily briefs",
   "main": "out/main/index.js",
   "author": "thatcooperguy",
@@ -26,6 +26,7 @@
     "@ai-sdk/openai": "^2.0.0",
     "@ai-sdk/openai-compatible": "^1.0.0",
     "@ai-sdk/xai": "^2.0.0",
+    "@azure/msal-node": "^3.8.10",
     "ai": "^5.0.0",
     "better-sqlite3": "^12.0.0",
     "electron-updater": "^6.6.0",

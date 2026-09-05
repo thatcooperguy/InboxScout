@@ -6,6 +6,8 @@ export default function Review(): JSX.Element {
   const [messages, setMessages] = useState<any[]>([])
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<any[] | null>(null)
+  const [catFilter, setCatFilter] = useState<string>('all')
+  const [screenFilter, setScreenFilter] = useState<string>('all')
 
   const load = (): void => {
     void window.inboxScout.recentMessages(80).then(setMessages)
@@ -25,7 +27,19 @@ export default function Review(): JSX.Element {
     setResults(await window.inboxScout.searchMessages(query.trim()))
   }
 
-  const rows = results ?? messages
+  const rows = (results ?? messages).filter(
+    (m) => (catFilter === 'all' || m.category === catFilter) && (screenFilter === 'all' || m.screening === screenFilter)
+  )
+  const chip = (value: string, current: string, set: (v: string) => void, label: string): JSX.Element => (
+    <button
+      key={value}
+      className={`ghost tiny ${current === value ? 'active-chip' : ''}`}
+      style={current === value ? { background: 'var(--blue)', color: '#fff', borderColor: 'var(--blue)' } : {}}
+      onClick={() => set(value)}
+    >
+      {label}
+    </button>
+  )
 
   return (
     <div>
@@ -51,8 +65,22 @@ export default function Review(): JSX.Element {
           )}
         </div>
       </div>
+      <div className="card" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span className="hint">Show:</span>
+        {chip('all', catFilter, setCatFilter, 'All')}
+        {chip('work', catFilter, setCatFilter, 'Work')}
+        {chip('personal', catFilter, setCatFilter, 'Personal')}
+        {chip('promotions_noise', catFilter, setCatFilter, 'Noise')}
+        <span className="hint" style={{ marginLeft: 12 }}>Type:</span>
+        {chip('all', screenFilter, setScreenFilter, 'Any')}
+        {chip('needs_reply', screenFilter, setScreenFilter, 'Needs reply')}
+        {chip('fyi', screenFilter, setScreenFilter, 'FYI')}
+        {chip('newsletter', screenFilter, setScreenFilter, 'Newsletter')}
+        {chip('transactional', screenFilter, setScreenFilter, 'Receipts & orders')}
+        {chip('cold_pitch', screenFilter, setScreenFilter, 'Cold pitch')}
+      </div>
       <div className="card">
-        {rows.length === 0 && <div className="empty">No messages yet — run a scan first.</div>}
+        {rows.length === 0 && <div className="empty">Nothing here — try another filter or run a scan first.</div>}
         <table>
           <thead>
             <tr>

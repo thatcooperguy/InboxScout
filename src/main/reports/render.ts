@@ -70,6 +70,12 @@ export function renderMarkdown(
     lines.push('')
   }
 
+  if ((brief.resolvedRecently ?? []).length > 0) {
+    lines.push('## ✅ Done since last time', '')
+    for (const r of brief.resolvedRecently!) lines.push(`- ${r}`)
+    lines.push('')
+  }
+
   lines.push('## 🏠 Personal', '')
   if (brief.personal.length === 0) lines.push('Nothing notable.', '')
   else {
