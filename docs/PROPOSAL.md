@@ -15,7 +15,9 @@ Inbox Intel is a Windows desktop application that connects to your personal emai
 
 Every run updates a local database, so issues and projects are *tracked over time* — statuses evolve, resolved items close out, and new ones surface. Reports are always saved locally, and can optionally sync to Google Drive or OneDrive.
 
-The AI analysis runs through the user's choice of provider — Anthropic Claude, OpenAI, Google Gemini, or a fully local model via Ollama — behind a single abstraction layer, so switching providers is a settings change.
+The AI analysis runs through the user's choice of provider — Anthropic Claude, OpenAI, Google Gemini, xAI Grok, Groq, or a fully local model via Ollama — behind a single abstraction layer, so switching providers is a settings change.
+
+Inbox Intel is built for **anyone's inbox**, not just a company owner's. At setup the user picks (or the app infers) a **work profile** — business owner, real-estate agent, utility/field professional, general professional — and the classification taxonomy, issue detection, and brief vocabulary adapt to it. A **Simple Mode**, on by default, makes the whole experience three plain-language steps with zero technical choices, so a non-technical parent can run it unassisted.
 
 ## 2. Goals and non-goals
 
@@ -96,8 +98,39 @@ Supporting choices:
 
 - **Storage:** SQLite via `better-sqlite3`, with **FTS5** full-text search over subjects/snippets/senders.
 - **Secrets:** Electron `safeStorage` → Windows **DPAPI** (per-user encryption); encrypted blobs at rest, never plaintext. (keytar is deprecated — not used.)
-- **Scheduling:** tray-resident app with an internal scheduler (`node-schedule`) + start-at-login + missed-run catch-up ("if last scheduled run was missed while asleep/off, run on next launch"). This is what Slack/Dropbox-class apps do; Windows Task Scheduler can be added later as a belt-and-suspenders trigger.
+- **Scheduling:** tray-resident app with an internal scheduler (`node-cron`) + start-at-login + missed-run catch-up ("if last scheduled run was missed while asleep/off, run on next launch"). This is what Slack/Dropbox-class apps do; Windows Task Scheduler can be added later as a belt-and-suspenders trigger.
 - **Updates:** `electron-updater` against GitHub Releases.
+
+### 3.4 Built for anyone: work profiles and Simple Mode
+
+The intelligence layer must serve a company owner, a real-estate agent, and a power-company employee equally well. Two mechanisms make it generic:
+
+**Work profiles.** At setup the user answers one plain question — "What kind of work do you do?" — and picks a profile (or lets the app infer one from a first scan). A profile is a data file (JSON prompt + taxonomy template), not code, so new industries can be added without a release:
+
+| Profile | "Work" categories tuned for | The Pulse becomes | Typical emerging issues |
+|---|---|---|---|
+| **Business owner / executive** (default) | vendors, customers, finance, staff | Company Pulse — top projects & status | contract deadlines, escalations, approvals |
+| **Real-estate agent** | clients, listings, showings, offers, lender/title/inspection threads | **Deal Pipeline** — each active deal tracked by stage (listed → offer → escrow → closed) | expiring contingencies, unanswered clients, missing documents, closing dates |
+| **Utility / field professional** | shift & schedule notices, outage and safety bulletins, work orders, compliance/training | **Operations Pulse** — ongoing jobs and mandatory items | compliance due dates, urgent directives, schedule changes |
+| **General professional** | plain work vs personal | Work Pulse — active threads/commitments | deadlines, waiting-on-you replies |
+
+The tracking engine (projects/issues in SQLite) is unchanged across profiles — only the taxonomy, ranking hints, and report vocabulary swap. The correction loop (§4.3) then personalizes any profile further from the user's own re-labels.
+
+**Simple Mode (default).** Designed so a non-technical family member can complete setup unassisted:
+1. *Connect your email* — illustrated app-password wizard, one provider page at a time.
+2. *Tell us what you do* — one profile question.
+3. *Done* — AI defaults to the free tier (Gemini) behind the Connect AI overlay; schedule defaults to daily at 7:30am; reports save to Documents.
+
+Simple Mode hides provider choice, retention settings, and cost meters behind an "Advanced" toggle; briefs are written in plain language at a comfortable type size. Distribution matters here too: one signed installer with silent auto-update, no configuration files, and a "Help someone set this up" share link.
+
+### 3.5 Open-source landscape: build on, learn from, skip
+
+A survey of relevant repositories (verified September 2026) shapes the dependency list:
+
+- **Hermes ([NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent), MIT, ~242k★):** the standout personal-AI-agent harness — self-hosted, persistent SQLite/FTS5 memory, cron-scheduled runs, skill system. It is a Python end-user platform, not an embeddable TypeScript library, so we **learn from it rather than build on it**: its cross-run memory and scheduled-agent designs directly validate (and inform) our project/issue tracker and scheduler. It's also the reference competitor for "a general agent that reads your email."
+- **AI email assistants:** [inbox-zero](https://github.com/elie222/inbox-zero) (12k★, AGPL + commercial restrictions — study its triage rules and prompt patterns, copy no code) and [Mail-0/Zero](https://github.com/Mail-0/Zero) (11k★, MIT — provider-driver and AI-compose patterns are fair game). Notably, **no prominent project is desktop + IMAP + local-first + LLM triage** — this niche is open.
+- **Agent frameworks (Mastra, LangGraph.js, OpenAI Agents SDK, CrewAI):** **skipped.** Our pipeline is a deterministic fetch→classify→track→summarize DAG; the LLM never decides control flow, so plain **Vercel AI SDK** calls (`generateObject` + Zod schemas) with our own retry/queue logic beat any framework on debuggability and dependency surface. Mastra is the one to revisit if cross-restart workflow resumability ever becomes painful to hand-roll.
+- **Library verdicts:** `imapflow` + `mailparser` (both actively maintained by Postal Systems) for IMAP/MIME; `@azure/msal-node` for Graph OAuth; `better-sqlite3` (or Node's built-in `node:sqlite`) for storage; **`node-cron` instead of the stale `node-schedule`** for scheduling; `electron-updater` for releases; official `@ai-sdk/groq` and `@ai-sdk/xai` providers cover Groq and Grok with zero extra work; `node-llama-cpp` is the future option for an embedded no-install local model.
 
 ## 4. Architecture
 
@@ -130,7 +163,7 @@ Supporting choices:
 ### 4.1 The intelligence pipeline (per run)
 
 1. **Fetch (delta):** per account, pull only messages since the last run (IMAP UID watermark per folder with UIDVALIDITY checks; Graph delta queries for Outlook). Normalize to a common message record; dedupe by Message-ID.
-2. **Classify (cheap model, batched):** each message → structured JSON via schema-constrained output: `{category: personal|work|promotions_noise, importance: 0–3, is_actionable, action_summary, deadline?, topics[], project_hint?, people[]}`. Batches of ~20 messages per call (subject + sender + trimmed body) keep cost and latency low.
+2. **Classify (cheap model, batched):** each message → structured JSON via schema-constrained output: `{category: personal|work|promotions_noise, importance: 0–3, is_actionable, action_summary, deadline?, topics[], project_hint?, people[]}`. The category set and ranking hints come from the active **work profile** (§3.4). Batches of ~20 messages per call (subject + sender + trimmed body) keep cost and latency low.
 3. **Track (entity resolution):** work items are linked to existing **projects** and **issues** in the DB. The model receives the current project/issue roster and the new evidence, and returns link/create/update/resolve decisions. This is what makes statuses *update over time* instead of resetting every run.
 4. **Brief (stronger model, one pass):** from the updated aggregates — not raw mail — generate:
    - **Top Emerging Issues:** ranked by urgency × importance; each with what it is, why it matters now, evidence (source emails), and a suggested next step.
@@ -181,6 +214,8 @@ Classification will sometimes be wrong. The dashboard lets the user re-label any
 
 Weekly runs produce the same structure over a 7-day window plus a "resolved this week" section.
 
+Under other work profiles the same skeleton re-labels itself: a real-estate agent's brief leads with *Deals needing action today* and a *Deal Pipeline* table (address, stage, next deadline, what changed); a utility employee's leads with *Directives & deadlines* and an *Operations Pulse* (jobs, compliance items, schedule changes).
+
 ## 7. Build plan
 
 | Milestone | Scope | Est. effort |
@@ -188,8 +223,8 @@ Weekly runs produce the same structure over a 7-day window plus a "resolved this
 | **M1 — Skeleton** | Electron+React+TS scaffold, SQLite schema, tray + scheduler, settings storage w/ DPAPI | ~1 week |
 | **M2 — Mail ingest** | IMAP backend (Gmail/Yahoo/generic app-password), account wizard, delta sync, FTS | ~1–2 weeks |
 | **M3 — AI core** | Provider layer (Gemini/OpenAI/Claude/Grok/Groq/Ollama), Connect AI sign-in overlay with auto-detect, classification pipeline, cost meter | ~1–2 weeks |
-| **M4 — Tracking & briefs** | Project/issue entity tracking, Top Emerging Issues + Company Pulse generation, report renderer (MD/HTML/PDF) | ~1–2 weeks |
-| **M5 — Polish** | Dashboard UI, correction loop, Google Drive sync, notifications, installer + auto-update | ~1–2 weeks |
+| **M4 — Tracking & briefs** | Project/issue entity tracking, work-profile templates (owner / real estate / utility / general), Top Emerging Issues + Pulse generation, report renderer (MD/HTML/PDF) | ~1–2 weeks |
+| **M5 — Polish** | Dashboard UI, Simple Mode onboarding, correction loop, Google Drive sync, notifications, installer + auto-update | ~1–2 weeks |
 | **M6 (v1.1)** | Microsoft Graph backend for Outlook.com, OneDrive sync, optional Gmail-API BYO-client mode | later |
 
 Milestones are independently demoable; M2+M3 already delivers a usable "classify my inbox" tool.
@@ -200,6 +235,7 @@ Milestones are independently demoable; M2+M3 already delivers a usable "classify
 2. **Volume:** roughly how many emails/day across your accounts? (Only affects free-tier fit and run duration.)
 3. **Retention:** default to metadata + snippets only (recommended), or store full bodies locally for richer re-analysis?
 4. **Name:** "Inbox Intel" is a placeholder — happy to change.
+5. **First profiles:** business owner, real-estate agent, utility/field professional, general professional — the right starting set, or others to include?
 
 ---
 
