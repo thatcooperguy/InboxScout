@@ -32,10 +32,13 @@ Inbox Intel is built for **anyone's inbox**, not just a company owner's. At setu
 6. Save reports locally as Markdown/HTML/PDF; optional sync to Google Drive (v1) and OneDrive (v1.1).
 7. Let the user connect the AI provider of their choice with minimal friction.
 
+8. Ship as a downloadable **Windows `.exe` and macOS `.dmg`** from this repository's GitHub Releases, with **in-app self-update** that checks the repo for new versions.
+9. Flag — never redact — messages containing sensitive personal or confidential company information, so the owner knows it's there.
+
 ### Non-goals (v1)
 
 - Sending, replying to, or deleting email — the app is strictly **read-only** against mailboxes.
-- macOS/Linux/mobile (the stack keeps the door open; see §4).
+- Linux and mobile (the stack keeps the door open; see §4).
 - Multi-user / team features.
 
 ## 3. Key design decisions (and the research behind them)
@@ -100,6 +103,7 @@ Supporting choices:
 - **Secrets:** Electron `safeStorage` → Windows **DPAPI** (per-user encryption); encrypted blobs at rest, never plaintext. (keytar is deprecated — not used.)
 - **Scheduling:** tray-resident app with an internal scheduler (`node-cron`) + start-at-login + missed-run catch-up ("if last scheduled run was missed while asleep/off, run on next launch"). This is what Slack/Dropbox-class apps do; Windows Task Scheduler can be added later as a belt-and-suspenders trigger.
 - **Updates:** `electron-updater` against GitHub Releases.
+- **Distribution (confirmed decision):** `electron-builder` produces a Windows **NSIS `.exe`** installer and a macOS **`.dmg`**, both published to this repository's **GitHub Releases** (`thatcooperguy/email-person-assistant-`). The app checks that repo on launch and self-updates in place. Caveats to budget for: unsigned Windows builds trigger a SmartScreen "unrecognized app" warning (an Authenticode certificate removes it); macOS requires an Apple Developer ID + notarization ($99/yr) for the `.dmg` to open without a right-click-Open workaround.
 
 ### 3.4 Built for anyone: work profiles and Simple Mode
 
@@ -174,8 +178,8 @@ A survey of relevant repositories (verified September 2026) shapes the dependenc
 ### 4.2 Data model (SQLite)
 
 - `accounts` — provider, address, auth type, sync state (per-folder UID watermarks / Graph delta tokens).
-- `messages` — metadata + snippet (id, account, thread, from/to, subject, date, folder). Full bodies are **not persisted by default** (processed transiently); a setting enables body retention for reprocessing.
-- `classifications` — message_id, category, importance, action fields, model + prompt version, run_id (auditable, re-runnable).
+- `messages` — id, account, thread, from/to, subject, date, folder, snippet, **and full body text (stored by default — confirmed decision)**, enabling reprocessing and ask-your-inbox search; a privacy setting can switch to metadata-only.
+- `classifications` — message_id, category, importance, action fields, **sensitivity flags (personal-private / company-confidential)**, model + prompt version, run_id (auditable, re-runnable).
 - `projects` — canonical entities: name, aliases, status_summary, trend, last_activity, state (active/dormant/done).
 - `issues` — title, severity, state (emerging → active → resolved), owner_action, deadline, linked evidence.
 - `evidence` — many-to-many links from projects/issues to messages.
@@ -192,7 +196,8 @@ Classification will sometimes be wrong. The dashboard lets the user re-label any
 - **Read-only mail access**, enforced at the protocol level.
 - **Secrets** (app passwords, OAuth refresh tokens, AI keys) encrypted with DPAPI via `safeStorage`; scoped to the Windows user; "disconnect & wipe" per account in settings. Honest caveat: DPAPI protects against other users and offline theft, not malware running as the same user — standard for desktop apps of this class.
 - **Data flow transparency:** email content goes only to the AI provider the user selected (or nowhere, with Ollama), and reports go only to the drive the user opted into. A settings page states this plainly, and notes that Gemini's free tier may use data for product improvement (paid tier does not).
-- **Local-first:** the app is fully functional with zero cloud storage.
+- **Local-first:** the app is fully functional with zero cloud storage. Full bodies are stored locally by default (confirmed decision); a metadata-only mode remains available.
+- **Sensitive-information flagging (confirmed decision):** during classification the model also tags messages that contain sensitive personal data (financial, medical, government IDs, credentials) or confidential company information. The brief includes a quiet *"Sensitive items noticed"* note — a heads-up only, with the message listed. Nothing is redacted or withheld in v1; a redaction option can come later if wanted.
 
 ## 6. Report design (what the owner sees)
 
@@ -229,13 +234,14 @@ Under other work profiles the same skeleton re-labels itself: a real-estate agen
 
 Milestones are independently demoable; M2+M3 already delivers a usable "classify my inbox" tool.
 
-## 8. Open questions before we build
+## 8. Decisions confirmed (September 5, 2026)
 
-1. **Default AI provider:** OK to make Gemini free tier the default recommendation (zero cost), with Claude/OpenAI/Grok/Groq/Ollama as options?
-2. **Volume:** roughly how many emails/day across your accounts? (Only affects free-tier fit and run duration.)
-3. **Retention:** default to metadata + snippets only (recommended), or store full bodies locally for richer re-analysis?
-4. **Name:** "Inbox Intel" is a placeholder — happy to change.
-5. **First profiles:** business owner, real-estate agent, utility/field professional, general professional — the right starting set, or others to include?
+1. **Default AI provider:** free tiers by default — Gemini free tier as the primary default, Groq free tier as fallback; all other providers available in Advanced settings. ✅
+2. **Volume:** average personal volume — comfortably inside the free tiers. ✅
+3. **Retention:** **store full bodies and text locally** (space is cheap; enables reprocessing and inbox Q&A). Paired with the sensitive-information flagging behavior: the AI flags private/company-confidential content in the brief as a heads-up, but does **not** redact it. ✅
+4. **Name:** Inbox Intel stays. ✅
+5. **Distribution:** Windows `.exe` + macOS `.dmg` downloadable from this GitHub repo's Releases; in-app self-update dialing back to the repo. ✅
+6. **Profiles:** starting set stands — business owner, real-estate agent, utility/field professional, general professional.
 
 ---
 

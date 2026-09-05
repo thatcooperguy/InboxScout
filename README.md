@@ -16,6 +16,8 @@ Built for anyone's inbox: **work profiles** adapt the briefs to what you do — 
 - Connect AI with a sign-in-style overlay (no manual key wrangling): Google Gemini (free tier default), OpenAI, Anthropic Claude, xAI Grok, Groq, or fully local via Ollama — with auto-detection of installed AI tools and guided downloads
 - Daily/weekly scheduled runs from the system tray, plus run-on-demand
 - Local-first SQLite storage with full-text search; Markdown/HTML/PDF reports; optional Drive/OneDrive sync
+- Sensitive-information heads-up: flags private or company-confidential content in briefs (never redacts)
+- Downloadable Windows `.exe` and macOS `.dmg` from this repo's Releases, with in-app self-update
 
 ## Planned stack
 
