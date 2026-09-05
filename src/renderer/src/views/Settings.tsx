@@ -102,6 +102,16 @@ export default function SettingsView(): JSX.Element {
             <span>Reports folder</span>
             <input value={settings.reportsDir} onChange={(e) => update({ reportsDir: e.target.value })} />
           </label>
+          <label className="field">
+            <span>Start Inbox Intel when the computer starts</span>
+            <select
+              value={settings.launchAtLogin ? 'yes' : 'no'}
+              onChange={(e) => update({ launchAtLogin: e.target.value === 'yes' })}
+            >
+              <option value="yes">Yes — so scheduled briefs always run (recommended)</option>
+              <option value="no">No — I'll open it myself</option>
+            </select>
+          </label>
           <p className="hint">
             Sensitive personal or company-confidential content is flagged in your brief as a heads-up. Nothing is ever
             hidden or redacted.

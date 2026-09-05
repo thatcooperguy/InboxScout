@@ -63,9 +63,12 @@ function createWindow(): void {
   })
 }
 
+// 16x16 envelope-on-blue tray icon, embedded so packaging needs no asset files.
+const TRAY_ICON_B64 =
+  'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAS0lEQVR4nGNggAKVsGX/ScEM6IBsA0jViGHQ4DOAEMBrAEwBPs3ohmAYgMsQdHm8BmDTgMsbOA1AVogvHPAagC8saGPAwCSkAc+NAHwFbPs7VvWUAAAAAElFTkSuQmCC'
+
 function createTray(): void {
-  // 16x16 transparent placeholder; packaged builds ship a real icon.
-  const icon = nativeImage.createEmpty()
+  const icon = nativeImage.createFromDataURL(`data:image/png;base64,${TRAY_ICON_B64}`)
   try {
     tray = new Tray(icon)
   } catch {
@@ -109,6 +112,18 @@ async function bootstrap(): Promise<void> {
     const current = loadSettings(db)
     scheduler.apply(current.schedule, current.lastRunAt)
   }, 5 * 60 * 1000)
+
+  // Start with Windows/macOS so scheduled runs actually happen.
+  const applyLoginItem = (): void => {
+    if (!app.isPackaged) return
+    try {
+      app.setLoginItemSettings({ openAtLogin: loadSettings(db).launchAtLogin })
+    } catch {
+      // not supported on this platform
+    }
+  }
+  applyLoginItem()
+  setInterval(applyLoginItem, 5 * 60 * 1000)
 
   // Auto-update from this repo's GitHub Releases (packaged builds only).
   if (app.isPackaged) {

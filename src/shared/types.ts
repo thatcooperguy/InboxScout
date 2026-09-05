@@ -143,6 +143,7 @@ export interface AppSettings {
   ai: AiSettings
   simpleMode: boolean
   storeFullBodies: boolean
+  launchAtLogin: boolean
   reportsDir: string
   lastRunAt: string | null
 }
@@ -153,6 +154,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   ai: { provider: 'gemini', model: '', ollamaBaseUrl: 'http://127.0.0.1:11434/v1' },
   simpleMode: true,
   storeFullBodies: true,
+  launchAtLogin: true,
   reportsDir: '',
   lastRunAt: null
 }
