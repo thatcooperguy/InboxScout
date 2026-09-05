@@ -4,11 +4,11 @@
   "description": "AI email intelligence assistant - sorts personal from work mail and delivers daily briefs",
   "main": "out/main/index.js",
   "author": "thatcooperguy",
-  "license": "MIT",
+  "license": "FSL-1.1-MIT",
   "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/thatcooperguy/email-person-assistant-.git"
+    "url": "https://github.com/thatcooperguy/inboxscout.git"
   },
   "scripts": {
     "dev": "electron-vite dev",

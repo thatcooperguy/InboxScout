@@ -25,6 +25,16 @@ npm run package    # build local installers (no publish)
 
 Run a headless scan without opening the window: `inboxscout --sync` (used by schedulers).
 
+## License
+
+InboxScout is **source-available** under the [Functional Source License 1.1, MIT future license (FSL-1.1-MIT)](LICENSE.md):
+
+- ✅ Free to use, read, modify, and redistribute for any internal, personal, educational, or research purpose.
+- 🚫 You may **not** use the code to build or offer a product or service that competes with InboxScout.
+- ⏳ Each release automatically converts to the permissive **MIT license two years** after it is published.
+
+Contributions are welcome under the terms in [CONTRIBUTING.md](CONTRIBUTING.md). "InboxScout" and the InboxScout logo identify this project — the license grants no trademark rights.
+
 ## Highlights (planned v1)
 
 - Multi-account: Gmail / Yahoo / Outlook.com / generic IMAP, read-only, credentials encrypted with Windows DPAPI
