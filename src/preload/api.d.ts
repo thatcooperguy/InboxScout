@@ -15,6 +15,11 @@ export interface InboxScoutApi {
   aiDisconnect: (provider: string) => Promise<boolean>
   aiOpenKeyPage: (provider: string) => Promise<boolean>
 
+  skillsList: () => Promise<{ skills: any[]; errors: string[]; folder: string }>
+  skillsSetEnabled: (ids: string[]) => Promise<boolean>
+  skillsOpenFolder: () => Promise<string>
+  latestBrief: () => Promise<{ brief: any; createdAt: string; reportId: string } | null>
+
   runNow: () => Promise<{ started: boolean; reason?: string }>
   listRuns: () => Promise<any[]>
   listReports: () => Promise<any[]>

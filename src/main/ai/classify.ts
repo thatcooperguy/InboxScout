@@ -20,7 +20,8 @@ export interface CorrectionExample {
 export function buildClassificationPrompt(
   profile: WorkProfile,
   messages: MessageRecord[],
-  corrections: CorrectionExample[]
+  corrections: CorrectionExample[],
+  promptHints = ''
 ): string {
   const lines: string[] = []
   lines.push(
@@ -37,6 +38,7 @@ export function buildClassificationPrompt(
     'Also flag sensitivity: personal_private for sensitive personal data (financial details, medical, government IDs,',
     'credentials), company_confidential for confidential business information. This is a heads-up flag only.'
   )
+  if (promptHints) lines.push(promptHints)
   if (corrections.length > 0) {
     lines.push('', 'The user has corrected past classifications - follow these precedents:')
     for (const c of corrections.slice(0, 10)) {
@@ -61,9 +63,10 @@ export async function classifyBatch(
   model: LanguageModel,
   profile: WorkProfile,
   messages: MessageRecord[],
-  corrections: CorrectionExample[]
+  corrections: CorrectionExample[],
+  promptHints = ''
 ): Promise<Map<string, MessageClassificationOutput>> {
-  const prompt = buildClassificationPrompt(profile, messages, corrections)
+  const prompt = buildClassificationPrompt(profile, messages, corrections, promptHints)
   const { object } = await generateObject({ model, schema: classificationBatchSchema, prompt })
   const byMessage = new Map<string, MessageClassificationOutput>()
   for (const result of object.results) {

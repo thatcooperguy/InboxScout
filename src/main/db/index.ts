@@ -113,6 +113,15 @@ CREATE TABLE IF NOT EXISTS corrections (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS skill_matches (
+  message_id TEXT NOT NULL,
+  skill_id TEXT NOT NULL,
+  extracted TEXT NOT NULL,
+  urgent INTEGER NOT NULL DEFAULT 0,
+  run_id TEXT NOT NULL,
+  PRIMARY KEY (message_id, skill_id)
+);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
   subject, from_address, snippet, body_text, content='messages', content_rowid='rowid'
 );
@@ -139,6 +148,7 @@ export function openDatabase(path: string): DB {
 function migrate(db: DB): void {
   ensureColumn(db, 'messages', 'list_unsubscribe', 'TEXT')
   ensureColumn(db, 'messages', 'has_attachments', 'INTEGER NOT NULL DEFAULT 0')
+  ensureColumn(db, 'reports', 'brief_json', 'TEXT')
 }
 
 function ensureColumn(db: DB, table: string, column: string, type: string): void {

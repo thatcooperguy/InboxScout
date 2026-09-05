@@ -2,7 +2,11 @@ import { useEffect, useState } from 'react'
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-export default function SettingsView(): JSX.Element {
+interface Props {
+  onSaved?: () => void
+}
+
+export default function SettingsView({ onSaved }: Props): JSX.Element {
   const [settings, setSettings] = useState<any | null>(null)
   const [profiles, setProfiles] = useState<any[]>([])
   const [saved, setSaved] = useState(false)
@@ -22,14 +26,36 @@ export default function SettingsView(): JSX.Element {
   const save = async (): Promise<void> => {
     setSettings(await window.inboxScout.setSettings(settings))
     setSaved(true)
+    onSaved?.()
   }
 
   return (
     <div>
-      <h1>Settings</h1>
+      <h1>Preferences</h1>
       <p className="sub">Everything here has a sensible default — change only what you want.</p>
       {saved && <div className="success">Saved ✓</div>}
       <div className="grid2">
+        <div className="card">
+          <h3>Comfort</h3>
+          <label className="field">
+            <span>Text size</span>
+            <select value={settings.textSize} onChange={(e) => update({ textSize: e.target.value })}>
+              <option value="normal">Normal</option>
+              <option value="large">Large</option>
+              <option value="xlarge">Extra large</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>Show advanced tools (Details and Inbox review tabs)</span>
+            <select
+              value={settings.simpleMode ? 'no' : 'yes'}
+              onChange={(e) => update({ simpleMode: e.target.value !== 'yes' })}
+            >
+              <option value="no">No — keep it simple (recommended)</option>
+              <option value="yes">Yes — I like to see everything</option>
+            </select>
+          </label>
+        </div>
         <div className="card">
           <h3>What kind of work do you do?</h3>
           <label className="field">

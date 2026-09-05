@@ -25,7 +25,9 @@ async function runNow(trigger: 'manual' | 'scheduled' | 'catchup' | 'cli' = 'man
   running = true
   broadcast('run:progress', { phase: 'fetch', detail: 'Starting…' } satisfies RunProgress)
   try {
-    const result = await runPipeline(db, secrets, trigger, (p) => broadcast('run:progress', p))
+    const result = await runPipeline(db, secrets, trigger, (p) => broadcast('run:progress', p), {
+      skillsDir: join(app.getPath('userData'), 'skills')
+    })
     if (trigger !== 'manual' && Notification.isSupported()) {
       // Failures must be visible too - a silently skipped brief is worse than an error.
       new Notification(
@@ -106,7 +108,13 @@ async function bootstrap(): Promise<void> {
     return
   }
 
-  registerIpc({ db, secrets, runNow: () => runNow('manual'), isRunning: () => running })
+  registerIpc({
+    db,
+    secrets,
+    runNow: () => runNow('manual'),
+    isRunning: () => running,
+    skillsDir: join(app.getPath('userData'), 'skills')
+  })
   createWindow()
   createTray()
 

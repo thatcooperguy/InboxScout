@@ -15,6 +15,16 @@ import { SecretStore, accountSecretName, providerSecretName } from '../secrets'
 import { resolveModel, DEFAULT_MODELS, LOCAL_PROVIDERS } from '../ai/provider'
 import { classifyMessageHeuristically, deriveIssues, buildBasicBrief } from '../ai/builtin'
 import type { MessageClassificationOutput } from '../ai/schemas'
+import {
+  applySkillEffects,
+  buildSkillSections,
+  dispatchAgents,
+  loadCustomSkills,
+  matchSkills,
+  resolveSkills,
+  skillPromptHints
+} from '../skills/engine'
+import type { SkillMatch } from '../skills/types'
 import type { Classification, MessageRecord, RunProgress } from '../../shared/types'
 
 export interface PipelineResult {
@@ -29,7 +39,8 @@ export async function runPipeline(
   db: DB,
   secrets: SecretStore,
   trigger: 'manual' | 'scheduled' | 'catchup' | 'cli',
-  onProgress: (p: RunProgress) => void = () => {}
+  onProgress: (p: RunProgress) => void = () => {},
+  opts: { skillsDir?: string } = {}
 ): Promise<PipelineResult> {
   const settings = loadSettings(db)
   const profile = getProfile(settings.profileId)
@@ -54,12 +65,19 @@ export async function runPipeline(
     const model = useBuiltin ? null : resolveModel(settings.ai, apiKey)
     const modelName = useBuiltin ? 'builtin/rules-v1' : settings.ai.model || DEFAULT_MODELS[settings.ai.provider]
 
+    // Skills: built-in watchers plus any custom JSON skills the user dropped in.
+    const custom = opts.skillsDir ? loadCustomSkills(opts.skillsDir) : { skills: [], errors: [] }
+    const { enabled: skills } = resolveSkills(settings.profileId, settings.enabledSkillIds, custom.skills)
+    const skillCtx = { vipSenders: settings.vipSenders, mutedSenders: settings.mutedSenders }
+    const promptHints = skillPromptHints(skills)
+    const allMatches: SkillMatch[] = []
+
     // 1. Fetch
     onProgress({ phase: 'fetch', detail: 'Checking mail accounts…' })
     const accounts = repo.listAccounts(db)
     if (accounts.length === 0) throw new Error('No email accounts connected yet.')
     const newMessages: MessageRecord[] = []
-    const syncErrors: string[] = []
+    const syncErrors: string[] = custom.errors.map((e) => `Custom skill problem: ${e}`)
     for (const account of accounts) {
       const password = secrets.get(accountSecretName(account.id))
       if (!password) {
@@ -88,7 +106,8 @@ export async function runPipeline(
         syncErrors.push(`${account.email}: ${String(err?.message ?? err)}`)
       }
     }
-    if (syncErrors.length === accounts.length && newMessages.length === 0) {
+    const accountFailures = syncErrors.length - custom.errors.length
+    if (accountFailures === accounts.length && newMessages.length === 0) {
       throw new Error(`Could not check any account. ${syncErrors.join(' | ')}`)
     }
 
@@ -103,14 +122,15 @@ export async function runPipeline(
         for (const m of batch) map.set(m.id, classifyMessageHeuristically(m, profile))
         return map
       }
-      return classifyBatch(model, profile, batch, corrections)
+      return classifyBatch(model, profile, batch, corrections, promptHints)
     }
     for (const batch of chunk(toClassify, BATCH_SIZE)) {
       const results = await classifyChunk(batch)
       for (const m of batch) {
         const r = results.get(m.id)
         if (!r) continue
-        const c: Classification = {
+        const matches = matchSkills(m, skills, skillCtx)
+        const raw: Classification = {
           messageId: m.id,
           category: r.category,
           importance: r.importance,
@@ -126,6 +146,9 @@ export async function runPipeline(
           model: modelName,
           corrected: false
         }
+        const c = applySkillEffects(m, raw, matches, skills, skillCtx)
+        for (const sm of matches) repo.insertSkillMatch(db, sm, runId)
+        allMatches.push(...matches)
         repo.upsertClassification(db, c)
         classifications.push(c)
       }
@@ -171,6 +194,9 @@ export async function runPipeline(
       .filter((c) => c.deadline && messageById.has(c.messageId))
       .map((c) => `${c.deadline} — ${messageById.get(c.messageId)!.subject}`)
     const periodType = settings.schedule.frequency === 'weekly' ? ('weekly' as const) : ('daily' as const)
+    const skillSections = buildSkillSections(allMatches, messageById, skills)
+    // Hand matched items to any custom agents before writing the brief so failures are visible in it.
+    syncErrors.push(...(await dispatchAgents(allMatches, messageById, skills)))
     const briefInputs = {
       profile,
       periodType,
@@ -179,7 +205,9 @@ export async function runPipeline(
       personalMessages: personalPairs,
       sensitiveMessages: sensitivePairs,
       deadlines,
-      replies
+      replies,
+      skillSections,
+      promptHints
     }
     const brief = model ? await generateBrief(model, briefInputs) : buildBasicBrief(briefInputs)
 
@@ -201,15 +229,11 @@ export async function runPipeline(
       }
     }
     const reportId = randomUUID()
-    repo.insertReport(db, {
-      id: reportId,
-      runId,
-      periodType,
-      createdAt: now.toISOString(),
-      markdown,
-      html,
-      filePath
-    })
+    repo.insertReport(
+      db,
+      { id: reportId, runId, periodType, createdAt: now.toISOString(), markdown, html, filePath },
+      JSON.stringify(brief)
+    )
 
     saveSettings(db, { ...settings, lastRunAt: now.toISOString() })
     repo.finishRun(db, runId, 'succeeded', newMessages.length, null)

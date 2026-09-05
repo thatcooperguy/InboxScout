@@ -155,7 +155,7 @@ const SEVERITY_ORDER: Record<string, number> = { urgent: 0, high: 1, medium: 2, 
 
 /** Template brief built purely from tracked data — no AI call. */
 export function buildBasicBrief(inputs: BriefInputs): Brief {
-  const { openIssues, projects, personalMessages, sensitiveMessages, deadlines, replies } = inputs
+  const { openIssues, projects, personalMessages, sensitiveMessages, deadlines, replies, skillSections } = inputs
   const sortedIssues = [...openIssues].sort(
     (a, b) => (SEVERITY_ORDER[a.severity] ?? 9) - (SEVERITY_ORDER[b.severity] ?? 9)
   )
@@ -181,6 +181,7 @@ export function buildBasicBrief(inputs: BriefInputs): Brief {
     waitingOnYou: replies.waitingOnYou.map((t) => `${t.subject} - ${t.counterpart}`),
     waitingOnThem: replies.waitingOnThem.map((t) => `${t.subject} - ${t.counterpart} (${t.daysWaiting}d)`),
     deadlines: deadlines.slice(0, 10),
+    skillSections,
     personal: personalMessages.slice(0, 10).map(({ message }) => `${message.subject} (${message.fromName || message.fromAddress})`),
     sensitiveNotices: sensitiveMessages
       .slice(0, 10)

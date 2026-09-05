@@ -242,11 +242,28 @@ export function listRuns(db: DB, limit: number): RunRecord[] {
   }))
 }
 
-export function insertReport(db: DB, r: ReportRecord): void {
+export function insertReport(db: DB, r: ReportRecord, briefJson: string): void {
   db.prepare(
-    `INSERT INTO reports (id, run_id, period_type, created_at, markdown, html, file_path)
-     VALUES (@id, @runId, @periodType, @createdAt, @markdown, @html, @filePath)`
-  ).run(r)
+    `INSERT INTO reports (id, run_id, period_type, created_at, markdown, html, file_path, brief_json)
+     VALUES (@id, @runId, @periodType, @createdAt, @markdown, @html, @filePath, @briefJson)`
+  ).run({ ...r, briefJson })
+}
+
+/** The most recent structured brief, for the Today screen. */
+export function latestBrief(db: DB): { brief: any; createdAt: string; reportId: string } | null {
+  const r = db.prepare('SELECT id, created_at, brief_json FROM reports ORDER BY created_at DESC LIMIT 1').get() as any
+  if (!r || !r.brief_json) return null
+  try {
+    return { brief: JSON.parse(r.brief_json), createdAt: r.created_at, reportId: r.id }
+  } catch {
+    return null
+  }
+}
+
+export function insertSkillMatch(db: DB, m: { messageId: string; skillId: string; extracted: Record<string, string>; urgent: boolean }, runId: string): void {
+  db.prepare(
+    `INSERT OR REPLACE INTO skill_matches (message_id, skill_id, extracted, urgent, run_id) VALUES (?, ?, ?, ?, ?)`
+  ).run(m.messageId, m.skillId, JSON.stringify(m.extracted), m.urgent ? 1 : 0, runId)
 }
 
 export function listReports(db: DB, limit: number): Omit<ReportRecord, 'markdown' | 'html'>[] {

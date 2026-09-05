@@ -44,6 +44,13 @@ export function renderMarkdown(
     lines.push('')
   }
 
+  for (const section of brief.skillSections ?? []) {
+    if (section.lines.length === 0) continue
+    lines.push(`## ${section.icon} ${section.title}`, '')
+    for (const l of section.lines) lines.push(`- ${l}`)
+    lines.push('')
+  }
+
   if (brief.waitingOnYou.length > 0 || brief.waitingOnThem.length > 0) {
     lines.push('## ✉ Reply tracker', '')
     if (brief.waitingOnYou.length > 0) {

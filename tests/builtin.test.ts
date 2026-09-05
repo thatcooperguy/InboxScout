@@ -146,7 +146,8 @@ describe('buildBasicBrief', () => {
       personalMessages: [],
       sensitiveMessages: [],
       deadlines: ['Friday — Safety training'],
-      replies: { waitingOnYou: [{ subject: 'Shift swap?', counterpart: 'Sam', daysWaiting: 1 }], waitingOnThem: [] }
+      replies: { waitingOnYou: [{ subject: 'Shift swap?', counterpart: 'Sam', daysWaiting: 1 }], waitingOnThem: [] },
+      skillSections: []
     })
     expect(brief.headline).toContain('2 open items')
     expect(brief.topIssues[0].title).toBe('Safety training overdue') // urgent sorts first
@@ -164,7 +165,8 @@ describe('buildBasicBrief', () => {
       personalMessages: [],
       sensitiveMessages: [],
       deadlines: [],
-      replies: { waitingOnYou: [], waitingOnThem: [] }
+      replies: { waitingOnYou: [], waitingOnThem: [] },
+      skillSections: []
     })
     expect(brief.headline).toContain('under control')
     expect(brief.topIssues).toHaveLength(0)

@@ -126,6 +126,13 @@ export interface BriefPulseEntry {
   whatChanged: string
 }
 
+export interface BriefSection {
+  skillId: string
+  title: string
+  icon: string
+  lines: string[]
+}
+
 export interface Brief {
   headline: string
   topIssues: BriefIssue[]
@@ -135,6 +142,8 @@ export interface Brief {
   deadlines: string[]
   personal: string[]
   sensitiveNotices: string[]
+  /** Sections contributed by enabled skills (bills, appointments, deals...). */
+  skillSections: BriefSection[]
 }
 
 export interface ScheduleSettings {
@@ -163,6 +172,13 @@ export interface AppSettings {
   launchAtLogin: boolean
   reportsDir: string
   lastRunAt: string | null
+  /** Skills the user has switched on; null = use the profile's defaults. */
+  enabledSkillIds: string[] | null
+  /** People whose mail is always important (names or addresses, matched loosely). */
+  vipSenders: string[]
+  /** Senders to always file as noise. */
+  mutedSenders: string[]
+  textSize: 'normal' | 'large' | 'xlarge'
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -173,7 +189,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   storeFullBodies: true,
   launchAtLogin: true,
   reportsDir: '',
-  lastRunAt: null
+  lastRunAt: null,
+  enabledSkillIds: null,
+  vipSenders: [],
+  mutedSenders: [],
+  textSize: 'normal'
 }
 
 export interface RunProgress {

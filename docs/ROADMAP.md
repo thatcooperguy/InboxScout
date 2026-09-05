@@ -29,7 +29,14 @@
 
 *(v0.2 also carried the product rename: Inbox Intel → **InboxScout**.)*
 
-## 🟠 Gaps — v0.3 (promised in proposal, not yet wired)
+## ✅ v0.3 — shipped (intelligence & simplicity)
+
+- **Skills engine** — declarative watchers (10 built-in) with extraction, urgency rules, brief sections, AI prompt hints, and **webhook agents** for customer-specific AI; custom skills as JSON files. See `docs/SKILLS.md`.
+- **Important people / never-bother-me lists** applied on every run.
+- **Simple Mode UI** — Today screen, Setup hub, three tabs, text-size control, advanced tabs behind a toggle.
+- Structured brief stored per report (powers the Today screen).
+
+## 🟠 Gaps — v0.4 (promised in proposal, not yet wired)
 
 7. **Outlook.com via Microsoft Graph** — Outlook users currently cannot connect at all (Microsoft killed app passwords in 2024). Needs Entra app registration + MSAL device/loopback flow + `Mail.Read`.
 8. **Google Drive report sync** — designed (`drive.file` scope, hand-rolled REST), not implemented. OneDrive after.

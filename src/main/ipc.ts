@@ -7,6 +7,8 @@ import { loadSettings, saveSettings } from './settings'
 import { PROVIDER_PRESETS, testConnection } from './mail/imap'
 import { testProvider, PROVIDER_LABELS, DEFAULT_MODELS, LOCAL_PROVIDERS } from './ai/provider'
 import { PROFILES } from './profiles/profiles'
+import { loadCustomSkills, resolveSkills } from './skills/engine'
+import { existsSync, mkdirSync } from 'node:fs'
 import type { AccountConfig, AppSettings } from '../shared/types'
 
 export interface IpcContext {
@@ -14,6 +16,7 @@ export interface IpcContext {
   secrets: SecretStore
   runNow: () => Promise<unknown>
   isRunning: () => boolean
+  skillsDir: string
 }
 
 export function registerIpc(ctx: IpcContext): void {
@@ -114,6 +117,36 @@ export function registerIpc(ctx: IpcContext): void {
     if (label) shell.openExternal(label.keyUrl)
     return true
   })
+
+  ipcMain.handle('skills:list', () => {
+    const settings = loadSettings(db)
+    const custom = loadCustomSkills(ctx.skillsDir)
+    const { all, enabled } = resolveSkills(settings.profileId, settings.enabledSkillIds, custom.skills)
+    const enabledIds = new Set(enabled.map((s) => s.id))
+    return {
+      skills: all.map((s) => ({
+        id: s.id,
+        name: s.name,
+        icon: s.icon,
+        description: s.description,
+        enabled: enabledIds.has(s.id),
+        custom: !!s.custom,
+        hasAgent: !!s.agent
+      })),
+      errors: custom.errors,
+      folder: ctx.skillsDir
+    }
+  })
+  ipcMain.handle('skills:setEnabled', (_e, ids: string[]) => {
+    const settings = loadSettings(db)
+    saveSettings(db, { ...settings, enabledSkillIds: ids })
+    return true
+  })
+  ipcMain.handle('skills:openFolder', () => {
+    if (!existsSync(ctx.skillsDir)) mkdirSync(ctx.skillsDir, { recursive: true })
+    return shell.openPath(ctx.skillsDir)
+  })
+  ipcMain.handle('brief:latest', () => repo.latestBrief(db))
 
   ipcMain.handle('run:now', () => {
     if (ctx.isRunning()) return { started: false, reason: 'A run is already in progress.' }

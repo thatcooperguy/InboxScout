@@ -22,7 +22,8 @@ const brief: Brief = {
   waitingOnThem: ['Lease question — Landlord (9d)'],
   deadlines: ['Sep 12 — Electric bill due'],
   personal: ['Dentist appointment Tuesday 10am'],
-  sensitiveNotices: ['"W-2 attached" from payroll@company.com contains personal financial data']
+  sensitiveNotices: ['"W-2 attached" from payroll@company.com contains personal financial data'],
+  skillSections: [{ skillId: 'bills', title: 'Bills & invoices', icon: '💵', lines: ['Electric bill — $128.40 due Sep 12 (City Power)'] }]
 }
 
 describe('renderMarkdown', () => {
@@ -38,6 +39,8 @@ describe('renderMarkdown', () => {
     expect(md).toContain('You owe 1 reply')
     expect(md).toContain('Dates & deadlines')
     expect(md).toContain('Sensitive items noticed')
+    expect(md).toContain('## 💵 Bills & invoices')
+    expect(md).toContain('$128.40 due Sep 12')
     expect(md).toContain('nothing has been hidden or redacted')
   })
 
@@ -78,7 +81,8 @@ describe('renderMarkdown edge cases', () => {
       waitingOnThem: [],
       deadlines: [],
       personal: [],
-      sensitiveNotices: []
+      sensitiveNotices: [],
+      skillSections: []
     }
     const md = renderMarkdown(empty, PROFILES.general, 'weekly', new Date())
     expect(md).toContain('# Weekly Brief')

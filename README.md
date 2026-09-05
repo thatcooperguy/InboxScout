@@ -44,6 +44,8 @@ Contributions are welcome under the terms in [CONTRIBUTING.md](CONTRIBUTING.md).
 - Optional AI upgrades with a sign-in-style overlay (no manual key wrangling): Google Gemini (free tier), Groq (free tier), OpenRouter (free models), Mistral, DeepSeek, OpenAI, Anthropic Claude, xAI Grok, local Ollama or LM Studio, or any custom OpenAI-compatible endpoint
 - Daily/weekly scheduled runs from the system tray, plus run-on-demand
 - Local-first SQLite storage with full-text search; Markdown/HTML/PDF reports; optional Drive/OneDrive sync
+- **Skills** — tick what to watch for (bills, appointments, deals, work orders, deliveries, travel, school, health, job search, customers, important people); companies add custom skills as JSON and can route matches to their own AI agents by webhook ([docs/SKILLS.md](docs/SKILLS.md))
+- **Simple Mode UI for all ages** — one Today screen, one big "Check my email" button, three tabs, adjustable text size
 - Sensitive-information heads-up: flags private or company-confidential content in briefs (never redacts)
 - Downloadable Windows `.exe` and macOS `.dmg` from this repo's Releases, with in-app self-update
 

@@ -17,6 +17,11 @@ const api = {
   aiDisconnect: (provider: string) => ipcRenderer.invoke('ai:disconnect', provider),
   aiOpenKeyPage: (provider: string) => ipcRenderer.invoke('ai:openKeyPage', provider),
 
+  skillsList: () => ipcRenderer.invoke('skills:list'),
+  skillsSetEnabled: (ids: string[]) => ipcRenderer.invoke('skills:setEnabled', ids),
+  skillsOpenFolder: () => ipcRenderer.invoke('skills:openFolder'),
+  latestBrief: () => ipcRenderer.invoke('brief:latest'),
+
   runNow: () => ipcRenderer.invoke('run:now'),
   listRuns: () => ipcRenderer.invoke('runs:list'),
   listReports: () => ipcRenderer.invoke('reports:list'),

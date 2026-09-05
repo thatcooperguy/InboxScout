@@ -1,5 +1,5 @@
 import { generateObject, type LanguageModel } from 'ai'
-import type { Brief, Classification, IssueRecord, MessageRecord, ProjectRecord } from '../../shared/types'
+import type { Brief, BriefSection, Classification, IssueRecord, MessageRecord, ProjectRecord } from '../../shared/types'
 import type { WorkProfile } from '../profiles/profiles'
 import { briefSchema } from './schemas'
 import type { ReplyTrackerResult } from '../pipeline/replies'
@@ -13,6 +13,10 @@ export interface BriefInputs {
   sensitiveMessages: { message: MessageRecord; classification: Classification }[]
   deadlines: string[]
   replies: ReplyTrackerResult
+  /** Sections built deterministically by enabled skills. */
+  skillSections: BriefSection[]
+  /** Guidance from enabled skills for the AI. */
+  promptHints?: string
 }
 
 export function buildBriefPrompt(inputs: BriefInputs): string {
@@ -22,6 +26,7 @@ export function buildBriefPrompt(inputs: BriefInputs): string {
     `Write the user's ${inputs.periodType} email brief. Plain language, no jargon, scannable in 30 seconds.`,
     '',
     `User context: ${profile.workDescription}`,
+    inputs.promptHints ?? '',
     '',
     `Open issues (severity | title | suggested action | deadline):`
   )
@@ -69,6 +74,7 @@ export async function generateBrief(model: LanguageModel, inputs: BriefInputs): 
     waitingOnThem: inputs.replies.waitingOnThem.map((t) => `${t.subject} - ${t.counterpart} (${t.daysWaiting}d)`),
     deadlines: object.deadlines,
     personal: object.personal,
-    sensitiveNotices: object.sensitiveNotices
+    sensitiveNotices: object.sensitiveNotices,
+    skillSections: inputs.skillSections
   }
 }
