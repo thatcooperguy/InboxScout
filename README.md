@@ -1,4 +1,4 @@
-# Inbox Intel
+# InboxScout
 
 A Windows desktop email intelligence assistant.
 
@@ -23,7 +23,7 @@ npm run lint
 npm run package    # build local installers (no publish)
 ```
 
-Run a headless scan without opening the window: `inbox-intel --sync` (used by schedulers).
+Run a headless scan without opening the window: `inboxscout --sync` (used by schedulers).
 
 ## Highlights (planned v1)
 

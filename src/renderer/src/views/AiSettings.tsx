@@ -9,10 +9,25 @@ export default function AiSettings(): JSX.Element {
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
 
+  const [detections, setDetections] = useState<any[]>([])
+
   const load = (): void => {
-    void window.inboxIntel.aiProviders().then(setProviders)
+    void window.inboxScout.aiProviders().then(setProviders)
+    void window.inboxScout.aiDetect().then(setDetections)
   }
   useEffect(load, [])
+
+  const connectDetected = async (provider: string): Promise<void> => {
+    setBusy(true)
+    try {
+      const res = await window.inboxScout.aiConnectDetected(provider)
+      setOk(res.ok ? `Connected ✓ — now using ${provider}.` : '')
+      setError(res.ok ? '' : (res.error ?? 'Could not connect.'))
+      load()
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const needsKey = (p: any): boolean => !p.local && p.id !== 'custom'
 
@@ -22,14 +37,14 @@ export default function AiSettings(): JSX.Element {
     setBaseUrl('')
     setError('')
     setOk('')
-    if (needsKey(p) && p.keyUrl) void window.inboxIntel.aiOpenKeyPage(p.id)
+    if (needsKey(p) && p.keyUrl) void window.inboxScout.aiOpenKeyPage(p.id)
   }
 
   const connect = async (p: any): Promise<void> => {
     setBusy(true)
     setError('')
     try {
-      const res = await window.inboxIntel.aiConnect({ provider: p.id, apiKey, baseUrl })
+      const res = await window.inboxScout.aiConnect({ provider: p.id, apiKey, baseUrl })
       if (res.ok) {
         setOk(`Connected ✓ — ${p.name} is now doing the thinking.`)
         setConnecting(null)
@@ -46,10 +61,24 @@ export default function AiSettings(): JSX.Element {
     <div>
       <h1>Connect AI</h1>
       <p className="sub">
-        Inbox Intel works out of the box with its free built-in engine — no account needed. Connect any AI backend for
+        InboxScout works out of the box with its free built-in engine — no account needed. Connect any AI backend for
         smarter sorting and briefs; keys are encrypted on this computer and used only for your own scans.
       </p>
       {ok && <div className="success">{ok}</div>}
+      {error && !connecting && <div className="error">{error}</div>}
+      {detections.length > 0 && (
+        <div className="card">
+          <h3>✨ Found on this computer</h3>
+          {detections.map((d) => (
+            <div key={d.provider} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+              <span>{d.detail}</span>
+              <button className="primary" disabled={busy} onClick={() => void connectDetected(d.provider)}>
+                Use it
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="provider-grid">
         {providers.map((p) => (
           <div key={p.id} className={`provider-card ${p.active ? 'active' : ''}`}>
@@ -114,7 +143,7 @@ export default function AiSettings(): JSX.Element {
                   <button
                     className="ghost"
                     onClick={() => {
-                      void window.inboxIntel.aiDisconnect(p.id).then(load)
+                      void window.inboxScout.aiDisconnect(p.id).then(load)
                     }}
                   >
                     Forget key

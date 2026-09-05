@@ -19,6 +19,8 @@ function makeMessage(overrides: Partial<MessageRecord> = {}): MessageRecord {
     snippet: 'Please sign the attached contract before Monday.',
     bodyText: 'Please sign the attached contract before Monday. Thanks, Jane.',
     fromMe: false,
+    listUnsubscribe: null,
+    hasAttachments: false,
     ...overrides
   }
 }

@@ -26,11 +26,16 @@ async function runNow(trigger: 'manual' | 'scheduled' | 'catchup' | 'cli' = 'man
   broadcast('run:progress', { phase: 'fetch', detail: 'Starting…' } satisfies RunProgress)
   try {
     const result = await runPipeline(db, secrets, trigger, (p) => broadcast('run:progress', p))
-    if (!result.error && trigger !== 'manual' && Notification.isSupported()) {
-      new Notification({
-        title: 'Inbox Intel — brief ready',
-        body: `${result.messagesScanned} new messages scanned, ${result.issueCount} issue${result.issueCount === 1 ? '' : 's'} need attention.`
-      }).show()
+    if (trigger !== 'manual' && Notification.isSupported()) {
+      // Failures must be visible too - a silently skipped brief is worse than an error.
+      new Notification(
+        result.error
+          ? { title: 'InboxScout — scan failed', body: result.error.slice(0, 200) }
+          : {
+              title: 'InboxScout — brief ready',
+              body: `${result.messagesScanned} new messages scanned, ${result.issueCount} issue${result.issueCount === 1 ? '' : 's'} need attention.`
+            }
+      ).show()
     }
     broadcast('run:finished', result)
   } finally {
@@ -44,7 +49,7 @@ function createWindow(): void {
     height: 760,
     minWidth: 860,
     minHeight: 560,
-    title: 'Inbox Intel',
+    title: 'InboxScout',
     autoHideMenuBar: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -74,10 +79,10 @@ function createTray(): void {
   } catch {
     return
   }
-  tray.setToolTip('Inbox Intel')
+  tray.setToolTip('InboxScout')
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: 'Open Inbox Intel', click: () => (mainWindow ? mainWindow.show() : createWindow()) },
+      { label: 'Open InboxScout', click: () => (mainWindow ? mainWindow.show() : createWindow()) },
       { label: 'Run now', click: () => void runNow('manual') },
       { type: 'separator' },
       { label: 'Quit', click: () => app.quit() }
@@ -87,12 +92,12 @@ function createTray(): void {
 
 async function bootstrap(): Promise<void> {
   const dataDir = app.getPath('userData')
-  db = openDatabase(join(dataDir, 'inbox-intel.db'))
+  db = openDatabase(join(dataDir, 'inboxscout.db'))
   secrets = new SecretStore(db)
 
   const settings = loadSettings(db)
   if (!settings.reportsDir) {
-    saveSettings(db, { ...settings, reportsDir: join(app.getPath('documents'), 'Inbox Intel', 'Reports') })
+    saveSettings(db, { ...settings, reportsDir: join(app.getPath('documents'), 'InboxScout', 'Reports') })
   }
 
   if (isHeadlessSync) {

@@ -5,9 +5,9 @@ export default function Reports(): JSX.Element {
   const [selected, setSelected] = useState<any | null>(null)
 
   useEffect(() => {
-    void window.inboxIntel.listReports().then((list) => {
+    void window.inboxScout.listReports().then((list) => {
       setReports(list)
-      if (list.length > 0) void window.inboxIntel.getReport(list[0].id).then(setSelected)
+      if (list.length > 0) void window.inboxScout.getReport(list[0].id).then(setSelected)
     })
   }, [])
 
@@ -23,7 +23,7 @@ export default function Reports(): JSX.Element {
               <button
                 className="ghost"
                 style={{ width: '100%', textAlign: 'left', fontWeight: selected?.id === r.id ? 700 : 400 }}
-                onClick={() => void window.inboxIntel.getReport(r.id).then(setSelected)}
+                onClick={() => void window.inboxScout.getReport(r.id).then(setSelected)}
               >
                 {r.periodType === 'weekly' ? 'Weekly' : 'Daily'} — {new Date(r.createdAt).toLocaleString()}
               </button>
@@ -36,7 +36,7 @@ export default function Reports(): JSX.Element {
               {selected.filePath && (
                 <p className="hint">
                   Saved to {selected.filePath}{' '}
-                  <button className="ghost tiny" onClick={() => void window.inboxIntel.openReportFile(selected.filePath)}>
+                  <button className="ghost tiny" onClick={() => void window.inboxScout.openReportFile(selected.filePath)}>
                     Open file
                   </button>
                 </p>

@@ -8,8 +8,8 @@ export default function SettingsView(): JSX.Element {
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    void window.inboxIntel.getSettings().then(setSettings)
-    void window.inboxIntel.listProfiles().then(setProfiles)
+    void window.inboxScout.getSettings().then(setSettings)
+    void window.inboxScout.listProfiles().then(setProfiles)
   }, [])
 
   if (!settings) return <div className="empty">Loading…</div>
@@ -20,7 +20,7 @@ export default function SettingsView(): JSX.Element {
   }
 
   const save = async (): Promise<void> => {
-    setSettings(await window.inboxIntel.setSettings(settings))
+    setSettings(await window.inboxScout.setSettings(settings))
     setSaved(true)
   }
 
@@ -103,7 +103,7 @@ export default function SettingsView(): JSX.Element {
             <input value={settings.reportsDir} onChange={(e) => update({ reportsDir: e.target.value })} />
           </label>
           <label className="field">
-            <span>Start Inbox Intel when the computer starts</span>
+            <span>Start InboxScout when the computer starts</span>
             <select
               value={settings.launchAtLogin ? 'yes' : 'no'}
               onChange={(e) => update({ launchAtLogin: e.target.value === 'yes' })}

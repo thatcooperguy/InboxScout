@@ -48,6 +48,9 @@ export interface MessageRecord {
   snippet: string
   bodyText: string
   fromMe: boolean
+  /** Raw List-Unsubscribe header when present (fuel for the future unsubscribe report). */
+  listUnsubscribe: string | null
+  hasAttachments: boolean
 }
 
 export interface Classification {

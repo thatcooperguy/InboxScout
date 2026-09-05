@@ -1,4 +1,4 @@
-export interface InboxIntelApi {
+export interface InboxScoutApi {
   getSettings: () => Promise<any>
   setSettings: (settings: unknown) => Promise<any>
   listProfiles: () => Promise<{ id: string; name: string; pulseName: string }[]>
@@ -9,6 +9,8 @@ export interface InboxIntelApi {
   removeAccount: (id: string) => Promise<boolean>
 
   aiProviders: () => Promise<any[]>
+  aiDetect: () => Promise<{ provider: string; kind: string; detail: string; hasKey: boolean }[]>
+  aiConnectDetected: (provider: string) => Promise<{ ok: boolean; error?: string }>
   aiConnect: (input: unknown) => Promise<{ ok: boolean; error?: string }>
   aiDisconnect: (provider: string) => Promise<boolean>
   aiOpenKeyPage: (provider: string) => Promise<boolean>
@@ -31,7 +33,7 @@ export interface InboxIntelApi {
 
 declare global {
   interface Window {
-    inboxIntel: InboxIntelApi
+    inboxScout: InboxScoutApi
   }
 }
 

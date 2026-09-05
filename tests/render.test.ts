@@ -53,6 +53,21 @@ describe('renderMarkdown', () => {
   })
 })
 
+describe('renderMarkdown sync errors', () => {
+  it('surfaces account problems at the top of the brief', () => {
+    const md = renderMarkdown(brief, PROFILES.owner, 'daily', new Date(), [
+      'mom@yahoo.com: Authentication failed'
+    ])
+    expect(md).toContain('Account problems')
+    expect(md).toContain('mom@yahoo.com: Authentication failed')
+  })
+
+  it('omits the section when every account synced', () => {
+    const md = renderMarkdown(brief, PROFILES.owner, 'daily', new Date())
+    expect(md).not.toContain('Account problems')
+  })
+})
+
 describe('renderMarkdown edge cases', () => {
   it('handles a completely empty brief', () => {
     const empty: Brief = {

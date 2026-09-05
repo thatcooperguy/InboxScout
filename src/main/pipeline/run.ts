@@ -59,25 +59,37 @@ export async function runPipeline(
     const accounts = repo.listAccounts(db)
     if (accounts.length === 0) throw new Error('No email accounts connected yet.')
     const newMessages: MessageRecord[] = []
+    const syncErrors: string[] = []
     for (const account of accounts) {
       const password = secrets.get(accountSecretName(account.id))
-      if (!password) continue
-      for (const folder of account.folders) {
-        onProgress({ phase: 'fetch', detail: `${account.email} — ${folder}` })
-        const state = repo.getSyncState(db, account.id, folder)
-        const result = await syncFolder(
-          account,
-          password,
-          folder,
-          state.uidValidity,
-          state.lastUid,
-          settings.storeFullBodies
-        )
-        for (const m of result.messages) {
-          if (repo.insertMessage(db, m)) newMessages.push(m)
-        }
-        repo.setSyncState(db, account.id, folder, result.uidValidity, result.lastUid)
+      if (!password) {
+        syncErrors.push(`${account.email}: no saved password — reconnect this account.`)
+        continue
       }
+      // One broken account must never block the others.
+      try {
+        for (const folder of account.folders) {
+          onProgress({ phase: 'fetch', detail: `${account.email} — ${folder}` })
+          const state = repo.getSyncState(db, account.id, folder)
+          const result = await syncFolder(
+            account,
+            password,
+            folder,
+            state.uidValidity,
+            state.lastUid,
+            settings.storeFullBodies
+          )
+          for (const m of result.messages) {
+            if (repo.insertMessage(db, m)) newMessages.push(m)
+          }
+          repo.setSyncState(db, account.id, folder, result.uidValidity, result.lastUid)
+        }
+      } catch (err: any) {
+        syncErrors.push(`${account.email}: ${String(err?.message ?? err)}`)
+      }
+    }
+    if (syncErrors.length === accounts.length && newMessages.length === 0) {
+      throw new Error(`Could not check any account. ${syncErrors.join(' | ')}`)
     }
 
     // 2. Classify (skip our own sent mail)
@@ -174,7 +186,7 @@ export async function runPipeline(
     // 5. Render & save
     onProgress({ phase: 'save', detail: 'Saving report…' })
     const now = new Date()
-    const markdown = renderMarkdown(brief, profile, periodType, now)
+    const markdown = renderMarkdown(brief, profile, periodType, now, syncErrors)
     const html = renderHtml(markdown)
     let filePath: string | null = null
     if (settings.reportsDir) {

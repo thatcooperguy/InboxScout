@@ -1,4 +1,4 @@
-# Inbox Intel — Product Proposal & Design
+# InboxScout — Product Proposal & Design
 
 *A Windows desktop email intelligence assistant*
 
@@ -8,7 +8,7 @@
 
 ## 1. Executive summary
 
-Inbox Intel is a Windows desktop application that connects to your personal email accounts (Gmail, Yahoo Mail, Outlook.com, and any IMAP provider), and — on demand or on a daily/weekly schedule — scans new mail, uses AI to separate **personal** items from **work-related** items, and produces an executive brief with two centerpieces:
+InboxScout is a Windows desktop application that connects to your personal email accounts (Gmail, Yahoo Mail, Outlook.com, and any IMAP provider), and — on demand or on a daily/weekly schedule — scans new mail, uses AI to separate **personal** items from **work-related** items, and produces an executive brief with two centerpieces:
 
 - **Top Emerging Issues** — a ranked list of critical items that need the owner's attention right now, with urgency, the source emails, and suggested next steps.
 - **Company Pulse** — the top projects and initiatives visible in the mail stream, each with a rolling, continuously updated status summary.
@@ -17,7 +17,7 @@ Every run updates a local database, so issues and projects are *tracked over tim
 
 The AI analysis runs through the user's choice of provider — Anthropic Claude, OpenAI, Google Gemini, xAI Grok, Groq, or a fully local model via Ollama — behind a single abstraction layer, so switching providers is a settings change.
 
-Inbox Intel is built for **anyone's inbox**, not just a company owner's. At setup the user picks (or the app infers) a **work profile** — business owner, real-estate agent, utility/field professional, general professional — and the classification taxonomy, issue detection, and brief vocabulary adapt to it. A **Simple Mode**, on by default, makes the whole experience three plain-language steps with zero technical choices, so a non-technical parent can run it unassisted.
+InboxScout is built for **anyone's inbox**, not just a company owner's. At setup the user picks (or the app infers) a **work profile** — business owner, real-estate agent, utility/field professional, general professional — and the classification taxonomy, issue detection, and brief vocabulary adapt to it. A **Simple Mode**, on by default, makes the whole experience three plain-language steps with zero technical choices, so a non-technical parent can run it unassisted.
 
 ## 2. Goals and non-goals
 
@@ -47,7 +47,7 @@ Inbox Intel is built for **anyone's inbox**, not just a company owner's. At setu
 
 Research into current provider policies drives the connection strategy per provider:
 
-| Provider | How Inbox Intel connects | Why |
+| Provider | How InboxScout connects | Why |
 |---|---|---|
 | **Gmail** | **App password + IMAP** (default), or **bring-your-own Google OAuth client** for the Gmail API (advanced) | Google's `gmail.readonly` scope is *restricted*: shipping a verified OAuth client requires an annual CASA Tier-2 security audit (~$500–$4,500+/yr). App passwords (with 2-Step Verification) are officially supported and take the user ~2 minutes to create. Advanced users can create their own free Google Cloud OAuth client for full Gmail API access. |
 | **Yahoo Mail** | **App password + IMAP** | Yahoo has no public mail API and gates OAuth-IMAP behind partner approval. App passwords are Yahoo's officially sanctioned route (basic passwords were disabled May 2024). |
@@ -180,7 +180,7 @@ A survey of relevant repositories (verified September 2026) shapes the dependenc
    - **Top Emerging Issues:** ranked by urgency × importance; each with what it is, why it matters now, evidence (source emails), and a suggested next step.
    - **Company Pulse:** top N projects with latest status, trend (▲ progressing / ▬ steady / ▼ at risk), and what changed since the last report.
    - **Personal digest (light):** a short list of personal items worth noticing (bills, appointments, family) — never mixed into the work brief.
-5. **Render & save:** report stored in DB, written to `Documents/Inbox Intel/Reports/` as Markdown + HTML (+PDF on demand), shown in the app, and synced to Drive/OneDrive if enabled. A Windows notification announces completion with the issue count.
+5. **Render & save:** report stored in DB, written to `Documents/InboxScout/Reports/` as Markdown + HTML (+PDF on demand), shown in the app, and synced to Drive/OneDrive if enabled. A Windows notification announces completion with the issue count.
 
 ### 4.2 Data model (SQLite)
 
@@ -265,7 +265,7 @@ Milestones are independently demoable; M2+M3 already delivers a usable "classify
 1. **Default AI provider:** free tiers by default — Gemini free tier as the primary default, Groq free tier as fallback; all other providers available in Advanced settings. ✅
 2. **Volume:** average personal volume — comfortably inside the free tiers. ✅
 3. **Retention:** **store full bodies and text locally** (space is cheap; enables reprocessing and inbox Q&A). Paired with the sensitive-information flagging behavior: the AI flags private/company-confidential content in the brief as a heads-up, but does **not** redact it. ✅
-4. **Name:** Inbox Intel stays. ✅
+4. **Name:** InboxScout stays. ✅
 5. **Distribution:** Windows `.exe` + macOS `.dmg` downloadable from this GitHub repo's Releases; in-app self-update dialing back to the repo. ✅
 6. **Profiles:** starting set stands — business owner, real-estate agent, utility/field professional, general professional.
 

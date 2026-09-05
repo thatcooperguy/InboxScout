@@ -84,7 +84,10 @@ export async function syncFolder(
             : []
         const bodyFull = (parsed.text ?? '').slice(0, MAX_BODY_CHARS)
         const snippet = makeSnippet(bodyFull)
+        const listUnsub = parsed.headers.get('list-unsubscribe')
         messages.push({
+          listUnsubscribe: typeof listUnsub === 'string' ? listUnsub : listUnsub ? String(listUnsub) : null,
+          hasAttachments: (parsed.attachments ?? []).length > 0,
           id: randomUUID(),
           accountId: account.id,
           folder,
@@ -135,6 +138,12 @@ export const PROVIDER_PRESETS: Record<string, { host: string; port: number; sent
     port: 993,
     sentFolder: 'Sent',
     help: 'Create an app password at Yahoo Account Security -> "Generate and manage app passwords".'
+  },
+  icloud: {
+    host: 'imap.mail.me.com',
+    port: 993,
+    sentFolder: 'Sent Messages',
+    help: 'Create an app-specific password at appleid.apple.com -> Sign-In and Security -> App-Specific Passwords.'
   },
   imap: {
     host: '',

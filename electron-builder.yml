@@ -1,5 +1,5 @@
-appId: com.inboxintel.app
-productName: Inbox Intel
+appId: com.inboxscout.app
+productName: InboxScout
 directories:
   output: dist
 files:
@@ -21,6 +21,6 @@ mac:
 publish:
   provider: github
   owner: thatcooperguy
-  repo: email-person-assistant-
+  repo: inboxscout
   releaseType: release
 npmRebuild: true

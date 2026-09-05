@@ -18,7 +18,9 @@ const msg = (id: string, subject: string): MessageRecord => ({
   date: '2026-09-05T00:00:00.000Z',
   snippet: 'hello',
   bodyText: 'hello body',
-  fromMe: false
+  fromMe: false,
+  listUnsubscribe: null,
+  hasAttachments: false
 })
 
 describe('chunk', () => {

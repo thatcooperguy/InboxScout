@@ -86,6 +86,29 @@ export function registerIpc(ctx: IpcContext): void {
     secrets.delete(providerSecretName(provider))
     return true
   })
+  ipcMain.handle('ai:detect', async () => {
+    const settings = loadSettings(db)
+    const { detectEnvKeys, detectLocalServers } = await import('./ai/detect')
+    const env = detectEnvKeys(process.env)
+    const local = await detectLocalServers(settings.ai.ollamaBaseUrl)
+    // Hide detections for providers already connected or active.
+    return [...local, ...env]
+      .filter((d) => d.provider !== settings.ai.provider)
+      .filter((d) => (d.kind === 'env_key' ? !secrets.get(providerSecretName(d.provider)) : true))
+      .map((d) => ({ provider: d.provider, kind: d.kind, detail: d.detail, hasKey: !!d.apiKey }))
+  })
+  ipcMain.handle('ai:connectDetected', async (_e, provider: string) => {
+    const settings = loadSettings(db)
+    const { detectEnvKeys } = await import('./ai/detect')
+    const envHit = detectEnvKeys(process.env).find((d) => d.provider === provider)
+    const ai = { ...settings.ai, provider: provider as any }
+    const result = await testProvider(ai, envHit?.apiKey ?? '')
+    if (result.ok) {
+      if (envHit?.apiKey) secrets.set(providerSecretName(provider), envHit.apiKey)
+      saveSettings(db, { ...settings, ai })
+    }
+    return result
+  })
   ipcMain.handle('ai:openKeyPage', (_e, provider: string) => {
     const label = PROVIDER_LABELS[provider as keyof typeof PROVIDER_LABELS]
     if (label) shell.openExternal(label.keyUrl)

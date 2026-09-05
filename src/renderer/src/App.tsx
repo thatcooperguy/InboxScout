@@ -5,6 +5,7 @@ import Accounts from './views/Accounts'
 import AiSettings from './views/AiSettings'
 import Reports from './views/Reports'
 import SettingsView from './views/Settings'
+import Onboarding from './views/Onboarding'
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -22,13 +23,21 @@ export default function App(): JSX.Element {
   const [status, setStatus] = useState('')
   const [running, setRunning] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [onboarding, setOnboarding] = useState<boolean | null>(null)
 
   useEffect(() => {
-    const offProgress = window.inboxIntel.onRunProgress((p) => {
+    // First run = no accounts and no runs yet: show the Simple Mode wizard.
+    void Promise.all([window.inboxScout.listAccounts(), window.inboxScout.listRuns()]).then(([accounts, runs]) =>
+      setOnboarding(accounts.length === 0 && runs.length === 0)
+    )
+  }, [])
+
+  useEffect(() => {
+    const offProgress = window.inboxScout.onRunProgress((p) => {
       setRunning(p.phase !== 'done' && p.phase !== 'error')
       setStatus(p.detail)
     })
-    const offFinished = window.inboxIntel.onRunFinished((r) => {
+    const offFinished = window.inboxScout.onRunFinished((r) => {
       setRunning(false)
       setStatus(r.error ? `Failed: ${r.error}` : 'Brief ready.')
       setRefreshKey((k) => k + 1)
@@ -42,17 +51,29 @@ export default function App(): JSX.Element {
   const runNow = async (): Promise<void> => {
     setRunning(true)
     setStatus('Starting…')
-    const res = await window.inboxIntel.runNow()
+    const res = await window.inboxScout.runNow()
     if (!res.started) {
       setRunning(false)
       setStatus(res.reason ?? '')
     }
   }
 
+  if (onboarding === null) return <div />
+  if (onboarding) {
+    return (
+      <Onboarding
+        onDone={() => {
+          setOnboarding(false)
+          setRefreshKey((k) => k + 1)
+        }}
+      />
+    )
+  }
+
   return (
     <div className="layout">
       <nav className="sidebar">
-        <div className="brand">📬 Inbox Intel</div>
+        <div className="brand">📬 InboxScout</div>
         {TABS.map((t) => (
           <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => setTab(t.id)}>
             {t.label}

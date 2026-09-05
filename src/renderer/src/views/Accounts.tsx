@@ -14,11 +14,11 @@ export default function Accounts(): JSX.Element {
   const [ok, setOk] = useState('')
 
   const load = (): void => {
-    void window.inboxIntel.listAccounts().then(setAccounts)
+    void window.inboxScout.listAccounts().then(setAccounts)
   }
   useEffect(() => {
     load()
-    void window.inboxIntel.accountPresets().then(setPresets)
+    void window.inboxScout.accountPresets().then(setPresets)
   }, [])
 
   const preset = presets[provider] ?? { host: '', port: 993, sentFolder: 'Sent', help: '' }
@@ -28,7 +28,7 @@ export default function Accounts(): JSX.Element {
     setError('')
     setOk('')
     try {
-      await window.inboxIntel.addAccount({
+      await window.inboxScout.addAccount({
         label: email,
         email,
         provider,
@@ -50,14 +50,14 @@ export default function Accounts(): JSX.Element {
   }
 
   const remove = async (id: string): Promise<void> => {
-    await window.inboxIntel.removeAccount(id)
+    await window.inboxScout.removeAccount(id)
     load()
   }
 
   return (
     <div>
       <h1>Email accounts</h1>
-      <p className="sub">Read-only access — Inbox Intel can never send, delete, or change your mail.</p>
+      <p className="sub">Read-only access — InboxScout can never send, delete, or change your mail.</p>
       {ok && <div className="success">{ok}</div>}
       <div className="card">
         <h3>Connected accounts</h3>
@@ -95,6 +95,7 @@ export default function Accounts(): JSX.Element {
             <select value={provider} onChange={(e) => setProvider(e.target.value)}>
               <option value="gmail">Gmail</option>
               <option value="yahoo">Yahoo Mail</option>
+              <option value="icloud">iCloud Mail</option>
               <option value="imap">Other (IMAP)</option>
             </select>
           </label>

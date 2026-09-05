@@ -23,6 +23,8 @@ function msg(overrides: Partial<MessageRecord>): MessageRecord {
     snippet: '',
     bodyText: '',
     fromMe: false,
+    listUnsubscribe: null,
+    hasAttachments: false,
     ...overrides
   }
 }

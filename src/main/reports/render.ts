@@ -9,12 +9,19 @@ export function renderMarkdown(
   brief: Brief,
   profile: WorkProfile,
   periodType: 'daily' | 'weekly',
-  date: Date
+  date: Date,
+  syncErrors: string[] = []
 ): string {
   const title = periodType === 'daily' ? 'Daily Brief' : 'Weekly Brief'
   const dateStr = date.toDateString()
   const lines: string[] = []
   lines.push(`# ${title} — ${dateStr}`, '', `> ${brief.headline}`, '')
+
+  if (syncErrors.length > 0) {
+    lines.push('## ⚠ Account problems', '', '_These accounts could not be checked this run — their mail is not included:_', '')
+    for (const e of syncErrors) lines.push(`- ${e}`)
+    lines.push('')
+  }
 
   lines.push('## ⚠ Top Emerging Issues', '')
   if (brief.topIssues.length === 0) lines.push('Nothing urgent right now.', '')
@@ -93,5 +100,5 @@ th { background: #f2f2ec; }
 
 export function renderHtml(markdown: string): string {
   const body = marked.parse(markdown, { async: false }) as string
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Inbox Intel Brief</title><style>${HTML_STYLE}</style></head><body>${body}</body></html>`
+  return `<!doctype html><html><head><meta charset="utf-8"><title>InboxScout Brief</title><style>${HTML_STYLE}</style></head><body>${body}</body></html>`
 }

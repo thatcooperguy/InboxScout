@@ -41,7 +41,9 @@ CREATE TABLE IF NOT EXISTS messages (
   date TEXT NOT NULL,
   snippet TEXT NOT NULL,
   body_text TEXT NOT NULL,
-  from_me INTEGER NOT NULL DEFAULT 0
+  from_me INTEGER NOT NULL DEFAULT 0,
+  list_unsubscribe TEXT,
+  has_attachments INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(thread_key, date);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_dedupe ON messages(account_id, folder, uid);
@@ -129,5 +131,19 @@ export function openDatabase(path: string): DB {
   const db = new Database(path)
   db.pragma('journal_mode = WAL')
   db.exec(SCHEMA)
+  migrate(db)
   return db
+}
+
+/** Additive column migrations for databases created by older versions. */
+function migrate(db: DB): void {
+  ensureColumn(db, 'messages', 'list_unsubscribe', 'TEXT')
+  ensureColumn(db, 'messages', 'has_attachments', 'INTEGER NOT NULL DEFAULT 0')
+}
+
+function ensureColumn(db: DB, table: string, column: string, type: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
+  if (!cols.some((c) => c.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
+  }
 }

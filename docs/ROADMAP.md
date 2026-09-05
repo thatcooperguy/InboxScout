@@ -18,14 +18,16 @@
 | SQLite + FTS5 search; DPAPI-encrypted secrets; MD/HTML reports saved locally | ✅ |
 | CI (lint/typecheck/41 tests/build) + Release workflow; `.exe` + `.dmg` on GitHub Releases with self-update | ✅ |
 
-## 🔴 Gaps — v0.2 (correctness & first-run experience)
+## ✅ v0.2 — shipped (correctness & first-run experience)
 
-1. **Per-account fault isolation** — today one failing account (bad password, provider hiccup) fails the whole run. Sync errors should be caught per account, reported in the brief ("couldn't check yahoo account"), and not block the others.
-2. **Failure notifications** — a failed scheduled run is silent; the user only finds out by opening the app. Notify on failure, not just success.
-3. **First-run Simple Mode wizard** — the 3-step onboarding (connect email → pick profile → done) exists as settings, not as a guided flow. This is the make-or-break feature for non-technical users.
-4. **AI auto-detection** — Connect AI should probe for a running Ollama/LM Studio server and existing `GEMINI_API_KEY`/`OPENAI_API_KEY`/etc. env vars and offer one-click connect (designed in proposal, not implemented).
-5. **iCloud preset** — add `imap.mail.me.com` to the account wizard presets (generic IMAP works today but shouldn't be needed).
-6. **Capture `List-Unsubscribe` + attachment metadata during sync** — cheap to store now, required later for the unsubscribe report and attachment awareness; not retroactive, so start capturing early.
+1. ~~Per-account fault isolation~~ — ✅ sync errors are caught per account, listed under "Account problems" in the brief, and never block other accounts.
+2. ~~Failure notifications~~ — ✅ failed scheduled runs now notify.
+3. ~~First-run Simple Mode wizard~~ — ✅ 3-step guided onboarding (welcome → profile → connect email → first scan).
+4. ~~AI auto-detection~~ — ✅ probes running Ollama/LM Studio servers and environment API keys; one-click connect in Connect AI.
+5. ~~iCloud preset~~ — ✅ `imap.mail.me.com` in the wizard.
+6. ~~Capture `List-Unsubscribe` + attachment metadata~~ — ✅ stored on every synced message (with additive DB migration).
+
+*(v0.2 also carried the product rename: Inbox Intel → **InboxScout**.)*
 
 ## 🟠 Gaps — v0.3 (promised in proposal, not yet wired)
 

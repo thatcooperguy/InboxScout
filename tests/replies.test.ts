@@ -17,6 +17,8 @@ function msg(partial: Partial<MessageRecord> & { id: string; threadKey: string; 
     snippet: '',
     bodyText: '',
     fromMe: false,
+    listUnsubscribe: null,
+    hasAttachments: false,
     ...partial
   }
 }

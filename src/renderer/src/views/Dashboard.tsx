@@ -6,9 +6,9 @@ export default function Dashboard(): JSX.Element {
   const [runs, setRuns] = useState<any[]>([])
 
   useEffect(() => {
-    void window.inboxIntel.listIssues().then(setIssues)
-    void window.inboxIntel.listProjects().then(setProjects)
-    void window.inboxIntel.listRuns().then(setRuns)
+    void window.inboxScout.listIssues().then(setIssues)
+    void window.inboxScout.listProjects().then(setProjects)
+    void window.inboxScout.listRuns().then(setRuns)
   }, [])
 
   const openIssues = issues.filter((i) => i.state !== 'resolved')

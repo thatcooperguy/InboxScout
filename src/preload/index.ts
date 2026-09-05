@@ -11,6 +11,8 @@ const api = {
   removeAccount: (id: string) => ipcRenderer.invoke('accounts:remove', id),
 
   aiProviders: () => ipcRenderer.invoke('ai:providers'),
+  aiDetect: () => ipcRenderer.invoke('ai:detect'),
+  aiConnectDetected: (provider: string) => ipcRenderer.invoke('ai:connectDetected', provider),
   aiConnect: (input: unknown) => ipcRenderer.invoke('ai:connect', input),
   aiDisconnect: (provider: string) => ipcRenderer.invoke('ai:disconnect', provider),
   aiOpenKeyPage: (provider: string) => ipcRenderer.invoke('ai:openKeyPage', provider),
@@ -39,6 +41,6 @@ const api = {
   }
 }
 
-contextBridge.exposeInMainWorld('inboxIntel', api)
+contextBridge.exposeInMainWorld('inboxScout', api)
 
-export type InboxIntelApi = typeof api
+export type InboxScoutApi = typeof api

@@ -1,6 +1,6 @@
 {
-  "name": "inbox-intel",
-  "version": "0.1.0",
+  "name": "inboxscout",
+  "version": "0.2.0",
   "description": "AI email intelligence assistant - sorts personal from work mail and delivers daily briefs",
   "main": "out/main/index.js",
   "author": "thatcooperguy",

@@ -8,12 +8,12 @@ export default function Review(): JSX.Element {
   const [results, setResults] = useState<any[] | null>(null)
 
   const load = (): void => {
-    void window.inboxIntel.recentMessages(80).then(setMessages)
+    void window.inboxScout.recentMessages(80).then(setMessages)
   }
   useEffect(load, [])
 
   const correct = async (messageId: string, category: string): Promise<void> => {
-    await window.inboxIntel.correctMessage({ messageId, category })
+    await window.inboxScout.correctMessage({ messageId, category })
     load()
   }
 
@@ -22,7 +22,7 @@ export default function Review(): JSX.Element {
       setResults(null)
       return
     }
-    setResults(await window.inboxIntel.searchMessages(query.trim()))
+    setResults(await window.inboxScout.searchMessages(query.trim()))
   }
 
   const rows = results ?? messages
