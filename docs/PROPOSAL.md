@@ -103,7 +103,7 @@ Supporting choices:
 - **Secrets:** Electron `safeStorage` → Windows **DPAPI** (per-user encryption); encrypted blobs at rest, never plaintext. (keytar is deprecated — not used.)
 - **Scheduling:** tray-resident app with an internal scheduler (`node-cron`) + start-at-login + missed-run catch-up ("if last scheduled run was missed while asleep/off, run on next launch"). This is what Slack/Dropbox-class apps do; Windows Task Scheduler can be added later as a belt-and-suspenders trigger.
 - **Updates:** `electron-updater` against GitHub Releases.
-- **Distribution (confirmed decision):** `electron-builder` produces a Windows **NSIS `.exe`** installer and a macOS **`.dmg`**, both published to this repository's **GitHub Releases** (`thatcooperguy/email-person-assistant-`). The app checks that repo on launch and self-updates in place. Caveats to budget for: unsigned Windows builds trigger a SmartScreen "unrecognized app" warning (an Authenticode certificate removes it); macOS requires an Apple Developer ID + notarization ($99/yr) for the `.dmg` to open without a right-click-Open workaround.
+- **Distribution (confirmed decision, path verified):** `electron-builder` produces a Windows **NSIS `.exe`** installer and a macOS **`.dmg`**, both published to this repository's **GitHub Releases** (`thatcooperguy/email-person-assistant-`) via `publish: {provider: "github"}`. `electron-updater` self-updates from public GitHub releases **with no token needed**. Signing costs to budget: unsigned Windows builds trigger SmartScreen "unrecognized app" warnings — **Azure Trusted Signing (~$10/mo, open to individuals)** is the cheapest fix; on macOS, notarization is effectively mandatory (since Sequoia the right-click-Open bypass is gone), so an **Apple Developer ID ($99/yr)** is required from day one for a non-technical audience.
 
 ### 3.4 Built for anyone: work profiles and Simple Mode
 
@@ -221,6 +221,25 @@ Weekly runs produce the same structure over a 7-day window plus a "resolved this
 
 Under other work profiles the same skeleton re-labels itself: a real-estate agent's brief leads with *Deals needing action today* and a *Deal Pipeline* table (address, stage, next deadline, what changed); a utility employee's leads with *Directives & deadlines* and an *Operations Pulse* (jobs, compliance items, schedule changes).
 
+## 6A. Feature roadmap (from a scan of the 2025–2026 market)
+
+A survey of Shortwave, Superhuman, SaneBox, Fyxer, Gmail's Gemini features, Notion Mail, Cora, and the open-source assistants confirms the daily brief is the market's most-loved artifact (Cora — an AI screener whose twice-daily brief users describe as "reading the inbox in 30 seconds" — is the strongest validation of this product's thesis). The features below translate best to a read-only, local-first desktop app; everything requiring send capability or mailbox mutation is deliberately deferred.
+
+**Fold into v1 (cheap extensions of the existing pipeline):**
+
+- **Richer screening labels:** beyond Personal/Work — *needs-reply, FYI, newsletter, cold-pitch, transactional* — surfaced as filters in the dashboard (the analytical half of Superhuman's Auto Labels / SaneBox's filtering).
+- **Waiting-on-reply tracker:** detect unanswered threads in both directions from headers already synced — "you owe 3 replies; 4 people owe you" in every brief. Gold for chasing quotes, offers, and invoices.
+- **Deadline & commitment extraction:** dates, appointments, and promises pulled into the brief ("inspection Friday 2pm," "invoice due 9/15") — extends the existing issue tracking.
+
+**v1.x (after the core ships):**
+
+- **Ask-your-inbox chat:** natural-language Q&A over the local full-body SQLite index ("who was the lender on the Hartley closing?") — the flagship feature of Shortwave and Gmail's paid tier, and a natural fit since full bodies are stored locally.
+- **On-demand thread summaries** — one click on any long thread; table stakes by 2026.
+- **Sender analytics & VIPs:** per-sender history, response patterns, noisiest-senders and volume trends — cheap queries over SQLite that feel magical.
+- **Unsubscribe report (read-only-safe):** lists bulk senders with their `List-Unsubscribe` links; the user clicks, the app never sends.
+
+**Deliberately skipped (and why):** AI reply drafting and auto-replies (requires send capability — the highest trust bar; revisit only as "copy draft to clipboard"); snooze/archive/auto-labeling that mutates the mailbox (breaks the read-only trust story); real-time pre-inbox screening (impossible without server-side hooks — we won't pretend); Slack/Notion/calendar integrations and sales tooling (wrong audience).
+
 ## 7. Build plan
 
 | Milestone | Scope | Est. effort |
@@ -228,9 +247,9 @@ Under other work profiles the same skeleton re-labels itself: a real-estate agen
 | **M1 — Skeleton** | Electron+React+TS scaffold, SQLite schema, tray + scheduler, settings storage w/ DPAPI | ~1 week |
 | **M2 — Mail ingest** | IMAP backend (Gmail/Yahoo/generic app-password), account wizard, delta sync, FTS | ~1–2 weeks |
 | **M3 — AI core** | Provider layer (Gemini/OpenAI/Claude/Grok/Groq/Ollama), Connect AI sign-in overlay with auto-detect, classification pipeline, cost meter | ~1–2 weeks |
-| **M4 — Tracking & briefs** | Project/issue entity tracking, work-profile templates (owner / real estate / utility / general), Top Emerging Issues + Pulse generation, report renderer (MD/HTML/PDF) | ~1–2 weeks |
-| **M5 — Polish** | Dashboard UI, Simple Mode onboarding, correction loop, Google Drive sync, notifications, installer + auto-update | ~1–2 weeks |
-| **M6 (v1.1)** | Microsoft Graph backend for Outlook.com, OneDrive sync, optional Gmail-API BYO-client mode | later |
+| **M4 — Tracking & briefs** | Project/issue entity tracking, work-profile templates (owner / real estate / utility / general), Top Emerging Issues + Pulse generation, waiting-on-reply tracker, deadline extraction, sensitive-info flagging, report renderer (MD/HTML/PDF) | ~2 weeks |
+| **M5 — Polish & ship** | Dashboard UI, Simple Mode onboarding, correction loop, Google Drive sync, notifications, `.exe` + `.dmg` installers published to this repo's Releases with self-update | ~1–2 weeks |
+| **M6 (v1.1)** | Microsoft Graph backend for Outlook.com, OneDrive sync, ask-your-inbox chat, thread summaries, sender analytics, unsubscribe report, optional Gmail-API BYO-client mode | later |
 
 Milestones are independently demoable; M2+M3 already delivers a usable "classify my inbox" tool.
 
