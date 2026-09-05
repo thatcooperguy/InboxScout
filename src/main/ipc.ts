@@ -5,7 +5,7 @@ import * as repo from './db/repo'
 import { SecretStore, accountSecretName, providerSecretName } from './secrets'
 import { loadSettings, saveSettings } from './settings'
 import { PROVIDER_PRESETS, testConnection } from './mail/imap'
-import { testProvider, PROVIDER_LABELS, DEFAULT_MODELS } from './ai/provider'
+import { testProvider, PROVIDER_LABELS, DEFAULT_MODELS, LOCAL_PROVIDERS } from './ai/provider'
 import { PROFILES } from './profiles/profiles'
 import type { AccountConfig, AppSettings } from '../shared/types'
 
@@ -59,20 +59,26 @@ export function registerIpc(ctx: IpcContext): void {
 
   ipcMain.handle('ai:providers', () => {
     const settings = loadSettings(db)
-    return Object.entries(PROVIDER_LABELS).map(([id, label]) => ({
-      id,
-      ...label,
-      defaultModel: DEFAULT_MODELS[id as keyof typeof DEFAULT_MODELS],
-      connected: id === 'ollama' ? true : !!secrets.get(providerSecretName(id)),
-      active: settings.ai.provider === id
-    }))
+    return Object.entries(PROVIDER_LABELS).map(([id, label]) => {
+      const local = LOCAL_PROVIDERS.includes(id as any)
+      return {
+        id,
+        ...label,
+        defaultModel: DEFAULT_MODELS[id as keyof typeof DEFAULT_MODELS],
+        local,
+        connected: local ? true : id === 'custom' ? !!settings.ai.customBaseUrl : !!secrets.get(providerSecretName(id)),
+        active: settings.ai.provider === id
+      }
+    })
   })
-  ipcMain.handle('ai:connect', async (_e, input: { provider: string; apiKey: string }) => {
+  ipcMain.handle('ai:connect', async (_e, input: { provider: string; apiKey: string; baseUrl?: string }) => {
     const settings = loadSettings(db)
-    const result = await testProvider({ ...settings.ai, provider: input.provider as any }, input.apiKey)
+    const ai = { ...settings.ai, provider: input.provider as any }
+    if (input.provider === 'custom' && input.baseUrl) ai.customBaseUrl = input.baseUrl.trim()
+    const result = await testProvider(ai, input.apiKey)
     if (result.ok) {
-      secrets.set(providerSecretName(input.provider), input.apiKey)
-      saveSettings(db, { ...settings, ai: { ...settings.ai, provider: input.provider as any } })
+      if (input.apiKey) secrets.set(providerSecretName(input.provider), input.apiKey)
+      saveSettings(db, { ...settings, ai })
     }
     return result
   })

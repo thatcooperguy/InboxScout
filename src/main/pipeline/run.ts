@@ -12,7 +12,9 @@ import { renderHtml, renderMarkdown } from '../reports/render'
 import { getProfile } from '../profiles/profiles'
 import { loadSettings, saveSettings } from '../settings'
 import { SecretStore, accountSecretName, providerSecretName } from '../secrets'
-import { resolveModel, DEFAULT_MODELS } from '../ai/provider'
+import { resolveModel, DEFAULT_MODELS, LOCAL_PROVIDERS } from '../ai/provider'
+import { classifyMessageHeuristically, deriveIssues, buildBasicBrief } from '../ai/builtin'
+import type { MessageClassificationOutput } from '../ai/schemas'
 import type { Classification, MessageRecord, RunProgress } from '../../shared/types'
 
 export interface PipelineResult {
@@ -44,12 +46,13 @@ export async function runPipeline(
   })
 
   try {
+    const useBuiltin = settings.ai.provider === 'builtin'
     const apiKey = secrets.get(providerSecretName(settings.ai.provider)) ?? ''
-    if (!apiKey && settings.ai.provider !== 'ollama') {
-      throw new Error(`No API key connected for provider "${settings.ai.provider}". Open AI settings to connect one.`)
+    if (!apiKey && !LOCAL_PROVIDERS.includes(settings.ai.provider) && settings.ai.provider !== 'custom') {
+      throw new Error(`No API key connected for provider "${settings.ai.provider}". Open Connect AI to add one.`)
     }
-    const model = resolveModel(settings.ai, apiKey)
-    const modelName = settings.ai.model || DEFAULT_MODELS[settings.ai.provider]
+    const model = useBuiltin ? null : resolveModel(settings.ai, apiKey)
+    const modelName = useBuiltin ? 'builtin/rules-v1' : settings.ai.model || DEFAULT_MODELS[settings.ai.provider]
 
     // 1. Fetch
     onProgress({ phase: 'fetch', detail: 'Checking mail accounts…' })
@@ -82,8 +85,16 @@ export async function runPipeline(
     onProgress({ phase: 'classify', detail: `Classifying ${toClassify.length} new messages…` })
     const corrections = repo.listCorrections(db, 10)
     const classifications: Classification[] = []
+    const classifyChunk = async (batch: MessageRecord[]): Promise<Map<string, MessageClassificationOutput>> => {
+      if (!model) {
+        const map = new Map<string, MessageClassificationOutput>()
+        for (const m of batch) map.set(m.id, classifyMessageHeuristically(m, profile))
+        return map
+      }
+      return classifyBatch(model, profile, batch, corrections)
+    }
     for (const batch of chunk(toClassify, BATCH_SIZE)) {
-      const results = await classifyBatch(model, profile, batch, corrections)
+      const results = await classifyChunk(batch)
       for (const m of batch) {
         const r = results.get(m.id)
         if (!r) continue
@@ -114,15 +125,21 @@ export async function runPipeline(
     const workPairs = classifications.filter((c) => c.category === 'work' && messageById.has(c.messageId)).map(pair)
     if (workPairs.length > 0) {
       onProgress({ phase: 'track', detail: `Updating ${profile.pulseName}…` })
-      const decisions = await decideTracking(model, profile, repo.listProjects(db), repo.listIssues(db, true), workPairs)
-      const applied = applyTrackingDecisions(
-        repo.listProjects(db),
-        repo.listIssues(db),
-        decisions,
-        new Date().toISOString()
-      )
-      for (const p of applied.projects) repo.upsertProject(db, p)
-      for (const i of applied.issues) repo.upsertIssue(db, i)
+      if (!model) {
+        for (const i of deriveIssues(repo.listIssues(db, false), workPairs, new Date().toISOString())) {
+          repo.upsertIssue(db, i)
+        }
+      } else {
+        const decisions = await decideTracking(model, profile, repo.listProjects(db), repo.listIssues(db, true), workPairs)
+        const applied = applyTrackingDecisions(
+          repo.listProjects(db),
+          repo.listIssues(db),
+          decisions,
+          new Date().toISOString()
+        )
+        for (const p of applied.projects) repo.upsertProject(db, p)
+        for (const i of applied.issues) repo.upsertIssue(db, i)
+      }
     }
 
     // 4. Brief
@@ -141,8 +158,8 @@ export async function runPipeline(
     const deadlines = classifications
       .filter((c) => c.deadline && messageById.has(c.messageId))
       .map((c) => `${c.deadline} — ${messageById.get(c.messageId)!.subject}`)
-    const periodType = settings.schedule.frequency === 'weekly' ? 'weekly' : 'daily'
-    const brief = await generateBrief(model, {
+    const periodType = settings.schedule.frequency === 'weekly' ? ('weekly' as const) : ('daily' as const)
+    const briefInputs = {
       profile,
       periodType,
       projects: repo.listProjects(db, true),
@@ -151,7 +168,8 @@ export async function runPipeline(
       sensitiveMessages: sensitivePairs,
       deadlines,
       replies
-    })
+    }
+    const brief = model ? await generateBrief(model, briefInputs) : buildBasicBrief(briefInputs)
 
     // 5. Render & save
     onProgress({ phase: 'save', detail: 'Saving report…' })

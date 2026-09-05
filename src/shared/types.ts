@@ -5,7 +5,19 @@ export type Trend = 'up' | 'steady' | 'down'
 export type IssueState = 'emerging' | 'active' | 'resolved'
 export type IssueSeverity = 'low' | 'medium' | 'high' | 'urgent'
 export type ProjectState = 'active' | 'dormant' | 'done'
-export type ProviderId = 'gemini' | 'groq' | 'openai' | 'xai' | 'anthropic' | 'ollama'
+export type ProviderId =
+  | 'builtin'
+  | 'gemini'
+  | 'groq'
+  | 'openai'
+  | 'xai'
+  | 'anthropic'
+  | 'openrouter'
+  | 'mistral'
+  | 'deepseek'
+  | 'ollama'
+  | 'lmstudio'
+  | 'custom'
 export type ProfileId = 'owner' | 'realestate' | 'utility' | 'general'
 export type ScheduleFrequency = 'daily' | 'weekly' | 'manual'
 
@@ -135,6 +147,8 @@ export interface AiSettings {
   /** Model override; empty string uses the provider default. */
   model: string
   ollamaBaseUrl: string
+  /** Base URL for the "custom" OpenAI-compatible provider. */
+  customBaseUrl: string
 }
 
 export interface AppSettings {
@@ -151,7 +165,7 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
   profileId: 'general',
   schedule: { frequency: 'daily', hour: 7, minute: 30, weekday: 1 },
-  ai: { provider: 'gemini', model: '', ollamaBaseUrl: 'http://127.0.0.1:11434/v1' },
+  ai: { provider: 'builtin', model: '', ollamaBaseUrl: 'http://127.0.0.1:11434/v1', customBaseUrl: '' },
   simpleMode: true,
   storeFullBodies: true,
   launchAtLogin: true,

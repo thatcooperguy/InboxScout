@@ -30,7 +30,8 @@ Run a headless scan without opening the window: `inbox-intel --sync` (used by sc
 - Multi-account: Gmail / Yahoo / Outlook.com / generic IMAP, read-only, credentials encrypted with Windows DPAPI
 - AI-powered classification: Personal / Work / Promotions-Noise with importance scoring
 - Top Emerging Issues brief + Pulse tracking (projects/deals/operations by profile) that updates across runs
-- Connect AI with a sign-in-style overlay (no manual key wrangling): Google Gemini (free tier default), OpenAI, Anthropic Claude, xAI Grok, Groq, or fully local via Ollama — with auto-detection of installed AI tools and guided downloads
+- **Free and works out of the box** — a built-in rule-based engine sorts mail, tracks issues, and writes briefs with no AI account, no payment, and no data leaving your PC
+- Optional AI upgrades with a sign-in-style overlay (no manual key wrangling): Google Gemini (free tier), Groq (free tier), OpenRouter (free models), Mistral, DeepSeek, OpenAI, Anthropic Claude, xAI Grok, local Ollama or LM Studio, or any custom OpenAI-compatible endpoint
 - Daily/weekly scheduled runs from the system tray, plus run-on-demand
 - Local-first SQLite storage with full-text search; Markdown/HTML/PDF reports; optional Drive/OneDrive sync
 - Sensitive-information heads-up: flags private or company-confidential content in briefs (never redacts)

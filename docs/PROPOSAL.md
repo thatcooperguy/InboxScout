@@ -66,7 +66,9 @@ A key research finding: **no major provider permits third-party apps to use cons
 - **OpenAI**'s "Sign in with ChatGPT" covers only OpenAI's own Codex surfaces; ChatGPT Plus has never included API access.
 - **Google** has no consumer-subscription API path — but offers a **free Gemini API tier** (~1,500 requests/day on Flash-class models) with a key from AI Studio, no credit card.
 
-So the design keeps keys under the hood but wraps them in a **"Connect AI" overlay** that feels like signing in:
+**Free and out-of-the-box first (confirmed decision):** the app must work with zero accounts and zero payment. A **built-in rule-based engine** (pure code, runs entirely on the PC) handles classification, issue detection, sensitivity flagging, reply tracking, deadline extraction, and template briefs by default. Connecting an AI backend is an optional quality upgrade, never a requirement — and the free tiers (Gemini, Groq, OpenRouter free models) or local engines (Ollama, LM Studio) keep the upgrade free too.
+
+For backends, the design keeps keys under the hood but wraps them in a **"Connect AI" overlay** that feels like signing in:
 
 1. User picks a provider from a card grid (Gemini, OpenAI, Claude, Grok, Groq, Ollama), each showing cost, free-tier availability, and a privacy note.
 2. The app opens an embedded sign-in window straight to that provider's key page (AI Studio / platform.openai.com / console.anthropic.com / console.x.ai / console.groq.com). The user signs in with their normal account; most providers show a one-click "Create key" button on that page.
@@ -75,7 +77,12 @@ So the design keeps keys under the hood but wraps them in a **"Connect AI" overl
 
 | Provider | Onboarding via Connect AI overlay | Est. cost per 1,000 emails* |
 |---|---|---|
-| **Google Gemini** (default) | Sign in with Google → free AI Studio key, no card | **$0** (free tier) / ~$0.60 paid |
+| **Built-in engine** (default) | Nothing — works on install | **$0**, forever, fully local |
+| **Google Gemini** (recommended AI upgrade) | Sign in with Google → free AI Studio key, no card | **$0** (free tier) / ~$0.60 paid |
+| **OpenRouter** | Sign in → one key, hundreds of models incl. free ones | **$0** (free models) |
+| **Mistral / DeepSeek** | Sign in → key | free tier / very low cost |
+| **LM Studio (local)** | Auto-detected local server; no account | $0 — local |
+| **Custom endpoint** | Any OpenAI-compatible server (self-hosted, vLLM, llama.cpp) | $0 — yours |
 | **Groq** (fast + free tier) | Sign in → free key; OpenAI-compatible; runs open models (Llama/Qwen) at very high speed | **$0** (free tier) / ~$0.10–0.20 paid |
 | **OpenAI** | Sign in → key from platform.openai.com (requires billing setup) | ~$0.50 (small models) |
 | **xAI Grok** | Sign in → key from console.x.ai | ~$0.30 (grok fast models) |

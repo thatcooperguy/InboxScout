@@ -4,6 +4,7 @@ export default function AiSettings(): JSX.Element {
   const [providers, setProviders] = useState<any[]>([])
   const [connecting, setConnecting] = useState<string | null>(null)
   const [apiKey, setApiKey] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
@@ -13,21 +14,24 @@ export default function AiSettings(): JSX.Element {
   }
   useEffect(load, [])
 
-  const startConnect = (id: string): void => {
-    setConnecting(id)
+  const needsKey = (p: any): boolean => !p.local && p.id !== 'custom'
+
+  const startConnect = (p: any): void => {
+    setConnecting(p.id)
     setApiKey('')
+    setBaseUrl('')
     setError('')
     setOk('')
-    if (id !== 'ollama') void window.inboxIntel.aiOpenKeyPage(id)
+    if (needsKey(p) && p.keyUrl) void window.inboxIntel.aiOpenKeyPage(p.id)
   }
 
-  const connect = async (id: string): Promise<void> => {
+  const connect = async (p: any): Promise<void> => {
     setBusy(true)
     setError('')
     try {
-      const res = await window.inboxIntel.aiConnect({ provider: id, apiKey })
+      const res = await window.inboxIntel.aiConnect({ provider: p.id, apiKey, baseUrl })
       if (res.ok) {
-        setOk(`Connected ✓ — ${id} is now your active AI.`)
+        setOk(`Connected ✓ — ${p.name} is now doing the thinking.`)
         setConnecting(null)
       } else {
         setError(res.error ?? 'That key did not work.')
@@ -42,7 +46,8 @@ export default function AiSettings(): JSX.Element {
     <div>
       <h1>Connect AI</h1>
       <p className="sub">
-        Pick who does the thinking. Your key is encrypted on this computer and used only for your own scans.
+        Inbox Intel works out of the box with its free built-in engine — no account needed. Connect any AI backend for
+        smarter sorting and briefs; keys are encrypted on this computer and used only for your own scans.
       </p>
       {ok && <div className="success">{ok}</div>}
       <div className="provider-grid">
@@ -55,7 +60,7 @@ export default function AiSettings(): JSX.Element {
             <p className="hint">Model: {p.defaultModel}</p>
             {connecting === p.id ? (
               <div>
-                {p.id !== 'ollama' && (
+                {needsKey(p) && (
                   <>
                     <p className="hint">
                       A sign-in page just opened in your browser. Sign in, create a key, and paste it here:
@@ -69,14 +74,31 @@ export default function AiSettings(): JSX.Element {
                     />
                   </>
                 )}
+                {p.id === 'custom' && (
+                  <>
+                    <input
+                      value={baseUrl}
+                      onChange={(e) => setBaseUrl(e.target.value)}
+                      placeholder="https://your-server/v1"
+                      style={{ marginBottom: 8 }}
+                    />
+                    <input
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="API key (if your server needs one)"
+                      style={{ marginBottom: 8 }}
+                    />
+                  </>
+                )}
                 {error && <div className="error">{error}</div>}
                 <div className="row">
                   <button
                     className="primary"
-                    disabled={busy || (p.id !== 'ollama' && !apiKey)}
-                    onClick={() => void connect(p.id)}
+                    disabled={busy || (needsKey(p) && !apiKey) || (p.id === 'custom' && !baseUrl)}
+                    onClick={() => void connect(p)}
                   >
-                    {busy ? 'Testing…' : p.id === 'ollama' ? 'Use local Ollama' : 'Connect'}
+                    {busy ? 'Testing…' : p.local ? 'Use this' : 'Connect'}
                   </button>
                   <button className="ghost" onClick={() => setConnecting(null)}>
                     Cancel
@@ -85,10 +107,10 @@ export default function AiSettings(): JSX.Element {
               </div>
             ) : (
               <div className="row">
-                <button className="primary" onClick={() => startConnect(p.id)}>
+                <button className="primary" onClick={() => startConnect(p)}>
                   {p.connected ? (p.active ? 'Reconnect' : 'Use this') : 'Connect'}
                 </button>
-                {p.connected && p.id !== 'ollama' && (
+                {p.connected && !p.local && p.id !== 'custom' && (
                   <button
                     className="ghost"
                     onClick={() => {
