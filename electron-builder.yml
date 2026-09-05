@@ -22,4 +22,5 @@ publish:
   provider: github
   owner: thatcooperguy
   repo: email-person-assistant-
+  releaseType: release
 npmRebuild: true
