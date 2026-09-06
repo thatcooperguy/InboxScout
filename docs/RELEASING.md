@@ -1,7 +1,24 @@
 # Releasing InboxScout
 
-Releases are built by `.github/workflows/release.yml` (Windows `.exe`, macOS arm64 + x64 `.dmg`) and
-published to GitHub Releases; installed apps self-update from there.
+Releases are built by `.github/workflows/release.yml` (Windows `.exe`, macOS arm64 + x64 `.dmg`, Linux x64
+`.AppImage` + `.deb`) and published to GitHub Releases; installed apps self-update from there.
+
+## Artifacts
+
+Names are fixed (no version in them) so the README's and website's `releases/latest/download/…` links never go stale:
+
+| File | Built on | Self-updates? |
+|---|---|---|
+| `InboxScout-Setup.exe` | windows-latest | yes (NSIS) |
+| `InboxScout-arm64.dmg`, `InboxScout-x64.dmg` | macos-latest | yes |
+| `InboxScout-x64.AppImage` | ubuntu-latest | yes (AppImage swaps itself, `latest-linux.yml`) |
+| `InboxScout-x64.deb` | ubuntu-latest | no — people run `sudo apt install ./InboxScout-x64.deb` again; the app logs that updates are off |
+
+electron-builder would otherwise name the Linux files `x86_64` (AppImage) and `amd64` (deb), which is why
+`linux.artifactName` in `electron-builder.yml` spells out `x64` and the targets are x64 only. The `.deb`
+carries `Maintainer: InboxScout <hello@inboxscout.ai>` (Debian requires an email; it must be a mailbox
+somebody reads — see `docs/TODO-AT-PC.md`). The icon for every OS is `build/icon.png` (512×512, rendered from
+`docs/assets/logo.svg`). Linux specifics for users are in `docs/LINUX.md`.
 
 ## Cut a release
 
@@ -31,4 +48,5 @@ beyond 100 users.
 
 Unsigned builds show a one-time warning on each OS (documented in the README). When ready: Azure Trusted
 Signing for Windows (~$10/mo) and an Apple Developer ID ($99/yr) with notarization; electron-builder picks up
-the certificates from environment variables.
+the certificates from environment variables. Linux packages are not signed; the AppImage just needs to be
+marked executable.

@@ -11,6 +11,8 @@ export interface SecretsLike {
   get(name: string): string | null
   set(name: string, value: string): void
   delete(name: string): void
+  /** True when the OS keyring protects stored secrets. Optional so simple in-memory stores (tests) need not implement it. */
+  isSecure?(): boolean
 }
 
 const LIST_KEY = 'signins'

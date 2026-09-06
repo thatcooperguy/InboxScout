@@ -32,6 +32,15 @@ So nobody who installs InboxScout ever registers an app with Google or Microsoft
 - [ ] Google only: in the Cloud console's OAuth **Audience** page either add family members' Gmail addresses as
       test users, or click **Publish app** so sign-ins don't expire weekly.
 
+## 2a. The project mailbox: hello@inboxscout.ai  (~5 min)
+
+The Linux `.deb` lists `InboxScout <hello@inboxscout.ai>` as its maintainer (Debian requires a contact email,
+and it must not be a personal address in the repo). Make sure that address actually reaches you:
+
+- [ ] Squarespace → Domains → inboxscout.ai → **Email forwarding** (or Google Workspace if you set that up):
+      forward **hello@inboxscout.ai → your real inbox** (https://account.squarespace.com/domains)
+- [ ] Send yourself a test mail to hello@inboxscout.ai and check it arrives
+
 ## 2b. Optional: let Hermes use InboxScout  (~3 min)
 
 - [ ] InboxScout → **Setup → Preferences → Agent bridge → On**, choose **Full** (or Read only), press **Show** on the token
@@ -42,7 +51,8 @@ So nobody who installs InboxScout ever registers an app with Google or Microsoft
 ## 3. Try it on your own inbox  (~5 min)
 
 - [ ] Download https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-Setup.exe
-      (SmartScreen → *More info* → *Run anyway*)
+      (SmartScreen → *More info* → *Run anyway*). Linux box? `…/InboxScout-x64.AppImage` (then `chmod +x`) or
+      `…/InboxScout-x64.deb` — see `docs/LINUX.md`
 - [ ] Connect one account, press **Check my email now**, read the brief; tell Claude what felt wrong — real mail
       tunes the rules better than any test.
 

@@ -55,6 +55,8 @@ export interface HealthCtx {
   /** Free space on the volume holding `dir`; null when unknown. */
   freeBytes: (dir: string) => number | null
   which: (binary: string) => boolean
+  /** True when the OS keyring/keychain protects saved passwords (false on Linux without gnome-keyring or kwallet). */
+  secureSecrets: () => boolean
   bridgeRunning: () => boolean
   portFree: (port: number) => Promise<boolean>
   syncBridge: () => void
@@ -268,6 +270,20 @@ const desktopLinuxCheck: Check = {
   }
 }
 
+const keyringLinuxCheck: Check = {
+  id: 'keyring-linux',
+  title: 'Password storage',
+  detect(ctx) {
+    if (ctx.platform !== 'linux') return item(this, 'ok', 'Nothing to check on this system.')
+    if (ctx.secureSecrets()) return item(this, 'ok', 'Passwords are locked with the system keyring.')
+    return item(
+      this,
+      'warn',
+      'Install gnome-keyring or kwallet (sudo apt install gnome-keyring) so InboxScout can lock your passwords with the system keyring; until then they are stored obfuscated, not encrypted.'
+    )
+  }
+}
+
 const diskCheck: Check = {
   id: 'disk',
   title: 'Disk space',
@@ -279,7 +295,7 @@ const diskCheck: Check = {
   }
 }
 
-export const CHECKS: Check[] = [dbCheck, reportsDirCheck, accountsCheck, aiCheck, scheduleCheck, bridgeCheck, desktopLinuxCheck, diskCheck]
+export const CHECKS: Check[] = [dbCheck, reportsDirCheck, accountsCheck, aiCheck, scheduleCheck, bridgeCheck, desktopLinuxCheck, keyringLinuxCheck, diskCheck]
 
 // ---- Running them ----
 

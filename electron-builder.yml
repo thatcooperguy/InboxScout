@@ -24,6 +24,28 @@ mac:
         - arm64
         - x64
   category: public.app-category.productivity
+linux:
+  # electron-builder expands ${arch} to "x86_64" for AppImage and "amd64" for .deb on Linux,
+  # so the arch is spelled out to keep the README's "latest" links stable:
+  # InboxScout-x64.AppImage and InboxScout-x64.deb. (Icon: build/icon.png, shared by every OS.)
+  artifactName: InboxScout-x64.${ext}
+  target:
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  category: Office
+  synopsis: Know what needs you. Skip the rest.
+  description: A free desktop app that reads your email (read-only) and hands you a 30-second brief, in plain words.
+  # Debian packages need a maintainer with an email address; this is the project mailbox, not a person.
+  maintainer: InboxScout <hello@inboxscout.ai>
+  desktop:
+    Name: InboxScout
+    Comment: Know what needs you. Skip the rest.
+    Categories: Office;Email;Network;
+    StartupWMClass: InboxScout
 publish:
   provider: github
   owner: thatcooperguy

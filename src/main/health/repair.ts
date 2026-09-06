@@ -136,6 +136,8 @@ export function createHealthContext(w: HealthWiring): HealthCtx {
     mkdir: (dir) => mkdirSync(dir, { recursive: true }),
     freeBytes,
     which: (b) => which(b),
+    // Stores without the probe (tests, in-memory fakes) are assumed fine; the real SecretStore answers honestly.
+    secureSecrets: () => w.secrets.isSecure?.() ?? true,
     bridgeRunning: w.bridgeRunning,
     portFree: (p) => portFree(p),
     syncBridge: w.syncBridge,

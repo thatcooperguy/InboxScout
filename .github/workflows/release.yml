@@ -17,6 +17,8 @@ jobs:
             artifact: Windows .exe
           - os: macos-latest
             artifact: macOS .dmg
+          - os: ubuntu-latest
+            artifact: Linux AppImage + .deb
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4

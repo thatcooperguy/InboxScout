@@ -15,6 +15,8 @@
   <a href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-arm64.dmg"><img src="https://img.shields.io/badge/⬇%20Mac-Apple%20Silicon-1e2430?style=for-the-badge" alt="Download for Mac (Apple Silicon)"/></a>
   &nbsp;
   <a href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-x64.dmg"><img src="https://img.shields.io/badge/⬇%20Mac-Intel-1e2430?style=for-the-badge" alt="Download for Mac (Intel)"/></a>
+  &nbsp;
+  <a href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-x64.AppImage"><img src="https://img.shields.io/badge/⬇%20Linux-AppImage-1e2430?style=for-the-badge" alt="Download for Linux (AppImage)"/></a>
 </p>
 
 <p align="center">
@@ -25,7 +27,7 @@
   <a href="https://github.com/thatcooperguy/InboxScout/releases/latest"><img src="https://img.shields.io/github/v/release/thatcooperguy/InboxScout?label=latest&color=2456a6" alt="Latest release"/></a>
   <a href="https://github.com/thatcooperguy/InboxScout/actions/workflows/ci.yml"><img src="https://github.com/thatcooperguy/InboxScout/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"/></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-FSL--1.1--MIT-blue" alt="License"/></a>
-  <img src="https://img.shields.io/badge/Windows%20%7C%20macOS-desktop-1e2430" alt="Platforms"/>
+  <img src="https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-desktop-1e2430" alt="Platforms"/>
   <img src="https://img.shields.io/badge/AI%20account-optional-2e7d4f" alt="No AI account needed"/>
 </p>
 
@@ -41,7 +43,7 @@ It works for a small-business owner, a real-estate agent, a nurse, a lineworker,
 
 ## 🚀 Two minutes to set up
 
-1. **Download** — [Windows](https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-Setup.exe) · [Mac with Apple Silicon (M1–M4)](https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-arm64.dmg) · [Mac with Intel](https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-x64.dmg). Not sure which Mac? Apple menu → *About This Mac*.
+1. **Download** — [Windows](https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-Setup.exe) · [Mac with Apple Silicon (M1–M4)](https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-arm64.dmg) · [Mac with Intel](https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-x64.dmg) · Linux: [AppImage](https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-x64.AppImage) · [.deb](https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-x64.deb). Not sure which Mac? Apple menu → *About This Mac*.
 2. **Connect your email** — Gmail, Yahoo, iCloud, Outlook.com, Hotmail, or any other mailbox. Read-only, always.
 3. **Say what you do — or don't** — pick from 56 kinds of people, or let InboxScout work it out from your mail.
 
@@ -50,7 +52,8 @@ Then press **Check my email**. Your first brief is ready before your coffee cool
 > **One-time warning at install:** the installers aren't code-signed yet (we're in the friends-and-family stage).
 > **Windows:** *"Windows protected your PC"* → **More info** → **Run anyway**.
 > **macOS:** *"InboxScout can't be opened"* → **System Settings → Privacy & Security** → **Open Anyway**.
-> After that, the app updates itself.
+> **Linux:** make the AppImage executable — right-click → Properties → Allow executing, or `chmod +x InboxScout-x64.AppImage` — or install the .deb with `sudo apt install ./InboxScout-x64.deb` ([Linux notes](docs/LINUX.md)).
+> After that, the app updates itself (on Linux: the AppImage does; the .deb is updated through apt).
 
 ## 🎚 Simple enough for a grandparent, sharp enough for a CEO
 

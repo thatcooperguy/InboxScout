@@ -1,5 +1,6 @@
-import { app, BrowserWindow, Menu, Notification, Tray, nativeImage } from 'electron'
+import { app, BrowserWindow, Menu, Notification, Tray, nativeImage, safeStorage } from 'electron'
 import { join } from 'node:path'
+import { applyLinuxAutostart } from './linux'
 import { openDatabase, type DB } from './db/index'
 import { SecretStore } from './secrets'
 import { registerIpc, type IpcHooks } from './ipc'
@@ -143,6 +144,15 @@ async function bootstrap(): Promise<void> {
   log('info', 'app', `start v${app.getVersion()}${isHeadlessSync ? ' (--sync)' : ''}`, { platform: process.platform, electron: process.versions.electron })
   app.on('before-quit', () => log('info', 'app', 'quit'))
   db = openDatabase(join(dataDir, 'inboxscout.db'))
+  if (process.platform === 'linux') {
+    // No keyring (gnome-keyring / kwallet) on this desktop? Use Electron's own obfuscated fallback
+    // rather than refusing to save anything; the "Password storage" health check says how to do better.
+    try {
+      safeStorage.setUsePlainTextEncryption(true)
+    } catch {
+      // SecretStore has its own base64 fallback when even that is missing
+    }
+  }
   secrets = new SecretStore(db)
 
   const settings = loadSettings(db)
@@ -178,28 +188,37 @@ async function bootstrap(): Promise<void> {
     scheduler.apply(current.schedule, current.lastRunAt)
   }, 5 * 60 * 1000)
 
-  // Start with Windows/macOS so scheduled runs actually happen.
+  // Start with Windows/macOS/Linux so scheduled runs actually happen.
   const applyLoginItem = (): void => {
     if (!app.isPackaged) return
+    const openAtLogin = loadSettings(db).launchAtLogin
     try {
-      app.setLoginItemSettings({ openAtLogin: loadSettings(db).launchAtLogin })
+      // setLoginItemSettings is a no-op on Linux; an XDG autostart entry does the same job there.
+      if (process.platform === 'linux') applyLinuxAutostart(openAtLogin, process.env['APPIMAGE'] ?? process.execPath)
+      else app.setLoginItemSettings({ openAtLogin })
     } catch {
-      // not supported on this platform
+      // not supported on this platform (or ~/.config is read-only)
     }
   }
   applyLoginItem()
   setInterval(applyLoginItem, 5 * 60 * 1000)
 
   // Auto-update from this repo's GitHub Releases (packaged builds only).
-  if (app.isPackaged) {
+  // On Linux only the AppImage can replace itself; the .deb (and an unpacked build) would make
+  // electron-updater fail on every check, so those skip it and get new versions through apt.
+  if (app.isPackaged && process.platform === 'linux' && !process.env['APPIMAGE']) {
+    log('info', 'updater', 'not running from an AppImage; automatic updates are off (install new versions with apt)')
+  } else if (app.isPackaged) {
     try {
       const { autoUpdater } = await import('electron-updater')
       autoUpdater.autoDownload = true
       autoUpdater.autoInstallOnAppQuit = true
-      void autoUpdater.checkForUpdatesAndNotify()
-      setInterval(() => void autoUpdater.checkForUpdatesAndNotify(), 6 * 60 * 60 * 1000)
-    } catch {
-      // updater unavailable in dev
+      // A failed check (offline, GitHub down) is a log line, not a "hit a snag" notification.
+      const check = (): void => void autoUpdater.checkForUpdatesAndNotify().catch((err) => log('warn', 'updater', 'update check failed', err))
+      check()
+      setInterval(check, 6 * 60 * 60 * 1000)
+    } catch (err) {
+      log('warn', 'updater', 'updater unavailable', err)
     }
   }
 }

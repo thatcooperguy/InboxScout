@@ -20,7 +20,7 @@ import {
   type Check,
   type HealthCtx
 } from '../src/main/health/checks'
-import { reauthAccount, resetSync, which } from '../src/main/health/repair'
+import { createHealthContext, reauthAccount, resetSync, which } from '../src/main/health/repair'
 import { openDatabase } from '../src/main/db/index'
 import * as repo from '../src/main/db/repo'
 import { saveSignin } from '../src/main/signins'
@@ -67,6 +67,7 @@ function fakeCtx(over: Partial<HealthCtx> = {}, settings: Partial<AppSettings> =
     mkdir: (d) => void calls.push(`mkdir:${d}`),
     freeBytes: () => 50 * 1024 * 1024 * 1024,
     which: () => true,
+    secureSecrets: () => true,
     bridgeRunning: () => true,
     portFree: async () => true,
     syncBridge: () => void calls.push('syncBridge'),
@@ -95,7 +96,7 @@ describe('health checks', () => {
   it('all green on a healthy app', () => {
     const report = runHealth(fakeCtx().ctx)
     expect(report.ok).toBe(true)
-    expect(report.items.map((i) => i.id)).toEqual(['db', 'reportsDir', 'accounts', 'ai', 'schedule', 'bridge', 'desktop-linux', 'disk'])
+    expect(report.items.map((i) => i.id)).toEqual(['db', 'reportsDir', 'accounts', 'ai', 'schedule', 'bridge', 'desktop-linux', 'keyring-linux', 'disk'])
     expect(report.items.every((i) => i.status === 'ok')).toBe(true)
     expect(report.checkedAt).toBe(NOW.toISOString())
   })
@@ -205,6 +206,17 @@ describe('health checks', () => {
     expect(detect('desktop-linux', fakeCtx({ platform: 'linux', which: () => true })).status).toBe('ok')
     expect(detect('desktop-linux', fakeCtx({ platform: 'win32', which: () => false })).status).toBe('ok')
     expect(detect('desktop-linux', fakeCtx({ platform: 'linux', which: () => false }, { systemControl: 'off' })).status).toBe('ok')
+  })
+
+  it('keyring-linux: warns only on Linux when the system keyring is not protecting passwords', () => {
+    const noKeyring = detect('keyring-linux', fakeCtx({ platform: 'linux', secureSecrets: () => false }))
+    expect(noKeyring).toMatchObject({ status: 'warn', title: 'Password storage', canRepair: false })
+    expect(noKeyring.detail).toContain('sudo apt install gnome-keyring')
+    expect(noKeyring.detail).toContain('obfuscated, not encrypted')
+    expect(detect('keyring-linux', fakeCtx({ platform: 'linux', secureSecrets: () => true })).status).toBe('ok')
+    // Windows and macOS always have a keystore; the check stays quiet there even if the probe says no.
+    expect(detect('keyring-linux', fakeCtx({ platform: 'win32', secureSecrets: () => false })).status).toBe('ok')
+    expect(detect('keyring-linux', fakeCtx({ platform: 'darwin', secureSecrets: () => false })).status).toBe('ok')
   })
 
   it('disk: warns under 500 MB and stays quiet when it cannot measure', () => {
@@ -375,6 +387,16 @@ describe('repairs with a real database', () => {
     // A busy Assistant is reported, not retried.
     const busy = { ...deps, startAgent: () => ({ ok: false, summary: 'The assistant is already working on something.' }) }
     expect(await reauthAccount(busy, 'g1')).toMatchObject({ ok: false, message: expect.stringContaining('already working') })
+  })
+
+  it('createHealthContext asks the secret store whether the keyring protects passwords', () => {
+    const db = openDatabase(':memory:')
+    const base = { db, userData: '/data', startAgent: () => ({ ok: true }), bridgeRunning: () => true, syncBridge: () => {}, probeAi: async () => ({ ok: true }) }
+    // A store without the probe (in-memory fakes) is assumed fine; a real store's answer is passed through.
+    expect(createHealthContext({ ...base, secrets: new FakeSecrets() }).secureSecrets()).toBe(true)
+    const insecure = Object.assign(new FakeSecrets(), { isSecure: () => false })
+    expect(createHealthContext({ ...base, secrets: insecure, platform: 'linux' }).secureSecrets()).toBe(false)
+    expect(createHealthContext({ ...base, secrets: insecure, platform: 'linux' }).platform).toBe('linux')
   })
 
   it('which() looks through PATH', () => {
