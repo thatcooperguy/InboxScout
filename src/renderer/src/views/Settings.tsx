@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ProfilePicker from './ProfilePicker'
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
@@ -81,11 +82,26 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
   const [carriers, setCarriers] = useState<{ id: string; name: string }[]>([])
   const [testMsg, setTestMsg] = useState('')
 
+  const [profileSuggestion, setProfileSuggestion] = useState<any | null>(null)
+
   useEffect(() => {
     void window.inboxScout.getSettings().then(setSettings)
     void window.inboxScout.listProfiles().then(setProfiles)
     void window.inboxScout.deliveryCarriers().then(setCarriers)
+    void window.inboxScout.profileStatus().then((s) => setProfileSuggestion(s.suggestion))
   }, [])
+
+  const chooseProfile = async (id: string | 'auto'): Promise<void> => {
+    const next = await window.inboxScout.chooseProfile(id)
+    setSettings({ ...settings, profileId: next.profileId, profileAuto: next.profileAuto, enabledSkillIds: next.enabledSkillIds })
+    setProfileSuggestion(null)
+    onSaved?.()
+  }
+
+  const dismissSuggestion = async (): Promise<void> => {
+    await window.inboxScout.dismissProfileSuggestion()
+    setProfileSuggestion(null)
+  }
 
   const testDelivery = async (kind: 'email' | 'sms'): Promise<void> => {
     await window.inboxScout.setSettings(settings)
@@ -140,19 +156,27 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
             </select>
           </label>
         </div>
-        <div className="card">
-          <h3>What kind of work do you do?</h3>
-          <label className="field">
-            <span>Work profile</span>
-            <select value={settings.profileId} onChange={(e) => update({ profileId: e.target.value })}>
-              {profiles.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} — {p.pulseName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <p className="hint">This tunes what counts as work mail and what your brief tracks.</p>
+        <div className="card" style={{ gridColumn: '1 / -1' }}>
+          <h3>Who is this inbox for?</h3>
+          <p className="hint" style={{ marginTop: 0 }}>
+            This tunes what counts as work mail, what is urgent, and what your brief tracks — {profiles.length} kinds of people and
+            counting. Current: <strong>{profiles.find((p) => p.id === settings.profileId)?.name ?? settings.profileId}</strong>
+            {settings.profileAuto ? ' (chosen automatically)' : ' (locked by you)'}.
+          </p>
+          {profileSuggestion && (
+            <div className="success" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span>
+                Your mail looks like <strong>{profileSuggestion.name}</strong>. {profileSuggestion.why}
+              </span>
+              <button className="primary" onClick={() => void chooseProfile(profileSuggestion.id)}>
+                Switch
+              </button>
+              <button className="ghost" onClick={() => void dismissSuggestion()}>
+                No thanks
+              </button>
+            </div>
+          )}
+          <ProfilePicker value={settings.profileId} auto={settings.profileAuto} onChoose={(id) => void chooseProfile(id)} />
         </div>
         <div className="card">
           <h3>Schedule</h3>

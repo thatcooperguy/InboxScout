@@ -50,7 +50,7 @@ export default function App(): JSX.Element {
     })
     const offFinished = window.inboxScout.onRunFinished((r) => {
       setRunning(false)
-      setStatus(r.error ? `Problem: ${r.error}` : 'Brief ready.')
+      setStatus(r.error ? `Problem: ${r.error}` : r.notices?.length ? `Brief ready. ${r.notices[0]}` : 'Brief ready.')
       setRefreshKey((k) => k + 1)
     })
     return () => {

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ProfilePicker from './ProfilePicker'
 
 interface Props {
   onDone: () => void
@@ -12,6 +13,7 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
   const [step, setStep] = useState(0)
   const [profiles, setProfiles] = useState<any[]>([])
   const [profileId, setProfileId] = useState('general')
+  const [profileAuto, setProfileAuto] = useState(true)
   const [presets, setPresets] = useState<Record<string, any>>({})
   const [provider, setProvider] = useState('gmail')
   const [email, setEmail] = useState('')
@@ -29,8 +31,7 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
   const preset = presets[provider] ?? { host: '', port: 993, sentFolder: 'Sent', help: '' }
 
   const saveProfile = async (): Promise<void> => {
-    const settings = await window.inboxScout.getSettings()
-    await window.inboxScout.setSettings({ ...settings, profileId })
+    await window.inboxScout.chooseProfile(profileAuto ? 'auto' : profileId)
     setStep(2)
   }
 
@@ -84,23 +85,23 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
 
       {step === 1 && (
         <div className="card">
-          <h1>Step 1 of 3 — What kind of work do you do?</h1>
-          <p className="hint">This tunes what your brief pays attention to. You can change it anytime in Settings.</p>
-          {profiles.map((p) => (
-            <label key={p.id} className="field" style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
-              <input
-                type="radio"
-                name="profile"
-                style={{ width: 'auto' }}
-                checked={profileId === p.id}
-                onChange={() => setProfileId(p.id)}
-              />
-              <span style={{ marginBottom: 0 }}>
-                {p.name} <span className="hint">— your brief tracks a {p.pulseName}</span>
-              </span>
-            </label>
-          ))}
-          <button className="primary" onClick={() => void saveProfile()}>
+          <h1>Step 1 of 3 — Who is this inbox for?</h1>
+          <p className="hint">
+            This tunes what your brief pays attention to. Not sure? Let InboxScout figure it out — it looks at what your mail is
+            about and picks from {profiles.length || '50+'} kinds of people. You can change it anytime in Settings.
+          </p>
+          <ProfilePicker
+            value={profileId}
+            auto={profileAuto}
+            onChoose={(id) => {
+              if (id === 'auto') setProfileAuto(true)
+              else {
+                setProfileAuto(false)
+                setProfileId(id)
+              }
+            }}
+          />
+          <button className="primary" style={{ marginTop: 12 }} onClick={() => void saveProfile()}>
             Next
           </button>
         </div>

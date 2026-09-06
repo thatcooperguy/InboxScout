@@ -53,6 +53,7 @@ J="content-type: application/json"
 | Show a desktop notification | `notify {title?, body}` | `POST /notify` |
 | Say something out loud | `speak {text}` | `POST /speak` |
 | Skills on/off | `list_skills`, `set_skills {ids}` | `GET /skills`, `POST /skills` |
+| Who is this inbox for? (50+ profiles) | `list_profiles`, `detect_profile`, `set_profile {id or "auto"}` | `GET /profiles`, `GET /profiles/detect`, `POST /profiles` |
 | Preferences (safe subset) | `get_settings`, `update_settings {patch}` | `GET /settings`, `PATCH /settings` |
 | Live events (scan progress, Assistant steps) | — | `GET /events` (Server-Sent Events) |
 
@@ -60,6 +61,8 @@ Machine-readable spec: `GET /v1/openapi.json` (no token needed).
 
 ## How to behave
 
+- **Profiles.** InboxScout tunes itself to who the person is (nurse, landlord, retiree, developer… 50+ kinds). By default it
+  picks from the mail automatically; `set_profile` locks a choice, `set_profile {id:"auto"}` hands it back.
 - **Sign-ins.** If the person has saved a sign-in (or gives you their password and agrees to save it with `save_signin`),
   the Assistant logs in for them. It types a placeholder that InboxScout swaps at the keyboard, so neither you nor the
   browser model ever needs to see the password again. The person chooses how far it may go in

@@ -4,6 +4,11 @@ const api = {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (settings: unknown) => ipcRenderer.invoke('settings:set', settings),
   listProfiles: () => ipcRenderer.invoke('profiles:list'),
+  profileGroups: () => ipcRenderer.invoke('profiles:groups'),
+  profileStatus: () => ipcRenderer.invoke('profiles:status'),
+  chooseProfile: (id: string) => ipcRenderer.invoke('profiles:choose', id),
+  detectProfile: () => ipcRenderer.invoke('profiles:detect'),
+  dismissProfileSuggestion: () => ipcRenderer.invoke('profiles:dismiss'),
 
   listAccounts: () => ipcRenderer.invoke('accounts:list'),
   accountPresets: () => ipcRenderer.invoke('accounts:presets'),

@@ -1,6 +1,6 @@
 {
   "name": "inboxscout",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "AI email intelligence assistant - sorts personal from work mail and delivers daily briefs",
   "main": "out/main/index.js",
   "author": "thatcooperguy",
@@ -16,6 +16,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",
     "lint": "eslint .",
+    "docs:profiles": "esbuild scripts/gen-profiles-doc.ts --bundle --platform=node --outfile=out/gen-profiles-doc.cjs --log-level=warning && node out/gen-profiles-doc.cjs",
     "package": "electron-vite build && electron-builder --publish never",
     "release": "electron-vite build && electron-builder --publish always"
   },

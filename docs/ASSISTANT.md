@@ -25,9 +25,12 @@ for non-technical people first.
 
 | Level | Sign-in pages | Payment / delete / password-change pages | Leaving the task's sites |
 |---|---|---|---|
+| **Full** (default) | logs in with your saved sign-in | keeps going (logged as a heads-up) | allowed |
+| **Sign in for me** | logs in with your saved sign-in | pauses so you can press Continue (or Stop) | pauses, asks you to steer back |
 | **Careful** | handed to you | run stops | pauses, asks you to steer back |
-| **Sign in for me** (default) | logs in with your saved sign-in | pauses so you can press Continue (or Stop) | pauses, asks you to steer back |
-| **Full** | logs in with your saved sign-in | keeps going (logged as a heads-up) | allowed |
+
+Full is the default because that is what "just works" for most people; dial it back to *Sign in for me* or *Careful*
+whenever you would rather be asked.
 
 Verification codes, phone approvals, and security keys are **always** handed to you — nothing else can do them.
 

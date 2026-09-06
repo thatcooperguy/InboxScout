@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { BriefSection, Classification, MessageRecord, ProfileId } from '../../shared/types'
 import { BUILTIN_SKILLS } from './library'
+import { getProfile } from '../profiles/profiles'
 import type { Skill, SkillMatch } from './types'
 
 export interface SkillContext {
@@ -11,7 +12,10 @@ export interface SkillContext {
 
 /** Skills a profile turns on when the user hasn't chosen explicitly. */
 export function defaultSkillIds(profileId: ProfileId): string[] {
-  return BUILTIN_SKILLS.filter((s) => s.defaultFor.includes(profileId)).map((s) => s.id)
+  const known = new Set(BUILTIN_SKILLS.map((s) => s.id))
+  const fromProfile = (getProfile(profileId).defaultSkills ?? []).filter((id) => known.has(id))
+  const fromSkills = BUILTIN_SKILLS.filter((s) => s.defaultFor.includes(profileId)).map((s) => s.id)
+  return [...new Set([...fromProfile, ...fromSkills])]
 }
 
 /**

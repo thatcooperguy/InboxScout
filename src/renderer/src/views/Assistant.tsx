@@ -113,14 +113,14 @@ export default function Assistant({ preset }: Props): JSX.Element {
             <label className="field">
               <span>Autonomy</span>
               <select value={autonomy} onChange={(e) => void changeAutonomy(e.target.value)}>
-                <option value="careful">Careful — hands every sign-in and risky page to me</option>
-                <option value="signin">Sign in for me — uses my saved sign-ins; pauses on payment/delete pages so I can say yes</option>
-                <option value="full">Full — signs in and keeps going; only verification codes come to me</option>
+                <option value="full">Full (recommended) — signs in with my saved sign-ins and keeps going; only verification codes come to me</option>
+                <option value="signin">Sign in for me — but pause on payment/delete pages so I can say yes</option>
+                <option value="careful">Careful — hand every sign-in and risky page to me</option>
               </select>
             </label>
             <p className="hint" style={{ margin: 0 }}>
-              Always on, whatever you pick: every step is shown below, there is a Stop button, the window is visible, and the AI
-              never sees a password — it types a placeholder that InboxScout swaps in at the keyboard.
+              Dial it back any time. Always on, whatever you pick: every step is shown below, there is a Stop button, the window is
+              visible, and the AI never sees a password — it types a placeholder that InboxScout swaps in at the keyboard.
             </p>
           </div>
           <div className="card">

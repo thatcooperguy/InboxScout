@@ -119,6 +119,22 @@ describe('bridge operations', () => {
     expect(() => saveSignin(deps.db, deps.secrets, '', 'x')).toThrow()
   })
 
+  it('lists, detects, and sets profiles through ops', async () => {
+    const { deps } = makeDeps()
+    const ops = buildOps(deps)
+    const list: any = await runOp(ops, 'list_profiles', {}, true)
+    expect(list.profiles.length).toBeGreaterThanOrEqual(4)
+    expect(list.current).toBe('general')
+    expect(list.auto).toBe(true)
+    expect(await runOp(ops, 'detect_profile', {}, true)).toBeNull()
+    const set: any = await runOp(ops, 'set_profile', { id: 'realestate' }, false)
+    expect(set).toEqual({ ok: true, profileId: 'realestate', auto: false })
+    await expect(runOp(ops, 'set_profile', { id: 'astronaut-zzz' }, false)).rejects.toThrow(/Unknown profile/)
+    const auto: any = await runOp(ops, 'set_profile', { id: 'auto' }, false)
+    expect(auto.auto).toBe(true)
+    expect(auto.profileId).toBe('realestate')
+  })
+
   it('resolves issues and reads mail through ops', async () => {
     const { deps } = makeDeps()
     const ops = buildOps(deps)

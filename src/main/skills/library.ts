@@ -1,11 +1,16 @@
 import type { Skill } from './types'
+import { BUSINESS_SKILLS } from './groups/business'
+import { TRADES_SKILLS } from './groups/trades'
+import { CARE_SKILLS } from './groups/care'
+import { CREATIVE_SKILLS } from './groups/creative'
+import { LIFE_SKILLS } from './groups/life'
 
 const MONEY = '\\$\\s?\\d{1,3}(?:,\\d{3})*(?:\\.\\d{2})?'
 const DATE =
   '\\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.? \\d{1,2}(?:st|nd|rd|th)?(?:,? \\d{4})?\\b|\\b\\d{1,2}/\\d{1,2}(?:/\\d{2,4})?\\b'
 
 /** Built-in skills. Ordered roughly by how universal they are. */
-export const BUILTIN_SKILLS: Skill[] = [
+export const CORE_SKILLS: Skill[] = [
   {
     id: 'vip',
     name: 'Important people',
@@ -174,3 +179,18 @@ export const BUILTIN_SKILLS: Skill[] = [
     promptHint: 'Customer complaints and quote requests are high-priority issues with a reply as the next step.'
   }
 ]
+
+/** All built-in skills: the universal core plus every profile group's watchers. Ids must be unique; first wins. */
+export const BUILTIN_SKILLS: Skill[] = dedupeSkills([
+  ...CORE_SKILLS,
+  ...BUSINESS_SKILLS,
+  ...TRADES_SKILLS,
+  ...CARE_SKILLS,
+  ...CREATIVE_SKILLS,
+  ...LIFE_SKILLS
+])
+
+function dedupeSkills(list: Skill[]): Skill[] {
+  const seen = new Set<string>()
+  return list.filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)))
+}

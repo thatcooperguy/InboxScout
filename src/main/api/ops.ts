@@ -3,6 +3,9 @@ import * as repo from '../db/repo'
 import { loadSettings, saveSettings } from '../settings'
 import { RECIPES } from '../agent/policy'
 import { deleteSignin, listSignins, saveSignin, type SecretsLike } from '../signins'
+import { PROFILES, PROFILE_GROUPS, PROFILE_LIST, getProfile } from '../profiles/profiles'
+import { detectProfile } from '../profiles/detect'
+import { recentDetectInput } from '../profiles/auto'
 import type { AccountConfig, AppSettings } from '../../shared/types'
 
 /**
@@ -52,6 +55,7 @@ export interface OpsDeps {
 /** Preference keys an agent may read and change. Secrets and app IDs are never exposed. */
 export const SETTINGS_ALLOWLIST: (keyof AppSettings)[] = [
   'profileId',
+  'profileAuto',
   'schedule',
   'simpleMode',
   'storeFullBodies',
@@ -310,6 +314,46 @@ export function buildOps(deps: OpsDeps): Op[] {
       run: (a) => {
         deps.speak(String(a.text ?? ''))
         return { ok: true }
+      }
+    },
+    {
+      name: 'list_profiles',
+      description: 'The 50+ work/life profiles InboxScout can tune itself to (id, name, group, tagline), plus the current one and whether "choose for me" is on.',
+      write: false,
+      input: obj({}),
+      run: () => {
+        const s = loadSettings(db)
+        return {
+          current: s.profileId,
+          auto: s.profileAuto,
+          groups: PROFILE_GROUPS,
+          profiles: PROFILE_LIST.map((p) => ({ id: p.id, name: p.name, group: p.group, icon: p.icon, tagline: p.tagline, pulseName: p.pulseName }))
+        }
+      }
+    },
+    {
+      name: 'detect_profile',
+      description: 'Look at recent mail and say which profile fits best (null when unclear). Does not change anything.',
+      write: false,
+      input: obj({}),
+      run: () => {
+        const d = detectProfile(recentDetectInput(db), PROFILE_LIST)
+        return d ? { ...d, name: getProfile(d.id).name } : null
+      }
+    },
+    {
+      name: 'set_profile',
+      description: 'Choose a profile by id, or "auto" to let InboxScout pick from the mail after each scan.',
+      write: true,
+      input: obj({ id: { type: 'string' } }, ['id']),
+      run: (a) => {
+        const s = loadSettings(db)
+        const id = String(a.id)
+        if (id === 'auto') saveSettings(db, { ...s, profileAuto: true })
+        else if (PROFILES[id]) saveSettings(db, { ...s, profileId: id, profileAuto: false, enabledSkillIds: null })
+        else throw new Error(`Unknown profile "${id}" — see list_profiles`)
+        const n = loadSettings(db)
+        return { ok: true, profileId: n.profileId, auto: n.profileAuto }
       }
     },
     {

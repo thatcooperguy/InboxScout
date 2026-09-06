@@ -8,10 +8,31 @@ export interface BridgeInfo {
   access: 'read' | 'full'
 }
 
+export interface ProfileSummary {
+  id: string
+  name: string
+  group: string
+  icon: string
+  tagline: string
+  pulseName: string
+}
+
+export interface ProfileSuggestion {
+  id: string
+  name: string
+  confidence: 'high' | 'medium' | 'low'
+  why: string
+}
+
 export interface InboxScoutApi {
   getSettings: () => Promise<any>
   setSettings: (settings: unknown) => Promise<any>
-  listProfiles: () => Promise<{ id: string; name: string; pulseName: string }[]>
+  listProfiles: () => Promise<ProfileSummary[]>
+  profileGroups: () => Promise<{ id: string; name: string; icon: string }[]>
+  profileStatus: () => Promise<{ profileId: string; profileAuto: boolean; suggestion: ProfileSuggestion | null }>
+  chooseProfile: (id: string | 'auto') => Promise<any>
+  detectProfile: () => Promise<ProfileSuggestion | null>
+  dismissProfileSuggestion: () => Promise<boolean>
 
   listAccounts: () => Promise<any[]>
   accountPresets: () => Promise<Record<string, { host: string; port: number; sentFolder: string; help: string }>>

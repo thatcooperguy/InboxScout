@@ -65,7 +65,14 @@
 - **Agent bridge** for Hermes and friends: MCP server (`/mcp`), REST + OpenAPI (`/v1`), Server-Sent Events (`/v1/events`), bearer token, Read-only/Full access switch, 30 operations (brief, issues, mail, scan, accounts, sign-ins, Assistant, notify, speak, skills, safe settings). `integrations/hermes/`.
 - **Brief webhook**: every new brief POSTed to an agent URL (Hermes gateway) with optional bearer token.
 
-## 🟠 Gaps — v0.8
+## ✅ v0.8 — shipped (works for everyone)
+
+- **56 profiles in five groups** — business & office, trades/field/property, health/education/public service, creative/tech/independent, life & home — each with its own idea of "work", urgency, pulse, default skills, and detection vocabulary. `docs/PROFILES.md`.
+- **Choose for me**: profile detection from the mail itself after every scan (high-confidence switch, medium only off the generic default; a suggestion when the choice is locked; dismissable). Grouped, searchable picker in Preferences and onboarding.
+- **30+ new skills** authored alongside the profiles (shifts, credentials, permits, tenants, loads, bookings, orders, incidents, gigs, benefits, medications, immigration…).
+- **Full autonomy by default** for the Assistant, with *Sign in for me* and *Careful* as dial-backs; bridge ops `list_profiles` / `detect_profile` / `set_profile`.
+
+## 🟠 Gaps — v0.9
 
 - ~~Autonomous console agent~~ — ✅ shipped in v0.7 as the Assistant, with handoffs where a bot would be brittle.
 - **Voice commands** (talk to InboxScout) — Chromium speech recognition in Electron needs a Google key and is unreliable offline; revisit with a local model (e.g. whisper.cpp).

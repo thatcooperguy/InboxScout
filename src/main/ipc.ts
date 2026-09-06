@@ -21,7 +21,8 @@ import { SecretStore, accountSecretName, providerSecretName } from './secrets'
 import { loadSettings, saveSettings } from './settings'
 import { PROVIDER_PRESETS, testConnection } from './mail/imap'
 import { testProvider, PROVIDER_LABELS, DEFAULT_MODELS, LOCAL_PROVIDERS } from './ai/provider'
-import { PROFILES } from './profiles/profiles'
+import { PROFILES, PROFILE_GROUPS, PROFILE_LIST, getProfile, type WorkProfile } from './profiles/profiles'
+import { detectNow, dismissSuggestion, readSuggestion } from './profiles/auto'
 import { loadCustomSkills, resolveSkills } from './skills/engine'
 import { existsSync, mkdirSync } from 'node:fs'
 import type { AccountConfig, AppSettings } from '../shared/types'
@@ -238,7 +239,37 @@ export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
     return loadSettings(db)
   })
 
-  ipcMain.handle('profiles:list', () => Object.values(PROFILES).map((p) => ({ id: p.id, name: p.name, pulseName: p.pulseName })))
+  const profileSummary = (p: WorkProfile): object => ({ id: p.id, name: p.name, group: p.group, icon: p.icon, tagline: p.tagline, pulseName: p.pulseName })
+  ipcMain.handle('profiles:list', () => PROFILE_LIST.map(profileSummary))
+  ipcMain.handle('profiles:groups', () => PROFILE_GROUPS)
+  /** Current profile, the "choose for me" switch, and any pending suggestion from the last scan. */
+  ipcMain.handle('profiles:status', () => {
+    const s = loadSettings(db)
+    const suggestion = readSuggestion(db)
+    const pending = suggestion && !suggestion.dismissed && suggestion.id !== s.profileId ? suggestion : null
+    return { profileId: s.profileId, profileAuto: s.profileAuto, suggestion: pending ? { ...pending, name: getProfile(pending.id).name } : null }
+  })
+  /** Person picks a profile by hand: lock it unless they say "choose for me". */
+  ipcMain.handle('profiles:choose', (_e, id: string | 'auto') => {
+    const s = loadSettings(db)
+    if (id === 'auto') {
+      saveSettings(db, { ...s, profileAuto: true })
+      const d = detectNow(db)
+      if (d && d.id !== s.profileId) saveSettings(db, { ...loadSettings(db), profileId: d.id, enabledSkillIds: null })
+    } else if (PROFILES[id]) {
+      saveSettings(db, { ...s, profileId: id, profileAuto: false, enabledSkillIds: null })
+      dismissSuggestion(db)
+    }
+    return loadSettings(db)
+  })
+  ipcMain.handle('profiles:detect', () => {
+    const d = detectNow(db)
+    return d ? { ...d, name: getProfile(d.id).name } : null
+  })
+  ipcMain.handle('profiles:dismiss', () => {
+    dismissSuggestion(db)
+    return true
+  })
 
   ipcMain.handle('accounts:list', () => repo.listAccounts(db))
   ipcMain.handle('accounts:presets', () => PROVIDER_PRESETS)

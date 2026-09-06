@@ -18,7 +18,9 @@ export type ProviderId =
   | 'ollama'
   | 'lmstudio'
   | 'custom'
-export type ProfileId = 'owner' | 'realestate' | 'utility' | 'general'
+/** Work/life profile id. Fifty-odd built-ins live in src/main/profiles; 'general' is the fallback. */
+export type ProfileId = string
+export type ProfileGroup = 'business' | 'trades' | 'care' | 'creative' | 'life'
 export type ScheduleFrequency = 'daily' | 'weekly' | 'manual'
 
 export interface AccountConfig {
@@ -184,6 +186,8 @@ export interface AiSettings {
 
 export interface AppSettings {
   profileId: ProfileId
+  /** Let InboxScout pick the profile from what the mail looks like (on by default; turn off to lock your choice). */
+  profileAuto: boolean
   schedule: ScheduleSettings
   ai: AiSettings
   simpleMode: boolean
@@ -237,6 +241,7 @@ export type AssistantAutonomy = 'careful' | 'signin' | 'full'
 
 export const DEFAULT_SETTINGS: AppSettings = {
   profileId: 'general',
+  profileAuto: true,
   schedule: { frequency: 'daily', hour: 7, minute: 30, weekday: 1 },
   ai: { provider: 'builtin', model: '', ollamaBaseUrl: 'http://127.0.0.1:11434/v1', customBaseUrl: '' },
   simpleMode: true,
@@ -259,7 +264,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   bridgeEnabled: false,
   bridgePort: 47311,
   bridgeAccess: 'full',
-  assistantAutonomy: 'signin',
+  assistantAutonomy: 'full',
   agentWebhookUrl: '',
   agentWebhookToken: ''
 }

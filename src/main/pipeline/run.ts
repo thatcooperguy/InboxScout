@@ -15,6 +15,7 @@ import { generateBrief } from '../ai/brief'
 import { trackReplies } from './replies'
 import { renderHtml, renderMarkdown } from '../reports/render'
 import { getProfile } from '../profiles/profiles'
+import { applyAutoProfile } from '../profiles/auto'
 import { loadSettings, saveSettings } from '../settings'
 import { SecretStore, accountSecretName, providerSecretName } from '../secrets'
 import { resolveModel, DEFAULT_MODELS, LOCAL_PROVIDERS } from '../ai/provider'
@@ -49,8 +50,9 @@ export async function runPipeline(
   onProgress: (p: RunProgress) => void = () => {},
   opts: { skillsDir?: string } = {}
 ): Promise<PipelineResult> {
-  const settings = loadSettings(db)
-  const profile = getProfile(settings.profileId)
+  let settings = loadSettings(db)
+  let profile = getProfile(settings.profileId)
+  let profileNotice: string | null = null
   const runId = randomUUID()
   const startedAt = new Date().toISOString()
   repo.insertRun(db, {
@@ -74,9 +76,9 @@ export async function runPipeline(
 
     // Skills: built-in watchers plus any custom JSON skills the user dropped in.
     const custom = opts.skillsDir ? loadCustomSkills(opts.skillsDir) : { skills: [], errors: [] }
-    const { enabled: skills } = resolveSkills(settings.profileId, settings.enabledSkillIds, custom.skills)
+    let { enabled: skills } = resolveSkills(settings.profileId, settings.enabledSkillIds, custom.skills)
     const skillCtx = { vipSenders: settings.vipSenders, mutedSenders: settings.mutedSenders }
-    const promptHints = skillPromptHints(skills)
+    let promptHints = skillPromptHints(skills)
     const allMatches: SkillMatch[] = []
 
     // 1. Fetch
@@ -150,6 +152,19 @@ export async function runPipeline(
     const accountFailures = syncErrors.length - custom.errors.length
     if (accountFailures === accounts.length && newMessages.length === 0) {
       throw new Error(`Could not check any account. ${syncErrors.join(' | ')}`)
+    }
+
+    // 1b. "Choose for me": pick the profile that fits this mail, then re-resolve skills if it changed.
+    {
+      const auto = applyAutoProfile(db, settings)
+      profileNotice = auto.notice
+      if (auto.changed) {
+        settings = auto.settings
+        profile = auto.profile
+        skills = resolveSkills(settings.profileId, settings.enabledSkillIds, custom.skills).enabled
+        promptHints = skillPromptHints(skills)
+        onProgress({ phase: 'classify', detail: `Using the "${profile.name}" profile…` })
+      }
     }
 
     // 2. Classify (skip our own sent mail)
@@ -283,7 +298,7 @@ export async function runPipeline(
     repo.finishRun(db, runId, 'succeeded', newMessages.length, null)
 
     // 6. Deliver (to you only) and export - never fatal.
-    const notices: string[] = []
+    const notices: string[] = profileNotice ? [profileNotice] : []
     const outbox = pickOutbox(accounts, null)
     const outboxPassword = outbox ? secrets.get(accountSecretName(outbox.id)) : null
     const topTitles = brief.topIssues.map((i) => i.title)
