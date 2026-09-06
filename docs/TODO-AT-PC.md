@@ -6,6 +6,9 @@ exact page. Most take under 10 minutes. Tick them off as you go.
 ## 1. Website live at inboxscout.ai  (~10 min)  → full steps: `docs/PHONE-SETUP.md`
 
 - [ ] **GitHub Pages on**: https://github.com/thatcooperguy/InboxScout/settings/pages → Source: **GitHub Actions**
+- [ ] **Let `main` deploy the site** (needed since the branch switch — deploys currently fail with
+      *"Branch main is not allowed to deploy to github-pages"*): https://github.com/thatcooperguy/InboxScout/settings/environments
+      → **github-pages** → *Deployment branches and tags* → either choose **No restriction**, or *Add deployment branch or tag rule* → `main` → Save.
 - [ ] Run the deploy: https://github.com/thatcooperguy/InboxScout/actions/workflows/pages.yml → *Run workflow*
       (or at a terminal: `GITHUB_TOKEN=ghp_… bash scripts/setup-pages.sh` does this and the next step)
 - [ ] Custom domain on that Pages page: `inboxscout.ai` → Save

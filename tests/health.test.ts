@@ -116,7 +116,8 @@ describe('health checks', () => {
     const what = await check('reportsDir').repair!(f.ctx, detect('reportsDir', f))
     expect(what).toContain('Reports')
     expect(f.settings.reportsDir.replace(/\\/g, '/')).toBe('/data/Reports')
-    expect(f.calls).toContain('mkdir:/data/Reports')
+    // path.join uses backslashes on Windows; compare with separators normalized.
+    expect(f.calls.map((c) => c.replace(/\\/g, '/'))).toContain('mkdir:/data/Reports')
     expect(detect('reportsDir', f).status).toBe('ok')
   })
 

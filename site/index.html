@@ -3,108 +3,222 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>InboxScout — Your email, scouted.</title>
-<meta name="description" content="A free desktop assistant that reads your inbox, sorts personal from work, and gives you a 30-second brief of what actually needs you. Windows and Mac. No account needed.">
+<title>InboxScout — Know what needs you. Skip the rest.</title>
+<meta name="description" content="InboxScout is a free desktop app that reads your email and hands you a 30-second brief of what actually needs you — bills, appointments, replies you owe — in plain words. Windows and Mac. No account needed.">
 <meta property="og:title" content="InboxScout — Your email, scouted.">
-<meta property="og:description" content="Free desktop email assistant: bills, appointments, deals, and the replies you owe — in one calm daily brief. Works out of the box, no AI account required.">
+<meta property="og:description" content="A free desktop app that reads your email and tells you, in plain words, what actually needs you today. Works out of the box. Never sends or deletes anything.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://inboxscout.ai/">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Crect x='8' y='8' width='144' height='144' rx='32' fill='%232456a6'/%3E%3Crect x='34' y='54' width='92' height='62' rx='8' fill='%23fff'/%3E%3Cpath d='M34 62 L80 96 L126 62' fill='none' stroke='%232456a6' stroke-width='7' stroke-linejoin='round' stroke-linecap='round'/%3E%3Ccircle cx='118' cy='46' r='20' fill='%23c0392f' stroke='%23fff' stroke-width='5'/%3E%3Cpath d='M118 33 L124 46 L118 59 L112 46 Z' fill='%23fff'/%3E%3C/svg%3E">
+<meta property="og:image" content="https://inboxscout.ai/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://inboxscout.ai/og.png">
+<meta name="theme-color" content="#2456a6">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@500;700;900&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;600&display=swap">
 <style>
   :root {
-    --paper:#fbfbf8; --surface:#f2f2ec; --ink:#1e2430; --ink-soft:#4a5261; --ink-faint:#7b8494;
-    --line:#d9dad1; --blue:#2456a6; --blue-deep:#1d4585; --blue-soft:#e8eef8; --red:#c0392f; --red-soft:#f8e9e7;
-    --good:#2e7d4f; --good-soft:#e6f2ea;
+    --paper:#fbfbf8; --surface:#f3f3ee; --card:#ffffff; --ink:#1e2430; --ink-soft:#4a5261; --ink-faint:#7b8494;
+    --line:#dcddd4; --blue:#2456a6; --blue-deep:#1d4585; --blue-soft:#e8eef8; --blue-glow:rgba(36,86,166,.16);
+    --red:#c0392f; --red-soft:#fbeae8; --good:#2e7d4f; --good-soft:#e6f2ea; --amber:#a6641b; --amber-soft:#fbf1e3;
+    --shadow:0 24px 60px rgba(20,26,40,.14), 0 2px 6px rgba(20,26,40,.06);
   }
   @media (prefers-color-scheme: dark) {
-    :root { --paper:#14171e; --surface:#1c2029; --ink:#e6e8ee; --ink-soft:#b3bac7; --ink-faint:#828b9c; --line:#313743;
-      --blue:#7ba3e0; --blue-deep:#9dbcec; --blue-soft:#1f2a3e; --red:#e08079; --red-soft:#3a2422; --good:#6cbd8f; --good-soft:#1f3328; }
+    :root { --paper:#12151c; --surface:#1a1e27; --card:#1f242f; --ink:#e8eaf0; --ink-soft:#b6bcc8; --ink-faint:#8891a2; --line:#2f3542;
+      --blue:#7ea6e3; --blue-deep:#a3c1ef; --blue-soft:#1f2b40; --blue-glow:rgba(126,166,227,.18); --red:#e38a83; --red-soft:#3a2523;
+      --good:#6fc493; --good-soft:#1f3328; --amber:#e0a35a; --amber-soft:#3a2d1c; --shadow:0 24px 60px rgba(0,0,0,.5), 0 2px 6px rgba(0,0,0,.3); }
   }
   * { box-sizing:border-box }
   html { scroll-behavior:smooth }
-  body { margin:0; background:var(--paper); color:var(--ink); font-family:"Source Serif 4",Georgia,serif; font-size:17px; line-height:1.65 }
+  body { margin:0; background:var(--paper); color:var(--ink); font-family:"Source Serif 4",Georgia,serif; font-size:17px; line-height:1.65; overflow-x:hidden }
   .airmail { height:8px; background:repeating-linear-gradient(135deg,var(--blue) 0 18px,var(--paper) 18px 26px,var(--red) 26px 44px,var(--paper) 44px 52px) }
-  .wrap { max-width:1040px; margin:0 auto; padding:0 24px }
-  h1,h2,h3 { font-family:"Libre Franklin","Franklin Gothic Medium",Arial,sans-serif; line-height:1.1; letter-spacing:-.01em; text-wrap:balance }
-  .mono { font-family:"IBM Plex Mono",Consolas,monospace; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint) }
+  .wrap { max-width:1080px; margin:0 auto; padding:0 24px }
+  h1,h2,h3 { font-family:"Libre Franklin","Franklin Gothic Medium",Arial,sans-serif; line-height:1.1; letter-spacing:-.015em; text-wrap:balance; margin:0 }
+  .sans { font-family:"Libre Franklin",Arial,sans-serif }
+  .mono { font-family:"IBM Plex Mono",Consolas,monospace; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); font-weight:600 }
   a { color:var(--blue) }
+  :focus-visible { outline:3px solid var(--blue); outline-offset:3px; border-radius:6px }
+  .sr { position:absolute; left:-9999px }
 
+  /* nav */
   nav { display:flex; align-items:center; justify-content:space-between; padding:18px 0; gap:16px; flex-wrap:wrap }
-  nav .brand { display:flex; align-items:center; gap:10px; font-family:"Libre Franklin",sans-serif; font-weight:900; font-size:20px; color:var(--ink); text-decoration:none }
-  nav .brand img { width:34px; height:34px }
-  nav .links { display:flex; gap:18px; flex-wrap:wrap; font-family:"Libre Franklin",sans-serif; font-size:14px; font-weight:500 }
+  nav .brand { display:flex; align-items:center; gap:10px; font-family:"Libre Franklin",sans-serif; font-weight:900; font-size:21px; color:var(--ink); text-decoration:none }
+  nav .brand img { width:36px; height:36px }
+  nav .links { display:flex; gap:20px; align-items:center; flex-wrap:wrap; font-family:"Libre Franklin",sans-serif; font-size:14.5px; font-weight:500 }
   nav .links a { color:var(--ink-soft); text-decoration:none }
   nav .links a:hover { color:var(--blue) }
+  nav .links .btn { padding:9px 14px; font-size:14px; border-radius:10px }
+  @media (max-width:600px){ nav .links a:not(.btn) { display:none } }
 
-  .hero { display:grid; grid-template-columns:1.1fr 1fr; gap:40px; align-items:center; padding:56px 0 48px }
-  @media (max-width:860px){ .hero { grid-template-columns:1fr; padding-top:32px } }
-  .hero h1 { font-size:clamp(2.4rem,6vw,4rem); font-weight:900; margin:0 0 16px }
-  .hero h1 em { font-style:normal; color:var(--blue) }
-  .hero p.lede { font-size:1.2rem; color:var(--ink-soft); margin:0 0 26px; max-width:52ch }
-  .dl { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px }
-  .btn { display:inline-flex; align-items:center; gap:8px; font-family:"Libre Franklin",sans-serif; font-weight:700; font-size:16px;
-    padding:14px 20px; border-radius:12px; text-decoration:none; border:2px solid transparent; transition:transform .08s ease }
+  /* buttons */
+  .btn { display:inline-flex; align-items:center; gap:9px; font-family:"Libre Franklin",sans-serif; font-weight:700; font-size:16px;
+    padding:14px 22px; border-radius:12px; text-decoration:none; border:2px solid transparent; transition:transform .08s ease, background .15s ease, border-color .15s ease; cursor:pointer; line-height:1.2 }
   .btn:active { transform:translateY(1px) }
-  .btn.primary { background:var(--blue); color:#fff; box-shadow:0 4px 16px rgba(36,86,166,.28) }
+  .btn.primary { background:var(--blue); color:#fff; box-shadow:0 6px 20px var(--blue-glow) }
   .btn.primary:hover { background:var(--blue-deep) }
   .btn.ghost { background:transparent; color:var(--ink); border-color:var(--line) }
   .btn.ghost:hover { border-color:var(--blue); color:var(--blue) }
-  .btn small { font-weight:500; opacity:.85; font-size:12px }
-  .fine { font-size:13.5px; color:var(--ink-faint) }
+  .btn.light { background:#fff; color:var(--blue-deep) }
+  .btn.light:hover { background:#eef3fb }
+  .btn.outline { background:transparent; color:#fff; border-color:rgba(255,255,255,.55) }
+  .btn.outline:hover { border-color:#fff }
+  .btn small { font-weight:500; opacity:.8; font-size:12px }
+  .btn svg { width:18px; height:18px; flex:none }
+  .dl { display:flex; flex-wrap:wrap; gap:10px; margin:0 0 12px }
+  .fine { font-size:13.5px; color:var(--ink-faint); margin:0 }
   .fine a { color:var(--ink-faint) }
 
-  /* Today mock */
-  .mock { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:14px; box-shadow:0 20px 50px rgba(20,26,40,.12) }
-  .mock .bar { display:flex; gap:6px; margin-bottom:12px }
-  .mock .bar i { width:10px; height:10px; border-radius:50%; background:var(--line); display:block }
-  .mock .screen { background:var(--paper); border-radius:10px; padding:16px; font-size:13.5px }
-  .mock .row { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px }
-  .mock h3 { margin:0; font-size:20px }
-  .mock .hd { color:var(--ink-soft); margin:2px 0 0; font-size:13px }
-  .mock .big { background:var(--blue); color:#fff; border-radius:10px; padding:10px 14px; font-family:"Libre Franklin",sans-serif; font-weight:700; font-size:13px; white-space:nowrap }
-  .mock .grid { display:grid; grid-template-columns:1fr 1fr; gap:10px }
-  @media (max-width:480px){ .mock .grid { grid-template-columns:1fr } }
-  .mock .card { background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 12px }
-  @media (prefers-color-scheme: dark){ .mock .card { background:#1c2029 } }
-  .mock .card.att { border-color:#e8b4b0; background:#fffafa }
-  @media (prefers-color-scheme: dark){ .mock .card.att { background:#2a1e1e } }
-  .mock .card b { display:block; font-family:"Libre Franklin",sans-serif; font-size:12.5px; margin-bottom:6px }
-  .mock .card div { padding:4px 0; border-top:1px solid var(--line); font-size:12.5px }
-  .mock .card div:first-of-type { border-top:none }
-  .mock .next { color:var(--ink-faint); font-size:11.5px }
-  .pill { display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:10px; font-weight:600; padding:1px 7px; border-radius:99px; background:var(--red-soft); color:var(--red); margin-right:6px }
+  /* hero */
+  .hero { position:relative; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.05fr); gap:44px; align-items:center; padding:64px 0 56px }
+  .hero > *, .app > *, .app .main, .lvl, .lvl > *, .free > *, .cards > * { min-width:0 }
+  .hero::before { content:""; position:absolute; inset:-120px -40% auto -40%; height:520px; z-index:-1; pointer-events:none;
+    background:radial-gradient(600px 320px at 22% 30%, var(--blue-soft) 0%, transparent 70%), radial-gradient(500px 300px at 85% 20%, var(--red-soft) 0%, transparent 70%); opacity:.9 }
+  @media (max-width:880px){ .hero { grid-template-columns:1fr; padding-top:36px; gap:36px } }
+  .hero .eyebrow { display:inline-flex; align-items:center; gap:8px; margin-bottom:18px; padding:6px 12px 6px 8px; border-radius:99px; background:var(--card); border:1px solid var(--line); font-family:"Libre Franklin",sans-serif; font-size:13px; font-weight:700; color:var(--ink-soft) }
+  .hero .eyebrow i { width:8px; height:8px; border-radius:50%; background:var(--good); display:inline-block; box-shadow:0 0 0 4px var(--good-soft) }
+  .hero h1 { font-size:clamp(2.5rem,6.2vw,4.3rem); font-weight:900; margin:0 0 18px }
+  .hero h1 em { font-style:normal; color:var(--blue) }
+  .hero p.lede { font-size:1.22rem; color:var(--ink-soft); margin:0 0 28px; max-width:50ch; text-wrap:pretty }
+  .trust { display:flex; flex-wrap:wrap; gap:8px 18px; margin-top:22px; font-family:"Libre Franklin",sans-serif; font-size:13.5px; font-weight:600; color:var(--ink-soft) }
+  .trust span::before { content:"✓"; color:var(--good); margin-right:6px; font-weight:900 }
 
-  section { padding:48px 0; border-top:1px solid var(--line) }
-  section h2 { font-size:clamp(1.6rem,3.4vw,2.2rem); margin:6px 0 14px }
-  .sub { color:var(--ink-soft); max-width:62ch; margin:0 0 26px; font-size:1.05rem }
+  /* fade in */
+  @media (prefers-reduced-motion: no-preference) {
+    .up { opacity:0; transform:translateY(14px); animation:up .7s cubic-bezier(.2,.7,.2,1) forwards }
+    .up.d1 { animation-delay:.08s } .up.d2 { animation-delay:.18s } .up.d3 { animation-delay:.3s }
+    @keyframes up { to { opacity:1; transform:none } }
+    .float { animation:float 6s ease-in-out infinite }
+    @keyframes float { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-6px) } }
+  }
+
+  /* app mock (shared) */
+  .stage { position:relative }
+  .win { background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:12px; box-shadow:var(--shadow) }
+  .win .bar { display:flex; gap:6px; margin:2px 0 10px 4px; align-items:center }
+  .win .bar i { width:10px; height:10px; border-radius:50%; background:var(--line); display:block }
+  .win .bar i:nth-child(1){ background:#e9695f } .win .bar i:nth-child(2){ background:#e9b64d } .win .bar i:nth-child(3){ background:#5fc36f }
+  .win .bar span { margin-left:auto; margin-right:6px; font-family:"IBM Plex Mono",monospace; font-size:10.5px; color:var(--ink-faint) }
+  .app { display:grid; grid-template-columns:104px 1fr; background:var(--paper); border-radius:12px; overflow:hidden; border:1px solid var(--line) }
+  @media (max-width:520px){ .app { grid-template-columns:1fr } .app .side { flex-direction:row; flex-wrap:wrap; border-right:none; border-bottom:1px solid var(--line); align-items:center } .app .side b { margin:0 6px 0 0 } .app .side .run { margin-left:auto; margin-top:0 } }
+  .app .side { background:var(--surface); border-right:1px solid var(--line); padding:12px 8px; font-family:"Libre Franklin",sans-serif; font-size:11.5px; display:flex; flex-direction:column; gap:3px }
+  .app .side b { font-weight:900; font-size:11.5px; margin-bottom:8px; display:block; white-space:nowrap; letter-spacing:-.01em }
+  .app .side span { padding:5px 8px; border-radius:7px; color:var(--ink-soft) }
+  .app .side span.on { background:var(--blue-soft); color:var(--blue); font-weight:700 }
+  .app .side .run { margin-top:auto; background:var(--blue); color:#fff; text-align:center; font-weight:700; padding:8px 6px; border-radius:8px; font-size:11px; white-space:nowrap }
+  .app .main { padding:14px 14px 12px; font-size:12.5px }
+  .app .hdr { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px }
+  .app h3 { font-size:19px; font-weight:900 }
+  .app .hd { color:var(--ink-soft); margin:2px 0 0; font-size:12.5px }
+  .app .stamp { font-family:"IBM Plex Mono",monospace; font-size:10px; color:var(--ink-faint); padding-top:6px; text-align:right }
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:10px }
+  @media (max-width:460px){ .cards { grid-template-columns:1fr } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:11px; padding:10px 12px }
+  .card.att { border-color:#e8b4b0; background:#fff8f7 }
+  @media (prefers-color-scheme: dark){ .card.att { background:#2a1e1e; border-color:#5a3b39 } }
+  .card b { display:block; font-family:"Libre Franklin",sans-serif; font-size:12.5px; margin-bottom:6px }
+  .card div { padding:5px 0; border-top:1px solid var(--line); font-size:12.5px; line-height:1.4 }
+  .card div:first-of-type { border-top:none }
+  .card .next { color:var(--ink-faint); font-size:11.5px; display:block }
+  .pill { display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:9.5px; font-weight:600; padding:1px 7px; border-radius:99px; background:var(--red-soft); color:var(--red); margin-right:6px; vertical-align:middle }
+  .pill.ok { background:var(--good-soft); color:var(--good) }
+  .foot { margin-top:12px; font-size:11.5px; color:var(--ink-faint); display:flex; gap:8px; align-items:center; flex-wrap:wrap }
+  .foot .heal { color:var(--good); font-weight:600 }
+  .toast { position:absolute; right:-14px; bottom:-20px; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:10px 14px; font-family:"Libre Franklin",sans-serif; font-size:13px; font-weight:600; box-shadow:var(--shadow); display:flex; align-items:center; gap:10px; max-width:300px }
+  .toast .ico { width:30px; height:30px; border-radius:8px; background:var(--good-soft); display:grid; place-items:center; font-size:15px; flex:none }
+  .toast small { display:block; font-weight:500; color:var(--ink-faint); font-size:11.5px }
+  .toast.top { right:auto; left:-18px; top:-18px; bottom:auto }
+  .toast.top .ico { background:var(--blue-soft) }
+  @media (max-width:880px){ .toast { right:6px } .toast.top { left:6px } }
+
+  /* sections */
+  section { padding:64px 0 }
+  section + section { border-top:1px solid var(--line) }
+  section h2 { font-size:clamp(1.7rem,3.6vw,2.4rem); margin:8px 0 14px; font-weight:900 }
+  .sub { color:var(--ink-soft); max-width:60ch; margin:0 0 30px; font-size:1.08rem; text-wrap:pretty }
+  .center { text-align:center } .center .sub { margin-left:auto; margin-right:auto }
+
+  .quotes { display:grid; grid-template-columns:repeat(3,1fr); gap:16px }
+  @media (max-width:800px){ .quotes { grid-template-columns:1fr } }
+  .q { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:22px 22px 18px; position:relative }
+  .q::before { content:"“"; position:absolute; top:6px; left:16px; font-family:"Libre Franklin",sans-serif; font-size:64px; font-weight:900; color:var(--blue-soft); line-height:1 }
+  .q p { margin:0 0 14px; font-size:1.05rem; position:relative; font-style:italic }
+  .q .who { display:flex; align-items:center; gap:10px; font-family:"Libre Franklin",sans-serif; font-size:13px; font-weight:700; color:var(--ink-soft) }
+  .q .av { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; font-size:18px; background:var(--blue-soft) }
 
   .steps { display:grid; grid-template-columns:repeat(3,1fr); gap:16px }
-  @media (max-width:760px){ .steps { grid-template-columns:1fr } }
-  .step { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:20px }
-  .step .n { font-family:"IBM Plex Mono",monospace; color:var(--blue); font-weight:600; font-size:12px; letter-spacing:.1em }
-  .step h3 { font-size:1.1rem; margin:6px 0 6px }
-  .step p { margin:0; color:var(--ink-soft); font-size:.97rem }
+  @media (max-width:800px){ .steps { grid-template-columns:1fr } }
+  .step { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:22px }
+  .step .n { width:36px; height:36px; border-radius:10px; background:var(--blue); color:#fff; display:grid; place-items:center; font-family:"Libre Franklin",sans-serif; font-weight:900; font-size:16px; margin-bottom:12px }
+  .step h3 { font-size:1.15rem; margin:0 0 8px }
+  .step p { margin:0; color:var(--ink-soft); font-size:.98rem }
 
-  .features { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:14px }
-  .feat { border:1px solid var(--line); border-radius:14px; padding:18px 20px; background:#fff }
-  @media (prefers-color-scheme: dark){ .feat { background:#1c2029 } }
-  .feat .ic { font-size:26px; margin-bottom:6px }
+  /* layouts */
+  .levels { display:grid; grid-template-columns:repeat(3,1fr); gap:18px; align-items:start }
+  @media (max-width:880px){ .levels { grid-template-columns:1fr } }
+  .lvl .win { padding:8px; border-radius:14px }
+  .lvl .scr { background:var(--paper); border:1px solid var(--line); border-radius:9px; padding:12px; min-height:236px; font-size:11.5px }
+  .lvl .cap { margin-top:14px }
+  .lvl .cap b { font-family:"Libre Franklin",sans-serif; font-size:1.05rem; display:block; margin-bottom:4px }
+  .lvl .cap p { margin:0; color:var(--ink-soft); font-size:.95rem }
+  .lvl .tag { display:inline-block; font-family:"IBM Plex Mono",monospace; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--blue); background:var(--blue-soft); padding:2px 8px; border-radius:99px; margin-bottom:8px }
+  .simple .bigbtn { background:var(--blue); color:#fff; border-radius:12px; padding:16px; text-align:center; font-family:"Libre Franklin",sans-serif; font-weight:900; font-size:16px; margin-bottom:12px }
+  .simple .row3 { display:grid; gap:8px }
+  .simple .row3 div { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; font-size:14px; font-family:"Libre Franklin",sans-serif; font-weight:700 }
+  .simple .row3 small { display:block; font-weight:500; color:var(--ink-soft); font-family:"Source Serif 4",serif; font-size:12.5px }
+  .simple .speak { text-align:center; margin-top:10px; color:var(--ink-faint); font-size:12px }
+  .std .cards { gap:6px } .std .card { padding:7px 9px; border-radius:8px } .std .card b { font-size:11px; margin-bottom:3px } .std .card div { font-size:10.5px; padding:3px 0 }
+  .std .hdr { margin-bottom:8px } .std h3 { font-size:15px } .std .hd { font-size:11px }
+  .pro .scr { font-family:"IBM Plex Mono",monospace }
+  .pro .top { display:flex; gap:6px; margin-bottom:8px; flex-wrap:wrap }
+  .pro .top span { border:1px solid var(--line); border-radius:6px; padding:2px 7px; font-size:9.5px; color:var(--ink-soft) }
+  .pro .top span.on { background:var(--blue); color:#fff; border-color:var(--blue) }
+  .pro table { width:100%; border-collapse:collapse; font-size:9.8px }
+  .pro td { padding:4px 3px; border-top:1px solid var(--line); vertical-align:top }
+  .pro td:first-child { color:var(--red); font-weight:600; white-space:nowrap }
+  .pro td:last-child { color:var(--ink-faint); text-align:right; white-space:nowrap }
+  .pro .kbd { margin-top:8px; font-size:9.5px; color:var(--ink-faint) }
+  .pro kbd { border:1px solid var(--line); border-radius:4px; padding:0 4px; font-size:9px }
+
+  /* features */
+  .features { display:grid; grid-template-columns:repeat(auto-fit,minmax(228px,1fr)); gap:14px }
+  .feat { border:1px solid var(--line); border-radius:16px; padding:20px; background:var(--card); transition:transform .15s ease, box-shadow .15s ease }
+  .feat:hover { transform:translateY(-2px); box-shadow:0 10px 30px rgba(20,26,40,.08) }
+  .feat .ic { width:42px; height:42px; border-radius:11px; background:var(--blue-soft); display:grid; place-items:center; font-size:21px; margin-bottom:12px }
   .feat h3 { font-size:1.05rem; margin:0 0 6px }
   .feat p { margin:0; color:var(--ink-soft); font-size:.95rem }
 
-  .people { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px }
-  .person { background:var(--blue-soft); border-radius:14px; padding:18px 20px }
-  .person .who { font-family:"Libre Franklin",sans-serif; font-weight:700; margin-bottom:6px }
+  /* people */
+  .who { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin:0 auto 26px; max-width:900px }
+  .who span { display:inline-flex; align-items:center; gap:8px; background:var(--card); border:1px solid var(--line); border-radius:99px; padding:8px 14px 8px 10px; font-family:"Libre Franklin",sans-serif; font-weight:700; font-size:14px }
+  .who span i { font-style:normal; font-size:18px }
+  .who span.more { background:var(--blue-soft); border-color:transparent; color:var(--blue) }
+  .personas { display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px }
+  .person { background:var(--blue-soft); border-radius:16px; padding:20px }
+  .person .t { font-family:"Libre Franklin",sans-serif; font-weight:900; margin-bottom:6px; font-size:1.02rem }
   .person p { margin:0; font-size:.95rem; color:var(--ink-soft) }
 
-  .free { display:grid; grid-template-columns:1fr 1fr; gap:24px; align-items:center }
-  @media (max-width:760px){ .free { grid-template-columns:1fr } }
-  .free ul { margin:0; padding-left:1.2em; color:var(--ink-soft) }
-  .free li { margin-bottom:8px }
-  .logos { display:flex; flex-wrap:wrap; gap:8px }
-  .logos span { font-family:"IBM Plex Mono",monospace; font-size:12px; border:1px solid var(--line); border-radius:99px; padding:4px 10px; color:var(--ink-soft) }
+  /* free & private */
+  .free { display:grid; grid-template-columns:1.1fr 1fr; gap:32px; align-items:center }
+  @media (max-width:800px){ .free { grid-template-columns:1fr } }
+  .free ul { margin:0; padding:0; list-style:none }
+  .free li { display:flex; gap:12px; margin-bottom:14px; color:var(--ink-soft) }
+  .free li b { color:var(--ink) }
+  .free li::before { content:"🔒"; flex:none; font-size:18px; line-height:1.4 }
+  .free li:nth-child(2)::before { content:"🖥" } .free li:nth-child(3)::before { content:"✉" } .free li:nth-child(4)::before { content:"🧠" } .free li:nth-child(5)::before { content:"👀" }
+  .lock { background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:26px; text-align:center }
+  .lock .big { font-family:"Libre Franklin",sans-serif; font-weight:900; font-size:2.6rem; color:var(--blue); line-height:1 }
+  .lock .lbl { font-family:"Libre Franklin",sans-serif; font-weight:700; margin:6px 0 16px }
+  .logos { display:flex; flex-wrap:wrap; gap:6px; justify-content:center }
+  .logos span { font-family:"IBM Plex Mono",monospace; font-size:11px; border:1px solid var(--line); border-radius:99px; padding:3px 9px; color:var(--ink-soft); background:var(--card) }
+
+  /* cta band */
+  .band { background:linear-gradient(135deg,#2456a6,#1d4585); color:#fff; border-radius:24px; padding:52px 32px; text-align:center; position:relative; overflow:hidden; margin:8px 0 }
+  .band::after { content:""; position:absolute; inset:auto -10% -60% -10%; height:240px; background:radial-gradient(closest-side, rgba(255,255,255,.14), transparent); pointer-events:none }
+  .band h2 { color:#fff; font-size:clamp(1.8rem,4vw,2.6rem) }
+  .band p { color:rgba(255,255,255,.85); max-width:52ch; margin:10px auto 26px; font-size:1.08rem }
+  .band .dl { justify-content:center }
+  .band .fine { color:rgba(255,255,255,.7) } .band .fine a { color:rgba(255,255,255,.85) }
 
   details { border:1px solid var(--line); border-radius:12px; padding:14px 18px; margin-bottom:10px; background:var(--surface) }
   summary { cursor:pointer; font-family:"Libre Franklin",sans-serif; font-weight:700 }
@@ -113,67 +227,135 @@
   footer { padding:36px 0 56px; color:var(--ink-faint); font-size:14px; border-top:1px solid var(--line) }
   footer .cols { display:flex; justify-content:space-between; flex-wrap:wrap; gap:14px }
   footer a { color:var(--ink-faint) }
+  footer .tink { margin-top:18px; padding-top:18px; border-top:1px dashed var(--line); font-size:13.5px }
 </style>
 </head>
 <body>
 <div class="airmail"></div>
 <div class="wrap">
-  <nav>
+  <nav aria-label="Main">
     <a class="brand" href="/"><img src="logo.svg" alt="">InboxScout</a>
     <div class="links">
-      <a href="#how">How it works</a><a href="#features">Features</a><a href="#free">Free &amp; private</a><a href="#faq">Install help</a>
-      <a href="https://github.com/thatcooperguy/InboxScout">GitHub</a>
+      <a href="#how">How it works</a><a href="#grows">Simple or Pro</a><a href="#features">What it does</a><a href="#free">Free &amp; private</a><a href="#faq">Install help</a>
+      <a class="btn primary" href="#download">Download free</a>
     </div>
   </nav>
 
   <header class="hero">
     <div>
-      <div class="mono">Free desktop app · Windows &amp; Mac</div>
-      <h1>Your email, <em>scouted.</em></h1>
-      <p class="lede">InboxScout reads your inbox so you don't have to — then hands you a 30-second brief of what actually needs you: the bill that's due, the client waiting on a reply, the form to sign. Everything else stays out of your way.</p>
-      <div class="dl">
-        <a class="btn primary" href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-Setup.exe">⬇ Download for Windows</a>
-        <a class="btn ghost" href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-arm64.dmg">⬇ Mac <small>Apple Silicon</small></a>
-        <a class="btn ghost" href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-x64.dmg">⬇ Mac <small>Intel</small></a>
+      <div class="eyebrow up"><i></i> Free for Windows &amp; Mac · No account · Works in 2 minutes</div>
+      <h1 class="up d1">Know what needs you.<br><em>Skip the rest.</em></h1>
+      <p class="lede up d2">InboxScout reads your email so you don't have to, then hands you a 30-second brief in plain words: the bill that's due, the client waiting on a reply, the form to sign. Everything else stays out of your way.</p>
+      <div class="dl up d3" id="download">
+        <a class="btn primary" data-os="win" href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-Setup.exe"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.4v7.1H3zM11.6 4.2 21 3v8.5h-9.4zM3 12.5h7.5v7.1L3 18.5zM11.6 12.5H21V21l-9.4-1.3z"/></svg>Download for Windows</a>
+        <a class="btn ghost" data-os="mac-arm" href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-arm64.dmg"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.5-.2-2.8.8-3.6.8-.7 0-1.9-.8-3.1-.8-1.6 0-3.1.9-3.9 2.4-1.7 2.9-.4 7.2 1.2 9.5.8 1.1 1.7 2.4 3 2.4 1.2 0 1.6-.8 3.1-.8s1.8.8 3.1.8 2.1-1.2 2.9-2.3c.9-1.3 1.3-2.6 1.3-2.7-.1 0-2.6-1-2.6-3.9zM14.1 5.6c.7-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.5 2.8-1.3z"/></svg>Mac <small>Apple Silicon</small></a>
+        <a class="btn ghost" data-os="mac-intel" href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-x64.dmg"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.5-.2-2.8.8-3.6.8-.7 0-1.9-.8-3.1-.8-1.6 0-3.1.9-3.9 2.4-1.7 2.9-.4 7.2 1.2 9.5.8 1.1 1.7 2.4 3 2.4 1.2 0 1.6-.8 3.1-.8s1.8.8 3.1.8 2.1-1.2 2.9-2.3c.9-1.3 1.3-2.6 1.3-2.7-.1 0-2.6-1-2.6-3.9zM14.1 5.6c.7-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.5 2.8-1.3z"/></svg>Mac <small>Intel</small></a>
       </div>
-      <p class="fine">Free forever · no account needed · never sends or deletes your mail · updates itself. <a href="#faq">First-time install tips ↓</a></p>
+      <p class="fine up d3">Free forever · never sends or deletes your mail · updates itself · <a href="#faq">first-time install tips ↓</a></p>
+      <div class="trust up d3"><span>Read-only</span><span>Private by design</span><span>Fixes itself</span><span>No AI account needed</span></div>
     </div>
-    <div class="mock" aria-label="Example of the Today screen">
-      <div class="bar"><i></i><i></i><i></i></div>
-      <div class="screen">
-        <div class="row">
-          <div><h3>Today</h3><p class="hd">2 things need you, then you're clear.</p></div>
-          <div class="big">✉ Check my email now</div>
-        </div>
-        <div class="grid">
-          <div class="card att"><b>⚠ Needs you</b>
-            <div><span class="pill">URGENT</span>Vendor contract expires Monday<br><span class="next">→ Sign and return the PDF from Jane</span></div>
-            <div>Northwind still waiting on the quote<br><span class="next">→ Reply to Mark</span></div>
-          </div>
-          <div class="card"><b>💵 Bills &amp; invoices</b>
-            <div>Electric bill — $128.40 due Sep 12</div>
-            <div>Water — $42.10 due Sep 20</div>
-          </div>
-          <div class="card"><b>📅 Coming up</b>
-            <div>Fri 2pm — Home inspection, 42 Maple St</div>
-            <div>Tue 10am — Dentist</div>
-          </div>
-          <div class="card"><b>✉ Waiting for your reply</b>
-            <div>Rate lock question — Jane Lender</div>
-            <div>Field trip form — Ms. Alvarez</div>
+
+    <div class="stage up d2" aria-label="Example of the Today screen">
+      <div class="win float">
+        <div class="bar"><i></i><i></i><i></i><span>InboxScout</span></div>
+        <div class="app">
+          <div class="side"><b>📬 InboxScout</b><span class="on">Today</span><span>My briefs</span><span>People</span><span>Setup</span><div class="run">✉ Check now</div></div>
+          <div class="main">
+            <div class="hdr">
+              <div><h3>Good morning</h3><p class="hd">2 things need you, then you're clear.</p></div>
+              <div class="stamp">Tue 7:30<br>3 inboxes</div>
+            </div>
+            <div class="cards">
+              <div class="card att"><b>⚠ Needs you</b>
+                <div><span class="pill">Due Mon</span>Vendor contract expires<span class="next">→ Sign and return Jane's PDF</span></div>
+                <div>Northwind still waiting on the quote<span class="next">→ Reply to Mark (3 days)</span></div>
+              </div>
+              <div class="card"><b>💵 Bills</b>
+                <div>Electric — $128.40 · due Sep 12</div>
+                <div>Water — $42.10 · due Sep 20</div>
+              </div>
+              <div class="card"><b>📅 This week</b>
+                <div>Fri 2pm — Home inspection, 42 Maple St</div>
+                <div>Tue 10am — Dentist</div>
+              </div>
+              <div class="card"><b>👥 Your people</b>
+                <div><span class="pill ok">Mom</span>Sunday lunch — she asked twice</div>
+                <div>Grandpa Joe has gone quiet for 3 weeks</div>
+              </div>
+            </div>
+            <div class="foot">Last checked 7:30 · all 3 inboxes fine · <span class="heal">✓ nothing else needs you</span></div>
           </div>
         </div>
       </div>
+      <div class="toast top"><div class="ico">☀</div><div>Your brief is ready<small>Read it, or press “Read it to me”</small></div></div>
+      <div class="toast"><div class="ico">🩹</div><div>Fixed on its own<small>Reconnected Yahoo with your saved sign-in</small></div></div>
     </div>
   </header>
+
+  <section id="familiar" class="center">
+    <div class="mono">Sound familiar?</div>
+    <h2>Email is where the important stuff hides.</h2>
+    <p class="sub">Between the newsletters and the receipts: the contract that expires Monday, the school form, the client who has been waiting three days. InboxScout finds those, and says so in one calm screen.</p>
+    <div class="quotes" style="text-align:left">
+      <div class="q"><p>I have four hundred unread emails and I know maybe six of them matter. I just don't know which six.</p><div class="who"><span class="av">💼</span>Owner, 9-person plumbing company</div></div>
+      <div class="q"><p>My mom kept missing doctor's appointments that were sitting right there in her inbox.</p><div class="who"><span class="av">👵</span>Daughter who set it up for her mother</div></div>
+      <div class="q"><p>Three deals, two lenders, a dozen inspectors. I need to know today what will hurt if it slips.</p><div class="who"><span class="av">🏠</span>Real-estate agent</div></div>
+    </div>
+  </section>
 
   <section id="how">
     <div class="mono">How it works</div>
     <h2>Two minutes to set up. Thirty seconds a day after that.</h2>
     <div class="steps">
-      <div class="step"><div class="n">STEP 1</div><h3>Connect your email</h3><p>Gmail, Yahoo, iCloud, Outlook.com/Hotmail, or any other mailbox. Read-only — InboxScout can never send, delete, or change anything.</p></div>
-      <div class="step"><div class="n">STEP 2</div><h3>Say what you do — or don't</h3><p>Nurse, contractor, teacher, landlord, retiree, developer, pastor, caregiver… 56 kinds of people. Pick one, or let InboxScout figure it out from your mail. It tunes what it watches for.</p></div>
-      <div class="step"><div class="n">STEP 3</div><h3>Get your brief</h3><p>Every morning (or whenever you press the button): what needs you, what you're waiting on, what's coming up — or simply "you're all caught up."</p></div>
+      <div class="step"><div class="n">1</div><h3>Connect your email</h3><p>Gmail, Yahoo, iCloud, Outlook.com, Hotmail — or any other mailbox. Read-only: InboxScout can never send, delete, or change anything.</p></div>
+      <div class="step"><div class="n">2</div><h3>Say what you do — or don't</h3><p>Nurse, contractor, teacher, landlord, retiree, developer, pastor, caregiver… 56 kinds of people. Pick one, or let InboxScout work it out from your mail.</p></div>
+      <div class="step"><div class="n">3</div><h3>Get your brief</h3><p>Every morning, or whenever you press the button: what needs you, what you're waiting on, what's coming up. Or simply, “you're all caught up.”</p></div>
+    </div>
+  </section>
+
+  <section id="grows">
+    <div class="mono">Simple or Pro</div>
+    <h2>Simple enough for a grandparent. Sharp enough for a CEO.</h2>
+    <p class="sub">The same app shows more as you use more. It notices how you work, changes at most once a week, always tells you, and always lets you go back or lock it.</p>
+    <div class="levels">
+      <div class="lvl simple">
+        <div class="win"><div class="scr">
+          <div class="bigbtn">✉ Check my email</div>
+          <div class="row3">
+            <div>⚠ 1 thing needs you<small>Dentist wants you to confirm Tuesday</small></div>
+            <div>💵 Bills<small>Electric is due next Friday</small></div>
+            <div>📅 This week<small>Book club on Thursday at 2</small></div>
+          </div>
+          <div class="speak">🔊 Read it to me</div>
+        </div></div>
+        <div class="cap"><span class="tag">Simple</span><b>One button. Three cards. Big text.</b><p>For anyone who just wants to know if something needs them. A voice can read the brief out loud.</p></div>
+      </div>
+      <div class="lvl std">
+        <div class="win"><div class="scr">
+          <div class="hdr"><div><h3>Today</h3><p class="hd">2 things need you, then you're clear.</p></div></div>
+          <div class="cards">
+            <div class="card att"><b>⚠ Needs you</b><div>Contract expires Monday</div><div>Quote for Northwind</div></div>
+            <div class="card"><b>💵 Bills</b><div>Electric — $128.40</div><div>Water — $42.10</div></div>
+            <div class="card"><b>📅 This week</b><div>Fri — Home inspection</div><div>Tue — Dentist</div></div>
+            <div class="card"><b>✉ Waiting on you</b><div>Rate lock — Jane</div><div>Field trip form</div></div>
+          </div>
+        </div></div>
+        <div class="cap"><span class="tag">Standard</span><b>The daily brief, at a glance.</b><p>Needs you, bills, this week, your people, and the replies you owe — with a next step for each.</p></div>
+      </div>
+      <div class="lvl pro">
+        <div class="win"><div class="scr">
+          <div class="top"><span class="on">All inboxes</span><span>work@</span><span>me@</span><span>ops@</span></div>
+          <table>
+            <tr><td>DECIDE</td><td>Sign vendor renewal (auto-renews Mon, +8%)</td><td>Jane · 2d</td></tr>
+            <tr><td>REPLY</td><td>Northwind quote — 3rd nudge</td><td>Mark · 3d</td></tr>
+            <tr><td>DELEGATE</td><td>Q3 invoices → Priya</td><td>ops@ · 5</td></tr>
+            <tr><td>WATCH</td><td>Lease: 42 Maple inspection Fri 2pm</td><td>overlap ⚠</td></tr>
+            <tr><td>PROMISE</td><td>“I'll send the deck by Thursday”</td><td>you · due</td></tr>
+          </table>
+          <div class="kbd"><kbd>R</kbd> check · <kbd>1–6</kbd> tabs · <kbd>/</kbd> search · per-inbox · promises · delegation</div>
+        </div></div>
+        <div class="cap"><span class="tag">Pro</span><b>Decisions first, every inbox, keyboard.</b><p>Dense and fast: what to decide, reply, delegate, and watch — across all your accounts at once.</p></div>
+      </div>
     </div>
   </section>
 
@@ -182,29 +364,29 @@
     <h2>A scout, not another inbox.</h2>
     <p class="sub">InboxScout doesn't replace your email app. It reads alongside it and reports back in plain language.</p>
     <div class="features">
-      <div class="feat"><div class="ic">🩹</div><h3>Fixes itself</h3><p>InboxScout checks its own health every time it runs and quietly repairs what it safely can — reconnecting an account, falling back to the built-in engine when an AI helper fails, finding a new home for your reports. You see one calm line about what it did. When something really needs you, it says so in plain words, with one button: <em>Fix it for me</em>.</p></div>
-      <div class="feat"><div class="ic">🧠</div><h3>Sorts personal from work</h3><p>Plus what needs a reply, what's a newsletter, what's a receipt — and a quiet heads-up when something contains sensitive information (never hidden, never redacted).</p></div>
-      <div class="feat"><div class="ic">🔎</div><h3>Watches for what matters to you</h3><p>Tick the "skills" that fit your life: bills &amp; invoices, appointments, real-estate deals, work orders &amp; compliance, deliveries, travel, school &amp; family, health, job search, customer requests, important people.</p></div>
-      <div class="feat"><div class="ic">📰</div><h3>Daily or weekly brief</h3><p>Top issues with a concrete next step each, a rolling pulse on your projects or deals, a reply tracker, and upcoming dates. Saved as HTML, PDF, and Markdown.</p></div>
-      <div class="feat"><div class="ic">📨</div><h3>Comes to you</h3><p>Email yourself the brief, get the headline as a text message, or have InboxScout read it out loud when it's ready. It only ever sends to <em>you</em>.</p></div>
-      <div class="feat"><div class="ic">✍</div><h3>Helps you act</h3><p>One click opens a reply draft in your own mail app (you send it), adds dates to your calendar, exports a list, or saves briefs to Google Docs and Sheets.</p></div>
-      <div class="feat"><div class="ic">🧩</div><h3>Extensible for teams</h3><p>Companies add their own watchers as small JSON files and can route matching mail to their own AI agents. Simple for people, powerful underneath.</p></div>
-      <div class="feat"><div class="ic">🎚</div><h3>Simple for a grandparent, sharp for a CEO</h3><p>The layout grows with you: one big button and three cards with spoken help, or a dense decisions-first view across every inbox. InboxScout picks from how you use it, tells you when it changes, and lets you lock it. Every setting says what it does and why.</p></div>
-      <div class="feat"><div class="ic">👥</div><h3>Knows your people and your week</h3><p>Learns who matters across every inbox and treats their mail as important on its own. Tells you when someone's gone quiet, gathers the week's dates from all your accounts (and spots overlaps), and remembers what you promised people. Nothing to set up.</p></div>
-      <div class="feat"><div class="ic">🤖</div><h3>An assistant that does the fiddly parts</h3><p>It opens its own browser window and creates app passwords, connects accounts, or does any web chore you describe. Save a sign-in and it logs in for you — the AI never sees the password. You pick how far it goes; there's always a Stop button.</p></div>
-      <div class="feat"><div class="ic">🖥</div><h3>Uses your whole computer — and asks first</h3><p>The assistant can open apps and files, click and type on your desktop, run commands, and work with files in your home folder. The first time it does each kind of thing, a popup asks you: allow once, always, or never. Dangerous things ask too, unless you keep the full-autonomy choice on (it is on by default; turn it off in Settings → Who can help). One switch turns it all off.</p></div>
-      <div class="feat"><div class="ic">🤝</div><h3>Works with Hermes and other agents</h3><p>Turn on the local Agent bridge and InboxScout becomes a tool for Hermes, Claude Code, or any MCP client — read the brief, search mail, connect accounts, drive the assistant. Read-only or full access, your choice.</p></div>
+      <div class="feat"><div class="ic">📬</div><h3>Reads all your mail, read-only</h3><p>Gmail, Yahoo, iCloud, Outlook.com, Hotmail, any IMAP mailbox — several at once. It can never send, delete, or move anything.</p></div>
+      <div class="feat"><div class="ic">🧠</div><h3>Sorts personal from work</h3><p>Plus what needs a reply, what's a newsletter, what's a receipt — and a quiet heads-up when something contains sensitive information.</p></div>
+      <div class="feat"><div class="ic">🔎</div><h3>Watches for what matters to you</h3><p>Bills, appointments, deals, work orders, deliveries, travel, school, health, job search, customer requests, the people you care about. Tick what fits.</p></div>
+      <div class="feat"><div class="ic">👥</div><h3>Knows your people and your week</h3><p>Learns who matters across every inbox, tells you when someone has gone quiet, gathers the week's dates from all your accounts, and remembers what you promised.</p></div>
+      <div class="feat"><div class="ic">📨</div><h3>Comes to you</h3><p>Email yourself the brief, get the headline as a text message, or have it read out loud when it's ready. It only ever sends to <em>you</em>.</p></div>
+      <div class="feat"><div class="ic">✍</div><h3>Helps you act</h3><p>One click opens a reply draft in your own mail app (you send it), adds dates to your calendar, or saves briefs to Google Docs and Sheets.</p></div>
+      <div class="feat"><div class="ic">🩹</div><h3>Fixes itself</h3><p>Checks its own health on every run and quietly repairs what it safely can. When something really needs you, it says so in plain words, with one button: <em>Fix it for me</em>.</p></div>
+      <div class="feat"><div class="ic">🤖</div><h3>Does the fiddly parts for you</h3><p>An assistant opens its own browser window and handles the setup chores — app passwords, connecting accounts — or any web task you describe. There's always a Stop button.</p></div>
     </div>
   </section>
 
-  <section>
+  <section id="people" class="center">
     <div class="mono">Who it's for</div>
     <h2>One app, anyone's inbox.</h2>
-    <div class="people">
-      <div class="person"><div class="who">🏠 Real-estate agents</div><p>Every deal tracked by address and stage; expiring contingencies, closing dates, and unanswered clients surfaced first.</p></div>
-      <div class="person"><div class="who">🦺 Utility &amp; field crews</div><p>Work orders, shift changes, safety bulletins, and mandatory training deadlines — nothing buried under newsletters.</p></div>
-      <div class="person"><div class="who">💼 Small-business owners</div><p>Customer requests, invoices, contracts, and the replies you owe, ranked by what will hurt if it slips.</p></div>
-      <div class="person"><div class="who">👵 Parents &amp; grandparents</div><p>Three tabs, one big button, adjustable text size, and a voice that reads the brief out loud. Set it up for them in two minutes.</p></div>
+    <p class="sub">InboxScout adapts to what you do instead of making you adapt to it. 56 kinds of people, each with their own idea of “urgent.”</p>
+    <div class="who">
+      <span><i>🏠</i>Real-estate agents</span><span><i>🔧</i>Contractors</span><span><i>🩺</i>Nurses</span><span><i>🍎</i>Teachers</span><span><i>💼</i>Small-business owners</span><span><i>🏢</i>Landlords</span><span><i>🌅</i>Retirees</span><span><i>💛</i>Caregivers</span><span><i>💻</i>Developers</span><span><i>⛪</i>Pastors</span><span><i>🍽</i>Restaurant owners</span><span><i>🦺</i>Field crews</span><span><i>👨‍👩‍👧</i>Busy parents</span><span><i>📈</i>Executives</span><span class="more">+ 42 more</span>
+    </div>
+    <div class="personas" style="text-align:left">
+      <div class="person"><div class="t">👵 Parents &amp; grandparents</div><p>One big button, three cards, larger text, and a voice that reads the brief out loud. Set it up for them in two minutes; it stays out of their way.</p></div>
+      <div class="person"><div class="t">💼 Small-business owners</div><p>Customer requests, invoices, contracts, and the replies you owe, ranked by what will hurt if it slips. Across every inbox you run.</p></div>
+      <div class="person"><div class="t">🏠 Agents, landlords &amp; trades</div><p>Every deal, unit, or job tracked by address and stage. Expiring dates, inspections, and unanswered clients surfaced first.</p></div>
+      <div class="person"><div class="t">📈 Executives &amp; managers</div><p>Decisions first. Delegate with a click, see promises you made, and keep one schedule across work and life. Keyboard all the way.</p></div>
     </div>
   </section>
 
@@ -213,29 +395,45 @@
     <div class="free">
       <div>
         <h2>Works out of the box. Nothing leaves your computer unless you say so.</h2>
-        <ul>
-          <li><strong>No AI account required.</strong> A built-in engine sorts, tracks, and writes briefs entirely on your PC.</li>
-          <li><strong>Optional smarter AI.</strong> Connect a free tier (Gemini, Groq, OpenRouter, Mistral) or a local model (Ollama, LM Studio) in one click — or a paid one if you prefer.</li>
-          <li><strong>Local-first.</strong> Your mail lives in a local database; passwords and keys are encrypted with your OS keychain.</li>
-          <li><strong>Read-only, always.</strong> InboxScout can't send, delete, or move your mail. Replies are drafts you send yourself.</li>
-          <li><strong>Source-available.</strong> The code is public on GitHub under the FSL-1.1-MIT license.</li>
+        <ul style="margin-top:22px">
+          <li><span><b>Local-first.</b> Your mail lives in a database on your computer. Passwords and keys are locked with your system's own keychain.</span></li>
+          <li><span><b>No AI account required.</b> A built-in engine sorts, tracks, and writes briefs entirely on your PC. Connect a smarter AI later if you like.</span></li>
+          <li><span><b>Read-only, always.</b> InboxScout can't send, delete, or move your mail. Replies are drafts you send yourself.</span></li>
+          <li><span><b>You choose how far it goes.</b> The assistant asks before it uses your computer; one switch turns it off. Every setting says what it does and why.</span></li>
+          <li><span><b>Source-available.</b> The code is public on GitHub, so anyone can check what it does.</span></li>
         </ul>
       </div>
-      <div>
-        <div class="mono" style="margin-bottom:10px">Optional AI backends</div>
-        <div class="logos"><span>Built-in (free)</span><span>Gemini</span><span>Groq</span><span>OpenRouter</span><span>Mistral</span><span>DeepSeek</span><span>OpenAI</span><span>Claude</span><span>Grok</span><span>Ollama</span><span>LM Studio</span><span>Any OpenAI-compatible</span></div>
+      <div class="lock">
+        <div class="big">$0</div>
+        <div class="lbl">Free forever. No account. No subscription.</div>
+        <div class="mono" style="margin-bottom:10px">Optional smarter AI — your pick</div>
+        <div class="logos"><span>Built-in (free)</span><span>Gemini</span><span>Groq</span><span>OpenRouter</span><span>Mistral</span><span>DeepSeek</span><span>OpenAI</span><span>Claude</span><span>Grok</span><span>Ollama</span><span>LM Studio</span></div>
       </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="band">
+      <h2>Give your inbox a scout.</h2>
+      <p>Download, connect your email, and get your first brief before your coffee cools. Windows and Mac.</p>
+      <div class="dl">
+        <a class="btn light" data-os="win" href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-Setup.exe">⬇ Download for Windows</a>
+        <a class="btn outline" data-os="mac-arm" href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-arm64.dmg">⬇ Mac <small>Apple Silicon</small></a>
+        <a class="btn outline" data-os="mac-intel" href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-x64.dmg">⬇ Mac <small>Intel</small></a>
+      </div>
+      <p class="fine">Not sure which Mac? Apple menu → About This Mac → “Apple M…” means Apple Silicon. <a href="https://github.com/thatcooperguy/InboxScout/releases">All versions</a></p>
     </div>
   </section>
 
   <section id="faq">
     <div class="mono">Install help</div>
     <h2>First-time install tips</h2>
-    <details open><summary>Windows says "Windows protected your PC"</summary><p>InboxScout isn't code-signed yet (that costs money; we're in the friends-and-family stage). Click <strong>More info</strong> → <strong>Run anyway</strong>. It's a one-time message; the app updates itself after that.</p></details>
-    <details><summary>Mac says "InboxScout can't be opened"</summary><p>Open <strong>System Settings → Privacy &amp; Security</strong>, scroll down, click <strong>Open Anyway</strong>, then open InboxScout again. One time only.</p></details>
-    <details><summary>Which Mac download do I need?</summary><p>Apple menu → <strong>About This Mac</strong>. If you see "Apple M1/M2/M3/M4", choose <strong>Apple Silicon</strong>; if you see "Intel", choose <strong>Intel</strong>.</p></details>
-    <details><summary>How does it connect to Gmail / Yahoo / iCloud / Outlook?</summary><p>Gmail and Outlook can use a normal "Sign in with Google / Microsoft" page. Gmail, Yahoo, and iCloud also work with an <em>app password</em> — a special 16-character password just for InboxScout; the setup screen shows exactly where to get one.</p></details>
-    <details><summary>Is it really free?</summary><p>Yes. The app, the built-in engine, texts via your carrier's free gateway, updates — all free. The only optional costs are paid AI backends you might choose to connect.</p></details>
+    <details open><summary>Windows says “Windows protected your PC”</summary><p>InboxScout isn't code-signed yet (that costs money; we're in the friends-and-family stage). Click <strong>More info</strong> → <strong>Run anyway</strong>. It's a one-time message; the app updates itself after that.</p></details>
+    <details><summary>Mac says “InboxScout can't be opened”</summary><p>Open <strong>System Settings → Privacy &amp; Security</strong>, scroll down, click <strong>Open Anyway</strong>, then open InboxScout again. One time only.</p></details>
+    <details><summary>Which Mac download do I need?</summary><p>Apple menu → <strong>About This Mac</strong>. If you see “Apple M1/M2/M3/M4”, choose <strong>Apple Silicon</strong>; if you see “Intel”, choose <strong>Intel</strong>.</p></details>
+    <details><summary>How does it connect to Gmail, Yahoo, iCloud, or Outlook?</summary><p>Gmail and Outlook can use a normal “Sign in with Google / Microsoft” page. Gmail, Yahoo, and iCloud also work with an <em>app password</em> — a special 16-character password just for InboxScout. The setup screen shows exactly where to get one, or the built-in assistant can create it for you.</p></details>
+    <details><summary>Is it really free?</summary><p>Yes. The app, the built-in engine, text messages through your carrier's free gateway, updates — all free. The only optional cost is a paid AI service you might choose to connect.</p></details>
+    <details><summary>Can I set it up for a parent or grandparent?</summary><p>Yes — that's one of the main reasons it exists. Install it, connect their email, pick the Simple layout (or let it pick), and turn on “Read it to me.” They get one big button and three cards.</p></details>
   </section>
 
   <footer>
@@ -243,7 +441,27 @@
       <div>© 2026 InboxScout · <a href="https://github.com/thatcooperguy/InboxScout/blob/main/LICENSE.md">FSL-1.1-MIT license</a></div>
       <div><a href="https://github.com/thatcooperguy/InboxScout">Source on GitHub</a> · <a href="https://github.com/thatcooperguy/InboxScout/releases">All releases</a> · <a href="https://github.com/thatcooperguy/InboxScout/issues">Report a problem</a></div>
     </div>
+    <div class="tink">For tinkerers: InboxScout can be a tool for Hermes, Claude Code, or any MCP client, with a local REST API and event stream, custom watchers as JSON files, and full desktop control that asks first. <a href="https://github.com/thatcooperguy/InboxScout/tree/main/integrations/hermes">Read the integration docs →</a></div>
   </footer>
 </div>
+<script>
+  // Put the visitor's own platform first, so the big button is the right one.
+  (function () {
+    try {
+      var ua = navigator.userAgent, isMac = /Macintosh|Mac OS X/.test(ua), isWin = /Windows/.test(ua);
+      if (!isMac && !isWin) return;
+      var want = isWin ? 'win' : 'mac-arm';
+      document.querySelectorAll('.dl').forEach(function (row) {
+        var btns = Array.prototype.slice.call(row.querySelectorAll('.btn'));
+        var first = btns.find(function (b) { return b.dataset.os === want; });
+        if (!first || first === btns[0]) return;
+        var primaryClass = btns[0].classList.contains('light') ? ['light', 'outline'] : ['primary', 'ghost'];
+        btns.forEach(function (b) { b.classList.remove(primaryClass[0]); b.classList.add(primaryClass[1]); });
+        first.classList.remove(primaryClass[1]); first.classList.add(primaryClass[0]);
+        row.insertBefore(first, btns[0]);
+      });
+    } catch (e) { /* never break the page over a nicety */ }
+  })();
+</script>
 </body>
 </html>
