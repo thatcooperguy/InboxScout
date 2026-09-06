@@ -1,5 +1,7 @@
 # Website: inboxscout.ai
 
+> On a phone? Follow **docs/PHONE-SETUP.md** — a tap-by-tap version of this page.
+
 The landing page lives in `site/` and is published free with **GitHub Pages** whenever `site/` changes
 (workflow: `.github/workflows/pages.yml`). HTTPS is automatic.
 
