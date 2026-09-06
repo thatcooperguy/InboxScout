@@ -557,6 +557,18 @@ export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
 
   ipcMain.handle('issues:list', () => repo.listIssues(db, false))
   ipcMain.handle('projects:list', () => repo.listProjects(db, false))
+  // ---- People (your circle) ----
+  ipcMain.handle('people:list', () => repo.listPeople(db))
+  ipcMain.handle('people:mark', (_e, address: string, how: 'important' | 'quiet' | 'clear') => {
+    const s = loadSettings(db)
+    const a = String(address).trim().toLowerCase()
+    const without = (list: string[]): string[] => list.filter((x) => x.trim().toLowerCase() !== a)
+    const next = { ...s, vipSenders: without(s.vipSenders), quietPeople: without(s.quietPeople) }
+    if (how === 'important') next.vipSenders = [...next.vipSenders, a]
+    if (how === 'quiet') next.quietPeople = [...next.quietPeople, a]
+    saveSettings(db, next)
+    return true
+  })
   ipcMain.handle('messages:recent', (_e, limit: number) =>
     repo.recentMessagesWithClassification(db, Math.min(limit || 50, 200))
   )

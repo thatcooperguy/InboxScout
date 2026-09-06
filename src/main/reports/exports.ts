@@ -61,10 +61,27 @@ export interface CalendarEvent {
 /** Deadlines in the brief look like "Sep 12 — Electric bill due"; split and parse. */
 export function eventsFromBrief(brief: Brief, now: Date): CalendarEvent[] {
   const events: CalendarEvent[] = []
+  const seen = new Set<string>()
+  // The unified schedule (every inbox, skills, promises) is the richest source when present.
+  for (const day of brief.schedule?.days ?? []) {
+    for (const e of day.events) {
+      const date = new Date(e.iso)
+      if (Number.isNaN(date.getTime())) continue
+      const key = `${day.date}|${e.title.toLowerCase()}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      events.push({ title: e.time ? `${e.time} ${e.title}` : e.title, date })
+    }
+  }
   for (const line of brief.deadlines) {
     const [when, ...rest] = line.split(/\s[—-]\s/)
     const date = parseLooseDate(when, now)
-    if (date) events.push({ title: rest.join(' — ') || line, date })
+    if (!date) continue
+    const title = rest.join(' — ') || line
+    const key = `${date.toISOString().slice(0, 10)}|${title.toLowerCase()}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    events.push({ title, date })
   }
   return events
 }

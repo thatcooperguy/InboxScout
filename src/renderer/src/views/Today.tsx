@@ -63,11 +63,20 @@ export default function Today({ running, onRun }: Props): JSX.Element {
     ? { ...rawBrief, topIssues: rawBrief.topIssues.filter((i: any) => !i.issueId || !doneIds.has(i.issueId)) }
     : null
   const when = latest ? new Date(latest.createdAt) : null
+  const schedule = brief?.schedule
+  const scheduleHas = !!schedule && (schedule.days.some((d: any) => d.events.length) || schedule.overdue.length > 0)
+  const circle = brief?.people
+  const circleHas = !!circle && (circle.goingQuiet.length > 0 || circle.newFaces.length > 0)
+  const promises = brief?.promises ?? []
+  const inboxes = brief?.inboxes ?? []
   const hasAnything =
     brief &&
     (brief.topIssues.length ||
       brief.waitingOnYou.length ||
       brief.deadlines.length ||
+      scheduleHas ||
+      circleHas ||
+      promises.length ||
       (brief.skillSections ?? []).some((s: any) => s.lines.length))
 
   return (
@@ -86,6 +95,15 @@ export default function Today({ running, onRun }: Props): JSX.Element {
             <p className="hint" style={{ marginTop: 6 }}>
               Last checked {when.toLocaleString()}
             </p>
+          )}
+          {inboxes.length > 1 && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+              {inboxes.map((ib: any) => (
+                <span key={ib.accountId} className="hint" style={{ border: '1px solid var(--line)', borderRadius: 999, padding: '2px 10px', fontSize: 12.5 }}>
+                  {ib.role === 'work' ? '💼' : ib.role === 'personal' ? '🏠' : '📥'} {ib.label}: {ib.newCount} new{ib.needsYou ? ` · ${ib.needsYou} need you` : ''}
+                </span>
+              ))}
+            </div>
           )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
@@ -167,12 +185,81 @@ export default function Today({ running, onRun }: Props): JSX.Element {
               <p className="hint">Draft reply opens your own mail app with a starter message — you review and send.</p>
             </div>
           )}
-          {brief.deadlines.length > 0 && (
+          {promises.length > 0 && (
             <div className="today-card">
-              <h3>📅 Coming up</h3>
+              <h3>🤝 Promises you made</h3>
               <ul>
-                {brief.deadlines.map((d: string, idx: number) => (
-                  <li key={idx}>{d}</li>
+                {promises.slice(0, 6).map((p: any, idx: number) => (
+                  <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                    <span>
+                      <strong>
+                        {p.overdue ? '‼ ' : ''}To {p.to}
+                        {p.due ? ` — by ${new Date(p.due).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}` : ''}
+                      </strong>
+                      <div className="next">“{p.text}”</div>
+                    </span>
+                    {p.address && (
+                      <button className="ghost" style={{ alignSelf: 'center', whiteSpace: 'nowrap' }} onClick={() => void window.inboxScout.openExternal(replyMailto(p.address, p.subject, p.to))}>
+                        ✍ Follow up
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {scheduleHas ? (
+            <div className="today-card">
+              <h3>🗓 This week</h3>
+              <ul>
+                {schedule.overdue.slice(0, 3).map((o: string, idx: number) => (
+                  <li key={`o${idx}`} style={{ color: 'var(--red, #c0392f)' }}>
+                    {o}
+                  </li>
+                ))}
+                {schedule.days
+                  .filter((d: any) => d.events.length)
+                  .map((d: any) => (
+                    <li key={d.date}>
+                      <strong>{d.label}</strong>
+                      {d.events.map((e: any, i: number) => (
+                        <div className="next" key={i} style={e.conflict ? { color: 'var(--red, #c0392f)' } : {}}>
+                          {e.conflict ? '‼ ' : ''}
+                          {e.time ? `${e.time} · ` : ''}
+                          {e.title}
+                          {e.person ? ` (${e.person})` : ''}
+                        </div>
+                      ))}
+                    </li>
+                  ))}
+                {schedule.recurring.length > 0 && (
+                  <li>
+                    <span className="hint">Regulars: {schedule.recurring.slice(0, 3).join(' · ')}</span>
+                  </li>
+                )}
+              </ul>
+            </div>
+          ) : (
+            brief.deadlines.length > 0 && (
+              <div className="today-card">
+                <h3>📅 Coming up</h3>
+                <ul>
+                  {brief.deadlines.map((d: string, idx: number) => (
+                    <li key={idx}>{d}</li>
+                  ))}
+                </ul>
+              </div>
+            )
+          )}
+          {circleHas && (
+            <div className="today-card">
+              <h3>👥 Your circle</h3>
+              <ul>
+                {circle.goingQuiet.map((g: string, idx: number) => (
+                  <li key={`q${idx}`}>{g}</li>
+                ))}
+                {circle.newFaces.map((n: string, idx: number) => (
+                  <li key={`n${idx}`}>{n}</li>
                 ))}
               </ul>
             </div>

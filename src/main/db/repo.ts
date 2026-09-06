@@ -97,7 +97,7 @@ export function getMessages(db: DB, ids: string[]): MessageRecord[] {
 export function recentMessagesWithClassification(db: DB, limit: number): any[] {
   return db
     .prepare(
-      `SELECT m.id, m.subject, m.from_address, m.from_name, m.date, m.snippet,
+      `SELECT m.id, m.subject, m.from_address, m.from_name, m.date, m.snippet, m.account_id,
               c.category, c.importance, c.screening, c.action_summary, c.sensitivity
        FROM messages m LEFT JOIN classifications c ON c.message_id = m.id
        ORDER BY m.date DESC LIMIT ?`
@@ -310,4 +310,127 @@ export function getMeta(db: DB, key: string): string | null {
 
 export function setMeta(db: DB, key: string, value: string): void {
   db.prepare('INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)').run(key, value)
+}
+
+// ---- Quiet intelligence (v0.9): people, recent mail windows, skill matches ----
+
+/** Messages from the last `days` days across every account, newest first, capped. */
+export function messagesSince(db: DB, days: number, limit = 4000): MessageRecord[] {
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString()
+  return (db.prepare('SELECT * FROM messages WHERE date >= ? ORDER BY date DESC LIMIT ?').all(cutoff, limit) as any[]).map(rowToMessage)
+}
+
+export interface StoredPerson {
+  key: string
+  name: string
+  addresses: string[]
+  domain: string
+  received: number
+  sent: number
+  repliedByMe: number
+  repliedToMe: number
+  firstSeen: string
+  lastSeen: string
+  cadenceDays: number | null
+  accounts: string[]
+  role: string
+  tier: string
+  score: number
+  goingQuiet: boolean
+  quietDays: number
+  isNew: boolean
+}
+
+export function replacePeople(db: DB, people: StoredPerson[]): void {
+  const now = new Date().toISOString()
+  const insert = db.prepare(
+    `INSERT OR REPLACE INTO people (key, name, addresses, domain, received, sent, replied_by_me, replied_to_me, first_seen, last_seen,
+       cadence_days, accounts, role, tier, score, going_quiet, quiet_days, is_new, updated_at)
+     VALUES (@key, @name, @addresses, @domain, @received, @sent, @repliedByMe, @repliedToMe, @firstSeen, @lastSeen,
+       @cadenceDays, @accounts, @role, @tier, @score, @goingQuiet, @quietDays, @isNew, @updatedAt)`
+  )
+  const tx = db.transaction((rows: StoredPerson[]) => {
+    db.prepare('DELETE FROM people').run()
+    for (const p of rows) {
+      insert.run({
+        ...p,
+        addresses: JSON.stringify(p.addresses),
+        accounts: JSON.stringify(p.accounts),
+        cadenceDays: p.cadenceDays ?? null,
+        goingQuiet: p.goingQuiet ? 1 : 0,
+        isNew: p.isNew ? 1 : 0,
+        updatedAt: now
+      })
+    }
+  })
+  tx(people)
+}
+
+export function listPeople(db: DB, limit = 300): StoredPerson[] {
+  return (db.prepare('SELECT * FROM people ORDER BY score DESC LIMIT ?').all(limit) as any[]).map((r) => ({
+    key: r.key,
+    name: r.name,
+    addresses: JSON.parse(r.addresses),
+    domain: r.domain,
+    received: r.received,
+    sent: r.sent,
+    repliedByMe: r.replied_by_me,
+    repliedToMe: r.replied_to_me,
+    firstSeen: r.first_seen,
+    lastSeen: r.last_seen,
+    cadenceDays: r.cadence_days,
+    accounts: JSON.parse(r.accounts),
+    role: r.role,
+    tier: r.tier,
+    score: r.score,
+    goingQuiet: !!r.going_quiet,
+    quietDays: r.quiet_days,
+    isNew: !!r.is_new
+  }))
+}
+
+/** Skill matches recorded in the last `days` days, joined with the message they came from. */
+export function recentSkillMatches(db: DB, days: number): { messageId: string; skillId: string; extracted: Record<string, string>; urgent: boolean; subject: string; fromName: string; fromAddress: string; accountId: string; date: string }[] {
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString()
+  return (
+    db
+      .prepare(
+        `SELECT s.message_id, s.skill_id, s.extracted, s.urgent, m.subject, m.from_name, m.from_address, m.account_id, m.date
+         FROM skill_matches s JOIN messages m ON m.id = s.message_id WHERE m.date >= ? ORDER BY m.date DESC LIMIT 2000`
+      )
+      .all(cutoff) as any[]
+  ).map((r) => ({
+    messageId: r.message_id,
+    skillId: r.skill_id,
+    extracted: safeJson(r.extracted),
+    urgent: !!r.urgent,
+    subject: r.subject,
+    fromName: r.from_name,
+    fromAddress: r.from_address,
+    accountId: r.account_id,
+    date: r.date
+  }))
+}
+
+/** Classifications with a deadline from the last `days` days, with their message. */
+export function recentDeadlines(db: DB, days: number): { messageId: string; deadline: string; subject: string; fromName: string; fromAddress: string; accountId: string; date: string }[] {
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString()
+  return (
+    db
+      .prepare(
+        `SELECT c.message_id, c.deadline, m.subject, m.from_name, m.from_address, m.account_id, m.date
+         FROM classifications c JOIN messages m ON m.id = c.message_id
+         WHERE c.deadline IS NOT NULL AND c.deadline != '' AND m.date >= ? ORDER BY m.date DESC LIMIT 1000`
+      )
+      .all(cutoff) as any[]
+  ).map((r) => ({ messageId: r.message_id, deadline: r.deadline, subject: r.subject, fromName: r.from_name, fromAddress: r.from_address, accountId: r.account_id, date: r.date }))
+}
+
+function safeJson(raw: string): Record<string, string> {
+  try {
+    const v = JSON.parse(raw)
+    return v && typeof v === 'object' ? v : {}
+  } catch {
+    return {}
+  }
 }

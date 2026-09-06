@@ -72,7 +72,15 @@
 - **30+ new skills** authored alongside the profiles (shifts, credentials, permits, tenants, loads, bookings, orders, incidents, gigs, benefits, medications, immigration…).
 - **Full autonomy by default** for the Assistant, with *Sign in for me* and *Careful* as dial-backs; bridge ops `list_profiles` / `detect_profile` / `set_profile`.
 
-## 🟠 Gaps — v0.9
+## ✅ v0.9 — shipped (quiet intelligence)
+
+- **People engine** across all inboxes: roles (family/friend/colleague/client/vendor/service/automated), tiers, cadence; inner circle auto-important; going-quiet and new-faces lines; People tab with Always/Not important. `docs/INSIGHTS.md`.
+- **Unified schedule**: deadlines + appointments + travel + skill dates + promises from every inbox, grouped by day with overlaps, overdue items, and detected regulars; feeds the `.ics` export and the spoken summary.
+- **Promises you made**: commitments extracted from sent mail with due dates and follow-up buttons.
+- **By inbox**: inferred inbox roles, per-inbox counts, cross-account de-duplication, inbox filter in Inbox review.
+- Bridge ops `list_people` / `get_schedule` / `list_promises`; one Preferences switch to turn insights off.
+
+## 🟠 Gaps — v1.0
 
 - ~~Autonomous console agent~~ — ✅ shipped in v0.7 as the Assistant, with handoffs where a bot would be brittle.
 - **Voice commands** (talk to InboxScout) — Chromium speech recognition in Electron needs a Google key and is unreliable offline; revisit with a local model (e.g. whisper.cpp).

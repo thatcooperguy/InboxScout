@@ -79,6 +79,8 @@ const api = {
   listIssues: () => ipcRenderer.invoke('issues:list'),
   listProjects: () => ipcRenderer.invoke('projects:list'),
   recentMessages: (limit: number) => ipcRenderer.invoke('messages:recent', limit),
+  listPeople: () => ipcRenderer.invoke('people:list'),
+  markPerson: (address: string, how: string) => ipcRenderer.invoke('people:mark', address, how),
   searchMessages: (query: string) => ipcRenderer.invoke('messages:search', query),
   correctMessage: (input: unknown) => ipcRenderer.invoke('messages:correct', input),
 

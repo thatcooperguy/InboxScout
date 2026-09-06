@@ -146,6 +146,13 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
             </select>
           </label>
           <label className="field">
+            <span>Quiet insights — your circle, this week's schedule across inboxes, promises you made, and a per-inbox view</span>
+            <select value={settings.insightsEnabled ? 'yes' : 'no'} onChange={(e) => update({ insightsEnabled: e.target.value === 'yes' })}>
+              <option value="yes">On — they only appear when there's something to say (recommended)</option>
+              <option value="no">Off</option>
+            </select>
+          </label>
+          <label className="field">
             <span>Show advanced tools (Details and Inbox review tabs)</span>
             <select
               value={settings.simpleMode ? 'no' : 'yes'}

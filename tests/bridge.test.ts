@@ -135,6 +135,13 @@ describe('bridge operations', () => {
     expect(auto.profileId).toBe('realestate')
   })
 
+  it('serves people, schedule, and promises from the latest brief', async () => {
+    const ops = buildOps(makeDeps().deps)
+    expect(await runOp(ops, 'list_people', {}, true)).toEqual([])
+    expect(await runOp(ops, 'get_schedule', {}, true)).toBeNull()
+    expect(await runOp(ops, 'list_promises', {}, true)).toEqual([])
+  })
+
   it('resolves issues and reads mail through ops', async () => {
     const { deps } = makeDeps()
     const ops = buildOps(deps)

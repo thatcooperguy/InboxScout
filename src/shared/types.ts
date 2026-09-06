@@ -150,6 +150,90 @@ export interface BriefSection {
   lines: string[]
 }
 
+/** One person in the owner's circle, as shown in a brief. */
+export interface PersonLine {
+  name: string
+  address: string
+  role: PersonRole
+  /** e.g. "12 emails this month · you usually reply within a day". */
+  note: string
+}
+export type PersonRole = 'family' | 'friend' | 'colleague' | 'client' | 'vendor' | 'service' | 'automated' | 'unknown'
+export type PersonTier = 'inner' | 'regular' | 'occasional'
+
+export interface BriefPeople {
+  /** The handful of people who matter most right now. */
+  inner: PersonLine[]
+  /** "You usually hear from Mom every week; it's been 3 weeks." */
+  goingQuiet: string[]
+  /** People who showed up for the first time recently and are already writing more than once. */
+  newFaces: string[]
+}
+
+export type ScheduleSource = 'deadline' | 'appointment' | 'travel' | 'skill' | 'promise' | 'ai'
+
+export interface ScheduleEvent {
+  title: string
+  /** ISO date-time (local) of the event; date-only events use 09:00. */
+  iso: string
+  /** "6:00 pm" or null when only the day is known. */
+  time: string | null
+  source: ScheduleSource
+  /** Skill name, "Deadline", "Travel"… for display. */
+  sourceLabel?: string
+  person?: string
+  accountId?: string
+  messageId?: string
+  /** Overlaps another event within the hour. */
+  conflict?: boolean
+}
+
+export interface ScheduleDay {
+  /** YYYY-MM-DD */
+  date: string
+  /** "Tue Sep 9" / "Today" / "Tomorrow" */
+  label: string
+  events: ScheduleEvent[]
+}
+
+export interface BriefSchedule {
+  days: ScheduleDay[]
+  /** "Every Tuesday around 6:00 pm — Soccer practice" */
+  recurring: string[]
+  /** Plain lines describing overlaps. */
+  conflicts: string[]
+  /** Dated items that already passed and were never marked done. */
+  overdue: string[]
+}
+
+/** Something the owner wrote that reads like a commitment. */
+export interface PromiseLine {
+  /** The sentence, trimmed (≤ 140 chars). */
+  text: string
+  /** Who it was made to (name or address). */
+  to: string
+  address: string
+  /** ISO date when one was stated, else null. */
+  due: string | null
+  subject: string
+  messageId: string
+  madeOn: string
+  overdue: boolean
+}
+
+export interface InboxSummary {
+  accountId: string
+  label: string
+  email: string
+  /** Inferred from what the mail looks like; nothing to configure. */
+  role: 'work' | 'personal' | 'mixed'
+  /** New messages this run. */
+  newCount: number
+  /** Open items that came through this inbox. */
+  needsYou: number
+  waitingOnYou: number
+}
+
 export interface Brief {
   headline: string
   topIssues: BriefIssue[]
@@ -165,6 +249,11 @@ export interface Brief {
   resolvedRecently?: string[]
   /** Structured reply-tracker entries (for one-click reply drafts). */
   waitingOnYouDetails?: { subject: string; counterpart: string; address: string }[]
+  /** Quiet intelligence (v0.9): always computed, shown only when there is something to say. */
+  people?: BriefPeople
+  schedule?: BriefSchedule
+  promises?: PromiseLine[]
+  inboxes?: InboxSummary[]
 }
 
 export interface ScheduleSettings {
@@ -216,6 +305,10 @@ export interface AppSettings {
   googleDriveExport: boolean
   /** Speak a short summary out loud whenever a scheduled brief is ready. */
   speakBriefs: boolean
+  /** Circle, schedule, promises, and per-inbox insights. On by default; they only appear when there is something to say. */
+  insightsEnabled: boolean
+  /** People the owner marked "not important" in the People view (addresses). */
+  quietPeople: string[]
   /** Local HTTP bridge so Hermes and other agents on this computer can use InboxScout as a tool. */
   bridgeEnabled: boolean
   bridgePort: number
@@ -261,6 +354,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   smsCarrier: '',
   googleDriveExport: false,
   speakBriefs: false,
+  insightsEnabled: true,
+  quietPeople: [],
   bridgeEnabled: false,
   bridgePort: 47311,
   bridgeAccess: 'full',

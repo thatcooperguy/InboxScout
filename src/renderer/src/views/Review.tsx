@@ -8,9 +8,12 @@ export default function Review(): JSX.Element {
   const [results, setResults] = useState<any[] | null>(null)
   const [catFilter, setCatFilter] = useState<string>('all')
   const [screenFilter, setScreenFilter] = useState<string>('all')
+  const [accountFilter, setAccountFilter] = useState<string>('all')
+  const [accounts, setAccounts] = useState<any[]>([])
 
   const load = (): void => {
-    void window.inboxScout.recentMessages(80).then(setMessages)
+    void window.inboxScout.recentMessages(120).then(setMessages)
+    void window.inboxScout.listAccounts().then(setAccounts)
   }
   useEffect(load, [])
 
@@ -28,7 +31,10 @@ export default function Review(): JSX.Element {
   }
 
   const rows = (results ?? messages).filter(
-    (m) => (catFilter === 'all' || m.category === catFilter) && (screenFilter === 'all' || m.screening === screenFilter)
+    (m) =>
+      (catFilter === 'all' || m.category === catFilter) &&
+      (screenFilter === 'all' || m.screening === screenFilter) &&
+      (accountFilter === 'all' || !m.account_id || m.account_id === accountFilter)
   )
   const chip = (value: string, current: string, set: (v: string) => void, label: string): JSX.Element => (
     <button
@@ -71,6 +77,13 @@ export default function Review(): JSX.Element {
         {chip('work', catFilter, setCatFilter, 'Work')}
         {chip('personal', catFilter, setCatFilter, 'Personal')}
         {chip('promotions_noise', catFilter, setCatFilter, 'Noise')}
+        {accounts.length > 1 && (
+          <>
+            <span className="hint" style={{ marginLeft: 12 }}>Inbox:</span>
+            {chip('all', accountFilter, setAccountFilter, 'All')}
+            {accounts.map((a) => chip(a.id, accountFilter, setAccountFilter, a.label))}
+          </>
+        )}
         <span className="hint" style={{ marginLeft: 12 }}>Type:</span>
         {chip('all', screenFilter, setScreenFilter, 'Any')}
         {chip('needs_reply', screenFilter, setScreenFilter, 'Needs reply')}

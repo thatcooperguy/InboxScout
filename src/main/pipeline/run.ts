@@ -16,6 +16,10 @@ import { trackReplies } from './replies'
 import { renderHtml, renderMarkdown } from '../reports/render'
 import { getProfile } from '../profiles/profiles'
 import { applyAutoProfile } from '../profiles/auto'
+import { buildPeople, inferOwnerName, inferVipAddresses, summarizePeople } from '../people/engine'
+import { buildSchedule, type ScheduleItem } from '../schedule/engine'
+import { extractPromises } from './promises'
+import { dedupeAcrossAccounts, summarizeInboxes } from './inboxes'
 import { loadSettings, saveSettings } from '../settings'
 import { SecretStore, accountSecretName, providerSecretName } from '../secrets'
 import { resolveModel, DEFAULT_MODELS, LOCAL_PROVIDERS } from '../ai/provider'
@@ -31,7 +35,7 @@ import {
   skillPromptHints
 } from '../skills/engine'
 import type { SkillMatch } from '../skills/types'
-import type { Classification, MessageRecord, RunProgress } from '../../shared/types'
+import type { Category, Classification, MessageRecord, RunProgress } from '../../shared/types'
 
 export interface PipelineResult {
   runId: string
@@ -77,7 +81,7 @@ export async function runPipeline(
     // Skills: built-in watchers plus any custom JSON skills the user dropped in.
     const custom = opts.skillsDir ? loadCustomSkills(opts.skillsDir) : { skills: [], errors: [] }
     let { enabled: skills } = resolveSkills(settings.profileId, settings.enabledSkillIds, custom.skills)
-    const skillCtx = { vipSenders: settings.vipSenders, mutedSenders: settings.mutedSenders }
+    const skillCtx = { vipSenders: [...settings.vipSenders], mutedSenders: settings.mutedSenders }
     let promptHints = skillPromptHints(skills)
     const allMatches: SkillMatch[] = []
 
@@ -152,6 +156,25 @@ export async function runPipeline(
     const accountFailures = syncErrors.length - custom.errors.length
     if (accountFailures === accounts.length && newMessages.length === 0) {
       throw new Error(`Could not check any account. ${syncErrors.join(' | ')}`)
+    }
+
+    // 1a. Who is in this person's life (all inboxes). Inner circle counts as important automatically.
+    const myAddresses = accounts.map((a) => a.email.trim().toLowerCase())
+    const circleMessages = repo.messagesSince(db, 120)
+    const categoryOfStored = (id: string): Category | undefined => repo.getClassifications(db, [id])[0]?.category
+    const people = settings.insightsEnabled
+      ? buildPeople({
+          messages: circleMessages,
+          categoryOf: categoryOfStored,
+          myAddresses,
+          now: new Date(),
+          ownerName: inferOwnerName(circleMessages, myAddresses),
+          quietPeople: settings.quietPeople
+        })
+      : []
+    if (people.length) {
+      repo.replacePeople(db, people)
+      for (const a of inferVipAddresses(people)) if (!skillCtx.vipSenders.includes(a)) skillCtx.vipSenders.push(a)
     }
 
     // 1b. "Choose for me": pick the profile that fits this mail, then re-resolve skills if it changed.
@@ -269,6 +292,41 @@ export async function runPipeline(
       resolvedRecently
     }
     const brief = model ? await generateBrief(model, briefInputs) : buildBasicBrief(briefInputs)
+
+    // 4b. Quiet intelligence: circle, unified schedule, promises, per-inbox view. Computed always, shown only when useful.
+    if (settings.insightsEnabled) {
+      const nowDate = new Date()
+      brief.people = summarizePeople(people, nowDate)
+      const promises = extractPromises({ messages: circleMessages, myAddresses, now: nowDate })
+      brief.promises = promises
+      const items: ScheduleItem[] = []
+      for (const d of repo.recentDeadlines(db, 45)) {
+        items.push({ title: d.subject, dateText: d.deadline, source: 'deadline', sourceLabel: 'Deadline', person: d.fromName || d.fromAddress, accountId: d.accountId, messageId: d.messageId, seenOn: d.date })
+      }
+      const skillName = new Map(skills.map((s) => [s.id, s]))
+      for (const sm of repo.recentSkillMatches(db, 90)) {
+        const when = sm.extracted['when'] || sm.extracted['dueDate'] || sm.extracted['date']
+        if (!when) continue
+        const skill = skillName.get(sm.skillId)
+        const isTravel = sm.skillId === 'travel'
+        const isAppt = sm.skillId === 'appointments' || /booking|session|shift|activit|class/i.test(sm.skillId)
+        items.push({
+          title: sm.subject,
+          dateText: when,
+          source: isTravel ? 'travel' : isAppt ? 'appointment' : 'skill',
+          sourceLabel: skill?.name ?? sm.skillId,
+          person: sm.fromName || sm.fromAddress,
+          accountId: sm.accountId,
+          messageId: sm.messageId,
+          seenOn: sm.date
+        })
+      }
+      for (const p of promises) if (p.due) items.push({ title: `Promise to ${p.to}: ${p.text}`, dateText: p.due, source: 'promise', sourceLabel: 'Promise', person: p.to, messageId: p.messageId, seenOn: p.madeOn })
+      const schedule = buildSchedule(items, nowDate)
+      brief.schedule = { days: schedule.days, recurring: schedule.recurring, conflicts: schedule.conflicts, overdue: schedule.overdue }
+      const newIds = new Set(newMessages.map((m) => m.id))
+      brief.inboxes = summarizeInboxes(accounts, dedupeAcrossAccounts(circleMessages), categoryOfStored, replies, newIds)
+    }
 
     // 5. Render & save
     onProgress({ phase: 'save', detail: 'Saving report…' })

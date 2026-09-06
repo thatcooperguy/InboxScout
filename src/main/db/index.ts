@@ -123,6 +123,28 @@ CREATE TABLE IF NOT EXISTS skill_matches (
   PRIMARY KEY (message_id, skill_id)
 );
 
+CREATE TABLE IF NOT EXISTS people (
+  key TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  addresses TEXT NOT NULL,
+  domain TEXT NOT NULL,
+  received INTEGER NOT NULL DEFAULT 0,
+  sent INTEGER NOT NULL DEFAULT 0,
+  replied_by_me INTEGER NOT NULL DEFAULT 0,
+  replied_to_me INTEGER NOT NULL DEFAULT 0,
+  first_seen TEXT NOT NULL,
+  last_seen TEXT NOT NULL,
+  cadence_days REAL,
+  accounts TEXT NOT NULL,
+  role TEXT NOT NULL,
+  tier TEXT NOT NULL,
+  score REAL NOT NULL DEFAULT 0,
+  going_quiet INTEGER NOT NULL DEFAULT 0,
+  quiet_days INTEGER NOT NULL DEFAULT 0,
+  is_new INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL
+);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
   subject, from_address, snippet, body_text, content='messages', content_rowid='rowid'
 );

@@ -3,14 +3,16 @@ import Today from './views/Today'
 import Dashboard from './views/Dashboard'
 import Review from './views/Review'
 import Reports from './views/Reports'
+import People from './views/People'
 import Setup from './views/Setup'
 import Onboarding from './views/Onboarding'
 
-type TabId = 'today' | 'reports' | 'setup' | 'dashboard' | 'review'
+type TabId = 'today' | 'reports' | 'people' | 'setup' | 'dashboard' | 'review'
 
 const SIMPLE_TABS: { id: TabId; label: string }[] = [
   { id: 'today', label: 'Today' },
   { id: 'reports', label: 'My briefs' },
+  { id: 'people', label: 'People' },
   { id: 'setup', label: 'Setup' }
 ]
 const ADVANCED_TABS: { id: TabId; label: string }[] = [
@@ -102,6 +104,7 @@ export default function App(): JSX.Element {
       <main className="content">
         {tab === 'today' && <Today key={`t${refreshKey}`} running={running} onRun={() => void runNow()} />}
         {tab === 'reports' && <Reports key={`r${refreshKey}`} />}
+        {tab === 'people' && <People key={`p${refreshKey}`} />}
         {tab === 'setup' && (
           <Setup
             onSettingsChanged={() => {

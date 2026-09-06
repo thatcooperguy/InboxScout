@@ -94,6 +94,8 @@ export interface InboxScoutApi {
   listIssues: () => Promise<any[]>
   listProjects: () => Promise<any[]>
   recentMessages: (limit: number) => Promise<any[]>
+  listPeople: () => Promise<any[]>
+  markPerson: (address: string, how: 'important' | 'quiet' | 'clear') => Promise<boolean>
   searchMessages: (query: string) => Promise<any[]>
   correctMessage: (input: unknown) => Promise<boolean>
 

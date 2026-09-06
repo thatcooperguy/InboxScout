@@ -53,6 +53,9 @@ J="content-type: application/json"
 | Show a desktop notification | `notify {title?, body}` | `POST /notify` |
 | Say something out loud | `speak {text}` | `POST /speak` |
 | Skills on/off | `list_skills`, `set_skills {ids}` | `GET /skills`, `POST /skills` |
+| The person's circle (family, friends, clients…) | `list_people {tier?}` | `GET /people?tier=inner` |
+| This week across every inbox (overlaps, overdue, regulars) | `get_schedule` | `GET /schedule` |
+| Promises the person made in their own mail | `list_promises` | `GET /promises` |
 | Who is this inbox for? (50+ profiles) | `list_profiles`, `detect_profile`, `set_profile {id or "auto"}` | `GET /profiles`, `GET /profiles/detect`, `POST /profiles` |
 | Preferences (safe subset) | `get_settings`, `update_settings {patch}` | `GET /settings`, `PATCH /settings` |
 | Live events (scan progress, Assistant steps) | — | `GET /events` (Server-Sent Events) |

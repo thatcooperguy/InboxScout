@@ -64,9 +64,60 @@ export function renderMarkdown(
     lines.push('')
   }
 
-  if (brief.deadlines.length > 0) {
+  const schedule = brief.schedule
+  if (schedule && (schedule.days.some((d) => d.events.length) || schedule.overdue.length || schedule.recurring.length)) {
+    lines.push('## 🗓 This week', '')
+    for (const day of schedule.days) {
+      if (day.events.length === 0) continue
+      lines.push(`**${day.label}**`)
+      for (const e of day.events) {
+        lines.push(`- ${e.conflict ? '‼ ' : ''}${e.time ? `${e.time} · ` : ''}${e.title}${e.person ? ` (${e.person})` : ''}${e.sourceLabel && e.sourceLabel !== 'Deadline' ? ` · ${e.sourceLabel}` : ''}`)
+      }
+      lines.push('')
+    }
+    if (schedule.conflicts.length) {
+      lines.push('_Overlaps:_')
+      for (const c of schedule.conflicts) lines.push(`- ‼ ${c}`)
+      lines.push('')
+    }
+    if (schedule.overdue.length) {
+      for (const o of schedule.overdue) lines.push(`- ${o}`)
+      lines.push('')
+    }
+    if (schedule.recurring.length) {
+      lines.push('_Regulars:_ ' + schedule.recurring.join(' · '), '')
+    }
+  } else if (brief.deadlines.length > 0) {
     lines.push('## 📅 Dates & deadlines', '')
     for (const d of brief.deadlines) lines.push(`- ${d}`)
+    lines.push('')
+  }
+
+  if ((brief.promises ?? []).length > 0) {
+    lines.push('## 🤝 Promises you made', '')
+    for (const p of brief.promises!) {
+      lines.push(`- ${p.overdue ? '‼ ' : ''}To ${p.to}: "${p.text}"${p.due ? ` — by ${new Date(p.due).toDateString()}` : ''} _(${p.subject})_`)
+    }
+    lines.push('')
+  }
+
+  const people = brief.people
+  if (people && (people.goingQuiet.length || people.newFaces.length || (periodType === 'weekly' && people.inner.length))) {
+    lines.push('## 👥 Your circle', '')
+    for (const g of people.goingQuiet) lines.push(`- ${g}`)
+    for (const n of people.newFaces) lines.push(`- ${n}`)
+    if (periodType === 'weekly' && people.inner.length) {
+      lines.push('', '_People who matter most right now:_')
+      for (const p of people.inner) lines.push(`- **${p.name}** — ${p.note}`)
+    }
+    lines.push('')
+  }
+
+  if ((brief.inboxes ?? []).length > 1) {
+    lines.push('## 📥 By inbox', '')
+    for (const ib of brief.inboxes!) {
+      lines.push(`- **${ib.label}** (${ib.role}) — ${ib.newCount} new${ib.needsYou ? `, ${ib.needsYou} need you` : ''}${ib.waitingOnYou ? `, ${ib.waitingOnYou} waiting for your reply` : ''}`)
+    }
     lines.push('')
   }
 

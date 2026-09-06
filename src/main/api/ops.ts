@@ -69,6 +69,8 @@ export const SETTINGS_ALLOWLIST: (keyof AppSettings)[] = [
   'smsCarrier',
   'googleDriveExport',
   'speakBriefs',
+  'insightsEnabled',
+  'quietPeople',
   'assistantAutonomy',
   'agentWebhookUrl'
 ]
@@ -315,6 +317,27 @@ export function buildOps(deps: OpsDeps): Op[] {
         deps.speak(String(a.text ?? ''))
         return { ok: true }
       }
+    },
+    {
+      name: 'list_people',
+      description: "The person's circle learned from mail across every inbox: name, addresses, role (family/friend/colleague/client/vendor/service/automated), tier (inner/regular/occasional), counts, last seen, going-quiet flag.",
+      write: false,
+      input: obj({ tier: { type: 'string', enum: ['inner', 'regular', 'occasional'] }, limit: { type: 'number' } }),
+      run: (a) => repo.listPeople(db, Math.min(500, Number(a.limit) || 100)).filter((p) => !a.tier || p.tier === a.tier)
+    },
+    {
+      name: 'get_schedule',
+      description: "The unified schedule from the latest brief: days with events across every inbox, overlaps, overdue items, and recurring patterns.",
+      write: false,
+      input: obj({}),
+      run: () => repo.latestBrief(db)?.brief?.schedule ?? null
+    },
+    {
+      name: 'list_promises',
+      description: 'Commitments the person made in their own sent mail ("I will send it by Friday"), with due dates and whether they are overdue.',
+      write: false,
+      input: obj({}),
+      run: () => repo.latestBrief(db)?.brief?.promises ?? []
     },
     {
       name: 'list_profiles',
