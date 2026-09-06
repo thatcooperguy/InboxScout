@@ -9,6 +9,7 @@ type Level = 'simple' | 'standard' | 'pro'
 function BridgeDetails(): JSX.Element {
   const [info, setInfo] = useState<any | null>(null)
   const [showToken, setShowToken] = useState(false)
+  const [confirmNew, setConfirmNew] = useState(false)
   useEffect(() => {
     void window.inboxScout.bridgeInfo().then(setInfo)
   }, [])
@@ -27,9 +28,21 @@ function BridgeDetails(): JSX.Element {
           <button className="ghost tiny" onClick={() => setShowToken(!showToken)}>
             {showToken ? 'Hide' : 'Show'}
           </button>{' '}
-          <button className="ghost tiny" onClick={() => void window.inboxScout.bridgeRegenerate().then(setInfo)}>
-            New token
-          </button>
+          {confirmNew ? (
+            <>
+              <span className="hint">Every connected tool will need the new key.</span>{' '}
+              <button className="primary" onClick={() => void window.inboxScout.bridgeRegenerate().then((i) => { setInfo(i); setConfirmNew(false) })}>
+                Yes, make a new key
+              </button>{' '}
+              <button className="ghost" onClick={() => setConfirmNew(false)}>
+                Keep it
+              </button>
+            </>
+          ) : (
+            <button className="ghost tiny" onClick={() => setConfirmNew(true)}>
+              New key…
+            </button>
+          )}
         </div>
         <p className="hint" style={{ marginBottom: 4 }}>Hermes: paste this into ~/.hermes/config.yaml (or add it as an MCP server in any MCP client):</p>
         <pre style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, fontSize: 12, overflowX: 'auto', margin: 0 }}>{hermesConfig}</pre>
@@ -95,17 +108,18 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
 
   if (!settings) return <div className="empty">Loading…</div>
 
+  // Apply on change (no Save button to forget): each change is stored at once and confirmed quietly.
   const change = (key: string, value: unknown): void => {
-    setSettings(setSetting(settings, key, value))
-    setSaved(false)
-  }
-
-  const save = async (): Promise<void> => {
-    const next = await window.inboxScout.setSettings(settings)
+    const next = setSetting(settings, key, value)
     setSettings(next)
-    if (next.uiLevel !== ui?.setting) setUi(await window.inboxScout.uiSetLevel(next.uiLevel))
-    setSaved(true)
-    onSaved?.()
+    setSaved(false)
+    void (async () => {
+      const stored = await window.inboxScout.setSettings(next)
+      if (key === 'uiLevel') setUi(await window.inboxScout.uiSetLevel(stored.uiLevel))
+      setSaved(true)
+      window.setTimeout(() => setSaved(false), 2500)
+      onSaved?.()
+    })()
   }
 
   const control = (d: SettingDesc): JSX.Element => {
@@ -135,6 +149,15 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
       }
       case 'number':
         return <input type="number" value={String(raw ?? '')} onChange={(e) => change(d.key, Number(e.target.value))} />
+      case 'folder':
+        return (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span className="hint" style={{ flex: 1, wordBreak: 'break-all' }}>{String(raw || 'Documents → InboxScout → Reports')}</span>
+            <button className="ghost" onClick={() => void window.inboxScout.chooseDir(String(raw ?? '')).then((dir) => dir && change(d.key, dir))}>
+              Choose folder…
+            </button>
+          </div>
+        )
       case 'time':
         return <input type="time" value={String(raw ?? '')} onChange={(e) => change(d.key, e.target.value)} />
       case 'password':
@@ -142,6 +165,20 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
       default:
         return <input value={String(raw ?? '')} placeholder={d.placeholder} onChange={(e) => change(d.key, e.target.value)} />
     }
+  }
+
+  const riskyNow = (d: SettingDesc): boolean => {
+    const v = getSetting(settings, d.key)
+    if (d.key === 'storeFullBodies') return v === false
+    if (d.key === 'assistantAutonomy' || d.key === 'bridgeAccess') return v === 'full'
+    return true
+  }
+  const scheduleSummary = (): string => {
+    const s = settings.schedule
+    const time = new Date(2000, 0, 1, s.hour, s.minute).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    if (s.frequency === 'manual') return 'InboxScout will only check when you press Check my email.'
+    if (s.frequency === 'weekly') return `InboxScout will check every ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][s.weekday]} at ${time}.`
+    return `InboxScout will check every day at ${time}.`
   }
 
   const row = (d: SettingDesc): JSX.Element => {
@@ -158,6 +195,12 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
             </button>
           </div>
           <div className="hint">{d.what}</div>
+          {d.caution && riskyNow(d) && (
+            <div className="hint" style={{ color: 'var(--red, #c0392f)' }}>
+              ⚠ {d.caution}
+            </div>
+          )}
+          {d.key === 'schedule.frequency' && <div className="hint">{scheduleSummary()}</div>}
           {openHelp === d.key && (
             <div className="hint" style={{ marginTop: 4 }}>
               <strong>Why this default:</strong> {d.why}
@@ -190,9 +233,10 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
 
   return (
     <div>
-      <h1>Preferences</h1>
+      <h1>Settings</h1>
       <p className="sub">
-        Everything here already has a sensible choice. Change only what you want — each one says what it does and why.
+        Everything here already has a sensible choice. Change only what you want — each one says what it does and why, and
+        every change is saved right away.
       </p>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search settings: voice, text size, Hermes, schedule…" style={{ flex: 1, minWidth: 220 }} />
@@ -202,7 +246,11 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
           </label>
         )}
       </div>
-      {saved && <div className="success">Saved ✓</div>}
+      {saved && (
+        <div className="success" role="status">
+          Saved ✓
+        </div>
+      )}
 
       {!query && (
         <div className="card">
@@ -257,10 +305,7 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
         )
       })}
       {visible.length === 0 && query && <div className="empty">Nothing matches “{query}”. Try another word, like “voice” or “schedule”.</div>}
-
-      <button className="primary" onClick={() => void save()}>
-        Save settings
-      </button>
+      <p className="hint">Changes are saved as you make them.</p>
     </div>
   )
 }

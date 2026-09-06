@@ -44,7 +44,7 @@ export interface InboxScoutApi {
   dismissProfileSuggestion: () => Promise<boolean>
 
   listAccounts: () => Promise<any[]>
-  accountPresets: () => Promise<Record<string, { host: string; port: number; sentFolder: string; help: string }>>
+  accountPresets: () => Promise<Record<string, { host: string; port: number; sentFolder: string; help: string; helpUrl: string }>>
   addAccount: (input: unknown) => Promise<any>
   removeAccount: (id: string) => Promise<boolean>
   outlookSignIn: () => Promise<any>
@@ -81,6 +81,7 @@ export interface InboxScoutApi {
   setupStop: () => Promise<boolean>
   onSetupEvent: (cb: (p: any) => void) => () => void
   resolveIssue: (id: string) => Promise<boolean>
+  reopenIssue: (id: string) => Promise<boolean>
 
   aiProviders: () => Promise<any[]>
   aiDetect: () => Promise<{ provider: string; kind: string; detail: string; hasKey: boolean }[]>
@@ -103,6 +104,7 @@ export interface InboxScoutApi {
   listIssues: () => Promise<any[]>
   listProjects: () => Promise<any[]>
   recentMessages: (limit: number) => Promise<any[]>
+  chooseDir: (current: string) => Promise<string | null>
   track: (kind: 'tab' | 'feature', name: string) => Promise<boolean>
   uiLevel: () => Promise<UiLevelInfo>
   uiAckLevel: () => Promise<UiLevelInfo>

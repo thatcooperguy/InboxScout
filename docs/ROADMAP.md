@@ -80,7 +80,15 @@
 - **By inbox**: inferred inbox roles, per-inbox counts, cross-account de-duplication, inbox filter in Inbox review.
 - Bridge ops `list_people` / `get_schedule` / `list_promises`; one Preferences switch to turn insights off.
 
-## 🟠 Gaps — v1.0
+## ✅ v1.0 — shipped (the evolving UI)
+
+- **Three layouts** — Simple / Standard / Pro — chosen from local usage signals with plain reasons, weekly hysteresis, a one-time announcement with "Keep it the way it was", and an override. `docs/ADAPTIVE.md`.
+- **Today rebuilt**: fixed card order with counts, Simple's three-card rule with "Show me everything", Pro's "Decide today" card, inbox filter chips, Delegate and Copy brief, Because/From lines, Undo on Done, "Why am I seeing this?" on every card, relative "last checked", spoken "Explain this screen".
+- **Settings generated from a registry**: what / why / who / caution for every setting, badges for chosen-for-you vs you-set-this, Back to automatic, search, level visibility, saves on change, folder picker.
+- **Accessibility pass** from the human-factors research: AA contrast for hint text, visible focus rings, 36–44 px targets, reduced motion, confirm-with-verb on destructive actions, plain-language enums, real labels and live regions, onboarding with Sign in with Google/Microsoft and "let the assistant get the app password".
+- Research: `docs/design/HUMAN-FACTORS.md`, `docs/design/UX-AUDIT.md`, `docs/design/ADAPTIVE-UI.md`.
+
+## 🟠 Gaps — v1.1
 
 - ~~Autonomous console agent~~ — ✅ shipped in v0.7 as the Assistant, with handoffs where a bot would be brittle.
 - **Voice commands** (talk to InboxScout) — Chromium speech recognition in Electron needs a Google key and is unreliable offline; revisit with a local model (e.g. whisper.cpp).

@@ -434,3 +434,8 @@ function safeJson(raw: string): Record<string, string> {
     return {}
   }
 }
+
+/** Undo for "Done ✓". */
+export function reopenIssue(db: DB, id: string): void {
+  db.prepare(`UPDATE issues SET state = 'active', updated_at = ? WHERE id = ?`).run(new Date().toISOString(), id)
+}

@@ -555,9 +555,18 @@ export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
     repo.resolveIssue(db, id)
     return true
   })
+  ipcMain.handle('issues:reopen', (_e, id: string) => {
+    repo.reopenIssue(db, id)
+    return true
+  })
 
   ipcMain.handle('issues:list', () => repo.listIssues(db, false))
   ipcMain.handle('projects:list', () => repo.listProjects(db, false))
+  ipcMain.handle('dialog:chooseDir', async (_e, current: string) => {
+    const { filePaths, canceled } = await dialog.showOpenDialog({ title: 'Choose a folder', defaultPath: current || undefined, properties: ['openDirectory', 'createDirectory'] })
+    return canceled || !filePaths[0] ? null : filePaths[0]
+  })
+
   // ---- Evolving UI: local usage signals and the Simple / Standard / Pro level ----
   ipcMain.handle('usage:track', (_e, kind: 'tab' | 'feature', name: string) => {
     if (kind === 'tab') recordTab(db, String(name).slice(0, 40))

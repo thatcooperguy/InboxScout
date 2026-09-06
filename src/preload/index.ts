@@ -57,6 +57,7 @@ const api = {
     return () => ipcRenderer.removeListener('setup:event', listener)
   },
   resolveIssue: (id: string) => ipcRenderer.invoke('issues:resolve', id),
+  reopenIssue: (id: string) => ipcRenderer.invoke('issues:reopen', id),
 
   aiProviders: () => ipcRenderer.invoke('ai:providers'),
   aiDetect: () => ipcRenderer.invoke('ai:detect'),
@@ -79,6 +80,7 @@ const api = {
   listIssues: () => ipcRenderer.invoke('issues:list'),
   listProjects: () => ipcRenderer.invoke('projects:list'),
   recentMessages: (limit: number) => ipcRenderer.invoke('messages:recent', limit),
+  chooseDir: (current: string) => ipcRenderer.invoke('dialog:chooseDir', current),
   track: (kind: 'tab' | 'feature', name: string) => ipcRenderer.invoke('usage:track', kind, name),
   uiLevel: () => ipcRenderer.invoke('ui:level'),
   uiAckLevel: () => ipcRenderer.invoke('ui:ackLevel'),

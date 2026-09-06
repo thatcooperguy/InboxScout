@@ -32,13 +32,15 @@ export interface SettingDesc {
   showWhen?: (s: AppSettings) => boolean
   /** True when InboxScout manages this value itself unless you override it. */
   managed?: boolean
+  /** A red one-liner for risky values. */
+  caution?: string
 }
 
 export const SETTING_GROUPS: { id: SettingGroupId; name: string; blurb: string }[] = [
   { id: 'basics', name: 'Basics', blurb: 'What InboxScout does and when.' },
-  { id: 'looks', name: 'Looks & comfort', blurb: 'How much you see and how big it is.' },
+  { id: 'looks', name: 'Reading & display', blurb: 'How much you see and how big it is.' },
   { id: 'get', name: 'What I get', blurb: 'Where your brief goes and what it includes.' },
-  { id: 'helpers', name: 'Helpers & other agents', blurb: 'The Assistant, Hermes, and voice.' },
+  { id: 'helpers', name: 'Who can help', blurb: 'The web-chores helper, other AI tools on this computer, and your voice.' },
   { id: 'advanced', name: 'Advanced', blurb: 'Only if you know why you are here.' }
 ]
 
@@ -146,9 +148,9 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'insightsEnabled',
     group: 'looks',
-    label: 'Quiet insights',
-    what: 'Your circle (who matters, who has gone quiet), this week across every inbox, promises you made, and per-inbox counts.',
-    why: 'On because they only appear when there is something to say; off if you would rather not see them.',
+    label: 'Extra cards on Today',
+    what: 'Adds cards about your people (who matters, who has gone quiet), this week across every inbox, promises you made, and each inbox. They only appear when there is something to say.',
+    why: 'On because they cost nothing when quiet and are the most-loved part of the brief.',
     kind: 'toggle',
     options: yesNo('On — show them when useful (recommended)', 'Off')
   },
@@ -157,7 +159,7 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'deliverEmailTo',
     group: 'get',
-    label: 'Email me the brief',
+    label: 'Email me my brief',
     what: 'Sends each new brief to this address using one of your own connected accounts as the outbox. Blank means off.',
     why: 'Handy on a phone; InboxScout only ever sends to you.',
     kind: 'text',
@@ -166,7 +168,7 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'smsPhone',
     group: 'get',
-    label: 'Text me the headline',
+    label: 'Text me the one-line summary',
     what: 'Sends the one-line headline to this phone as a text, through your carrier\'s free email-to-text gateway. Blank means off.',
     why: 'Free and works on any phone; pick your carrier below.',
     kind: 'text',
@@ -176,9 +178,9 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'smsCarrier',
     group: 'get',
-    label: 'Phone carrier',
-    what: 'Which carrier\'s text gateway to use.',
-    why: 'Each carrier has its own address; texts only work with the right one.',
+    label: 'Your mobile carrier',
+    what: 'Needed because texts are sent through the carrier\'s free email-to-text service.',
+    why: 'No default — carriers differ and a wrong one silently fails. Not all carriers deliver these reliably; send a test.',
     kind: 'select',
     options: [],
     showWhen: (s) => !!s.smsPhone,
@@ -187,9 +189,10 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'speakBriefs',
     group: 'get',
-    label: 'Say it out loud',
+    label: 'Speak my brief out loud',
     what: 'When a scheduled brief is ready, the computer reads a short summary aloud, even with the window closed.',
-    why: 'Off by default so it never surprises anyone; lovely for people who prefer listening.',
+    why: 'Off because a talking computer at 7:30 am surprises people; turn it on if you prefer listening.',
+    who: 'Anyone who would rather listen than read, or who is away from the screen in the morning.',
     kind: 'toggle',
     options: yesNo("Yes — use the computer's voice", 'No')
   },
@@ -205,20 +208,21 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   },
   {
     key: 'storeFullBodies',
-    group: 'get',
-    label: 'Keep full email text on this computer',
-    what: 'Stores the whole text of each email locally so you can search it and InboxScout can re-check it later.',
-    why: 'On because search and better briefs need it; everything stays on this computer.',
+    group: 'advanced',
+    label: 'Keep a copy of email text on this computer',
+    what: 'Lets you search old mail and lets the brief re-check details. Off keeps only short previews.',
+    why: 'Search and follow-ups need the text; it stays on this computer and is never sent anywhere unless you connect an AI service.',
+    caution: 'Turning this off stops search from working.',
     kind: 'toggle',
     options: yesNo('Yes — enables search (recommended)', 'No — short previews only'),
     minLevel: 'standard'
   },
   {
     key: 'reportsDir',
-    group: 'get',
-    label: 'Where briefs are saved',
-    what: 'The folder where each brief is saved as a web page and a text file.',
-    why: 'Documents → InboxScout → Reports, so you can always find them.',
+    group: 'advanced',
+    label: 'Where to save briefs',
+    what: 'The folder where each brief is saved as a file you can open, print, or share.',
+    why: 'Documents is where people look for their files.',
     kind: 'folder',
     minLevel: 'standard'
   },
@@ -227,9 +231,11 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'assistantAutonomy',
     group: 'helpers',
-    label: 'How far the Assistant goes on its own',
+    label: 'How far the web-chores helper goes on its own',
     what: 'Full signs in with your saved sign-ins and keeps going; Sign in for me pauses on payment or delete pages; Careful hands every sign-in to you. Verification codes always come to you.',
-    why: 'Full is what "just works"; dial it back if you would rather be asked.',
+    why: 'Full so chores finish without interruptions; every step is visible and Stop is always one click away.',
+    who: 'Dial it back if you would rather be asked before anything risky.',
+    caution: 'Full lets it continue through payment or delete pages when the job calls for it.',
     kind: 'select',
     options: [
       { value: 'full', label: 'Full (recommended)' },
@@ -240,9 +246,9 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'bridgeEnabled',
     group: 'helpers',
-    label: 'Agent bridge',
-    what: 'Lets another AI agent on this computer — such as Hermes — use InboxScout as a tool: read your brief, search mail, check now, run the Assistant.',
-    why: 'Off by default; nothing leaves this computer, and a token is required.',
+    label: 'Let other AI tools on this computer use InboxScout',
+    what: 'Lets another AI tool on this computer — such as Hermes — use InboxScout: read your brief, search mail, check now, run the web-chores helper.',
+    why: 'Off so nothing on your PC can read your brief unless you switch it on. Only reachable from this computer, with a secret key.',
     kind: 'toggle',
     options: yesNo('On — other agents on this PC may call InboxScout', 'Off'),
     minLevel: 'standard'
@@ -250,9 +256,10 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'bridgeAccess',
     group: 'helpers',
-    label: 'What other agents may do',
-    what: 'Read only lets them look (brief, mail, status). Full also lets them check now, connect accounts, save sign-ins, change preferences, and drive the Assistant.',
-    why: 'Full, because an agent you chose to connect usually needs to act.',
+    label: 'What other tools may do',
+    what: 'Read only lets them look (brief, mail, status). Full also lets them check now, connect accounts, save sign-ins, change settings, and drive the web-chores helper.',
+    why: 'Full, because a tool you chose to connect usually needs to act.',
+    caution: 'Full lets a connected tool change settings and connect accounts.',
     kind: 'select',
     options: [
       { value: 'read', label: 'Read only' },
@@ -264,9 +271,9 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'agentWebhookUrl',
     group: 'helpers',
-    label: 'Send each brief to an agent',
-    what: 'Posts every new brief to this web address (for example a Hermes webhook) so that agent can act on it.',
-    why: 'Blank means off.',
+    label: 'Also send each brief to another program',
+    what: 'Sends every new brief to this web address (for example a Hermes inbox) so that program can act on it.',
+    why: 'Off until you give an address.',
     kind: 'text',
     placeholder: 'https://… (blank = off)',
     minLevel: 'pro'
@@ -274,9 +281,9 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'agentWebhookToken',
     group: 'helpers',
-    label: 'Agent webhook token',
-    what: 'Sent as a bearer token with each webhook so the other side can trust it.',
-    why: 'Optional.',
+    label: 'Secret to send with it (optional)',
+    what: 'A secret sent along with the brief so the other program knows it is from InboxScout.',
+    why: 'Blank because most local programs do not need one.',
     kind: 'password',
     showWhen: (s) => !!s.agentWebhookUrl,
     minLevel: 'pro'
@@ -286,9 +293,9 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'ai.model',
     group: 'advanced',
-    label: 'AI model override',
-    what: 'Forces a specific model name for the connected AI helper instead of the recommended one.',
-    why: 'Blank uses the best free default for whichever helper you connected.',
+    label: 'AI model (advanced)',
+    what: 'Forces a specific model name for the connected AI service. Leave blank for the recommended one.',
+    why: 'Each service\'s recommended model is tested with InboxScout; only change this if you know a model you prefer.',
     kind: 'text',
     placeholder: 'e.g. gemini-2.5-flash',
     minLevel: 'standard'
@@ -296,18 +303,18 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'ai.ollamaBaseUrl',
     group: 'advanced',
-    label: 'Ollama address',
-    what: 'Where a local Ollama server listens, if you use one.',
-    why: 'The standard address on the same computer.',
+    label: 'Local AI address (Ollama)',
+    what: 'Where to find Ollama if you run a free AI on this computer.',
+    why: 'This is Ollama\'s standard address on your own PC.',
     kind: 'text',
     minLevel: 'pro'
   },
   {
     key: 'microsoftClientId',
     group: 'advanced',
-    label: 'Microsoft app ID',
-    what: 'The app registration used for "Sign in with Microsoft". Official builds have one built in.',
-    why: 'Only needed if you built InboxScout yourself — see docs/OUTLOOK.md.',
+    label: 'Microsoft app ID (advanced)',
+    what: 'The ID Microsoft gave this copy of InboxScout so "Sign in with Microsoft" works. Official builds include one.',
+    why: 'Blank unless the person who installed InboxScout registered it themselves (Sign-in setup).',
     kind: 'text',
     placeholder: '00000000-0000-0000-0000-000000000000',
     minLevel: 'pro'
@@ -315,9 +322,9 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'googleClientId',
     group: 'advanced',
-    label: 'Google client ID',
-    what: 'The app registration used for "Sign in with Google". Official builds have one built in.',
-    why: 'Only needed if you built InboxScout yourself — see docs/GOOGLE.md.',
+    label: 'Google app ID (advanced)',
+    what: 'The ID Google gave this copy of InboxScout so "Sign in with Google" works. Official builds include one.',
+    why: 'Blank unless the person who installed InboxScout registered it themselves (Sign-in setup).',
     kind: 'text',
     placeholder: 'xxxx.apps.googleusercontent.com',
     minLevel: 'pro'
@@ -325,18 +332,18 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
   {
     key: 'googleClientSecret',
     group: 'advanced',
-    label: 'Google client secret',
-    what: 'Pairs with the Google client ID.',
-    why: 'Only needed with a custom Google client ID.',
+    label: 'Google app secret (advanced)',
+    what: 'The matching secret for the Google app ID. Kept encrypted on this computer.',
+    why: 'Only needed with a custom Google app ID.',
     kind: 'password',
     minLevel: 'pro'
   },
   {
     key: 'bridgePort',
     group: 'advanced',
-    label: 'Agent bridge port',
-    what: 'The local port the bridge listens on.',
-    why: '47311 is unlikely to clash with anything else.',
+    label: 'Local door number for other tools (advanced)',
+    what: 'The local network door number other tools use to reach InboxScout. Only reachable from this computer.',
+    why: 'An unusual number that nothing else uses.',
     kind: 'number',
     showWhen: (s) => s.bridgeEnabled,
     minLevel: 'pro'

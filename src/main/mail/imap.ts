@@ -126,29 +126,33 @@ export async function testConnection(account: AccountConfig, password: string): 
   await client.logout().catch(() => client.close())
 }
 
-export const PROVIDER_PRESETS: Record<string, { host: string; port: number; sentFolder: string; help: string }> = {
+export const PROVIDER_PRESETS: Record<string, { host: string; port: number; sentFolder: string; help: string; helpUrl: string }> = {
   gmail: {
     host: 'imap.gmail.com',
     port: 993,
     sentFolder: '[Gmail]/Sent Mail',
-    help: 'Requires 2-Step Verification. Create an app password at myaccount.google.com/apppasswords.'
+    help: 'Requires 2-Step Verification. Create an app password at myaccount.google.com/apppasswords.',
+    helpUrl: 'https://myaccount.google.com/apppasswords'
   },
   yahoo: {
     host: 'imap.mail.yahoo.com',
     port: 993,
     sentFolder: 'Sent',
-    help: 'Create an app password at Yahoo Account Security -> "Generate and manage app passwords".'
+    help: 'Create an app password at Yahoo Account Security -> "Generate and manage app passwords".',
+    helpUrl: 'https://login.yahoo.com/myaccount/security/app-password/'
   },
   icloud: {
     host: 'imap.mail.me.com',
     port: 993,
     sentFolder: 'Sent Messages',
-    help: 'Create an app-specific password at appleid.apple.com -> Sign-In and Security -> App-Specific Passwords.'
+    help: 'Create an app-specific password at appleid.apple.com -> Sign-In and Security -> App-Specific Passwords.',
+    helpUrl: 'https://account.apple.com/account/manage'
   },
   imap: {
     host: '',
     port: 993,
     sentFolder: 'Sent',
-    help: 'Enter your provider\'s IMAP server. Most providers require an app password.'
+    help: 'Enter your provider\'s IMAP server. Most providers require an app password.',
+    helpUrl: ''
   }
 }

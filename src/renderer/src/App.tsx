@@ -7,6 +7,7 @@ import People from './views/People'
 import Setup from './views/Setup'
 import Onboarding from './views/Onboarding'
 import { LEVEL_BLURB, LEVEL_LABEL } from '../../shared/adapt'
+import { t } from './copy'
 
 type UiLevelInfo = Awaited<ReturnType<typeof window.inboxScout.uiLevel>>
 
@@ -48,6 +49,31 @@ export default function App(): JSX.Element {
     void window.inboxScout.track('tab', id)
   }
 
+  // Keyboard: R checks email, 1–6 switch tabs, / focuses the first search box. Never while typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent): void => {
+      const target = e.target as HTMLElement | null
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault()
+        void runNow()
+      } else if (/^[1-6]$/.test(e.key)) {
+        const all: TabId[] = ['today', 'reports', 'people', 'setup', 'dashboard', 'review']
+        const id = all[Number(e.key) - 1]
+        if (id) goTo(id)
+      } else if (e.key === '/') {
+        const box = document.querySelector<HTMLInputElement>('main input[placeholder^="Search"]')
+        if (box) {
+          e.preventDefault()
+          box.focus()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [running])
+
   useEffect(() => {
     loadSettings()
     void Promise.all([window.inboxScout.listAccounts(), window.inboxScout.listRuns()]).then(([accounts, runs]) =>
@@ -81,7 +107,13 @@ export default function App(): JSX.Element {
     }
   }
 
-  if (onboarding === null || settings === null) return <div />
+  if (onboarding === null || settings === null) {
+    return (
+      <div className="empty" style={{ padding: 80, fontSize: 18 }} role="status">
+        📬 InboxScout — opening…
+      </div>
+    )
+  }
   if (onboarding) {
     return (
       <Onboarding
@@ -107,16 +139,22 @@ export default function App(): JSX.Element {
     <div className={`layout level-${level}`}>
       <nav className="sidebar">
         <div className="brand">📬 InboxScout</div>
-        {tabs.map((t) => (
-          <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => goTo(t.id)}>
-            {t.label}
+        {tabs.map((tb, i) => (
+          <button key={tb.id} className={tab === tb.id ? 'active' : ''} aria-current={tab === tb.id ? 'page' : undefined} onClick={() => goTo(tb.id)} title={level === 'pro' ? `Press ${i + 1}` : undefined}>
+            {tb.id === 'reports' ? t('tab.reports', level) : tb.id === 'review' ? t('tab.review', level) : tb.label}
           </button>
         ))}
         <div className="spacer" />
-        <div className="status">{status}</div>
-        <button className="run-btn" onClick={() => void runNow()} disabled={running}>
-          {running ? 'Checking…' : '✉ Check my email'}
-        </button>
+        {level !== 'simple' && (
+          <div className="status" role="status" aria-live="polite">
+            {status}
+          </div>
+        )}
+        {level !== 'simple' && (
+          <button className="run-btn" onClick={() => void runNow()} disabled={running}>
+            {running ? t('hero.running', level) : `✉ ${t('hero.run', level)}`}
+          </button>
+        )}
       </nav>
       <main className="content">
         {ui?.announce && (
@@ -132,7 +170,7 @@ export default function App(): JSX.Element {
             </button>
           </div>
         )}
-        {tab === 'today' && <Today key={`t${refreshKey}`} running={running} onRun={() => void runNow()} level={level} />}
+        {tab === 'today' && <Today key={`t${refreshKey}`} running={running} onRun={() => void runNow()} level={level} status={status} onGoTo={(id) => goTo(id as TabId)} />}
         {tab === 'reports' && <Reports key={`r${refreshKey}`} />}
         {tab === 'people' && <People key={`p${refreshKey}`} />}
         {tab === 'setup' && (
