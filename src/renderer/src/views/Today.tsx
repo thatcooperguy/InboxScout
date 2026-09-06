@@ -6,6 +6,10 @@ import { RUN_PHASES, lastRunSeconds, remainingLabel, slotOf, stepOf } from '../.
 import type { RunProgress } from '../../../shared/types'
 import { lastChecked, t } from '../copy'
 import { speak, stopSpeaking } from '../useLevel'
+import AskBox from './AskBox'
+import AskForHelp from '../components/AskForHelp'
+import HelperNotesCard from '../components/HelperNotesCard'
+import HelperNotice from '../components/HelperNotice'
 
 type Level = 'simple' | 'standard' | 'pro'
 
@@ -124,6 +128,7 @@ export default function Today({ running, onRun, level = 'standard', status = '',
   const [inboxFilter, setInboxFilter] = useState<string | null>(null)
   const [lastSeconds, setLastSeconds] = useState<number | null>(null)
   const [showDetails, setShowDetails] = useState(false)
+  const [notesHidden, setNotesHidden] = useState(false)
 
   // Item 9: refetch in place after every run — the previous brief stays on screen (no "Opening…" flash),
   // and "Show me everything", the inbox filter, and the undo toast survive a check.
@@ -373,6 +378,7 @@ export default function Today({ running, onRun, level = 'standard', status = '',
                     ↗ Delegate
                   </button>
                 )}
+                <AskForHelp title={i.title} nextStep={i.nextStep} whyNow={i.whyNow} level={level} />
                 {i.issueId && (
                   <button className="ghost" data-done onClick={() => void markDone(i.issueId, i.title)}>
                     Done ✓
@@ -682,6 +688,9 @@ export default function Today({ running, onRun, level = 'standard', status = '',
           )}
         </div>
       </div>
+      <HelperNotice level={level} onChange={() => onGoTo?.('setup')} />
+      {brief && <AskBox level={level} onGoTo={onGoTo} />}
+      {brief?.helperNotes?.length > 0 && !notesHidden && <HelperNotesCard notes={brief.helperNotes} level={level} onDone={() => setNotesHidden(true)} />}
       {problem && (
         <div className="error" role="alert" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
           <span>{problem.text}</span>

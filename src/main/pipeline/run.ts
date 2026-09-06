@@ -21,6 +21,9 @@ import { buildSchedule, type ScheduleItem } from '../schedule/engine'
 import { extractPromises } from './promises'
 import { dedupeAcrossAccounts, summarizeInboxes } from './inboxes'
 import { loadSettings, markLastRunAt } from '../settings'
+import { afterRun as helpersAfterRun, findHelperNotes } from '../helpers/index'
+import { failingAccounts } from '../health/checks'
+import { invalidateAskCache } from '../ask/local'
 import { META_LAST_ATTEMPT_AT } from '../scheduler'
 import { SecretStore, accountSecretName, providerSecretName } from '../secrets'
 import { resolveModel, DEFAULT_MODELS, LOCAL_PROVIDERS } from '../ai/provider'
@@ -450,6 +453,11 @@ export async function runPipeline(
       brief.inboxes = summarizeInboxes(accounts, dedupeAcrossAccounts(circleMessages), categoryOfStored, replies, newIds)
     }
 
+    // 4c. Trusted helpers (v1.4): replies helpers sent to InboxScout mail, found in the person's own inbox.
+    if (settings.helpers.length > 0) {
+      brief.helperNotes = findHelperNotes(circleMessages, settings.helpers, { now: new Date() })
+    }
+
     // 5. Render & save
     onProgress({ phase: 'save', detail: 'Saving report…' })
     const now = new Date()
@@ -477,10 +485,30 @@ export async function runPipeline(
     markLastRunAt(db, now.toISOString())
     repo.finishRun(db, runId, 'succeeded', newMessages.length, null)
 
-    // v1.4 integration: helpers + ask cache (integrator adds calls here)
+    // A new brief exists: "Ask about your mail" must answer from it, not the previous one.
+    invalidateAskCache()
 
-    // 6. Deliver (to you only) and export - never fatal.
+    // 6. Deliver (to you and the helpers you named) and export - never fatal.
     const notices: string[] = [...(profileNotice ? [profileNotice] : []), ...runNotices]
+    if ((trigger === 'scheduled' || trigger === 'catchup') && !settings.helpersPaused && settings.helpers.length > 0) {
+      onProgress({ phase: 'save', detail: 'Telling your helpers…' })
+      notices.push(
+        ...(await helpersAfterRun(
+          { db, secrets, log },
+          {
+            brief,
+            trigger,
+            newClassifications: classifications,
+            messages: toClassify,
+            people,
+            failingAccounts: failingAccounts({ accounts: () => accounts, getMeta: (k) => repo.getMeta(db, k) }),
+            now,
+            markdown,
+            runStartedAt: startedAt
+          }
+        ))
+      )
+    }
     const outbox = pickOutbox(accounts, null)
     const outboxPassword = outbox ? secrets.get(accountSecretName(outbox.id)) : null
     const topTitles = brief.topIssues.map((i) => i.title)
