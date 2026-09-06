@@ -22,6 +22,26 @@ const api = {
   exportIcs: () => ipcRenderer.invoke('export:ics'),
   deliveryCarriers: () => ipcRenderer.invoke('delivery:carriers'),
   deliveryTest: (kind: string) => ipcRenderer.invoke('delivery:test', kind),
+  agentRecipes: () => ipcRenderer.invoke('agent:recipes'),
+  agentStart: (input: unknown) => ipcRenderer.invoke('agent:start', input),
+  agentAnswer: (text: string) => ipcRenderer.invoke('agent:answer', text),
+  agentContinue: () => ipcRenderer.invoke('agent:continue'),
+  agentStop: () => ipcRenderer.invoke('agent:stop'),
+  agentStatus: () => ipcRenderer.invoke('agent:status'),
+  agentCloseWindow: () => ipcRenderer.invoke('agent:closeWindow'),
+  onAgentEvent: (cb: (e: unknown) => void) => {
+    const listener = (_e: unknown, p: unknown): void => cb(p)
+    ipcRenderer.on('agent:event', listener)
+    return () => ipcRenderer.removeListener('agent:event', listener)
+  },
+  agentSetAutonomy: (autonomy: string) => ipcRenderer.invoke('agent:setAutonomy', autonomy),
+  signinsList: () => ipcRenderer.invoke('signins:list'),
+  signinsSave: (email: string, password: string) => ipcRenderer.invoke('signins:save', email, password),
+  signinsDelete: (email: string) => ipcRenderer.invoke('signins:delete', email),
+  bridgeInfo: () => ipcRenderer.invoke('bridge:info'),
+  bridgeSetEnabled: (enabled: boolean) => ipcRenderer.invoke('bridge:setEnabled', enabled),
+  bridgeRegenerate: () => ipcRenderer.invoke('bridge:regenerate'),
+  bridgeSetAccess: (access: string) => ipcRenderer.invoke('bridge:setAccess', access),
   setupInfo: () => ipcRenderer.invoke('setup:info'),
   setupStart: (kind: string, step: number) => ipcRenderer.invoke('setup:start', kind, step),
   setupGoto: (kind: string, step: number) => ipcRenderer.invoke('setup:goto', kind, step),

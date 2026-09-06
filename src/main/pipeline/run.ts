@@ -334,6 +334,38 @@ export async function runPipeline(
       }
     }
 
+    // 7. Hand the brief to an agent (Hermes webhook) so it can act on it with its own tools.
+    if (settings.agentWebhookUrl) {
+      try {
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 10000)
+        const res = await fetch(settings.agentWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            ...(settings.agentWebhookToken ? { authorization: `Bearer ${settings.agentWebhookToken}` } : {})
+          },
+          body: JSON.stringify({
+            event: 'brief',
+            source: 'inboxscout',
+            createdAt: now.toISOString(),
+            reportId,
+            periodType,
+            headline: brief.headline,
+            brief,
+            markdown,
+            messagesScanned: newMessages.length,
+            notices
+          }),
+          signal: controller.signal
+        })
+        clearTimeout(timer)
+        if (!res.ok) notices.push(`Agent webhook returned HTTP ${res.status}`)
+      } catch (err: any) {
+        notices.push(`Agent webhook failed: ${String(err?.message ?? err)}`)
+      }
+    }
+
     onProgress({ phase: 'done', detail: 'Brief ready.' })
     return {
       runId,

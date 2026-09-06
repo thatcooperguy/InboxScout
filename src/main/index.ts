@@ -10,6 +10,7 @@ import type { RunProgress } from '../shared/types'
 import { briefToSpeech } from '../shared/speech'
 import { speakWithOs } from './voice'
 import { latestBrief } from './db/repo'
+import { bridgeBroadcast } from './api/local'
 
 let db: DB
 let secrets: SecretStore
@@ -21,6 +22,8 @@ const isHeadlessSync = process.argv.includes('--sync')
 
 function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) win.webContents.send(channel, payload)
+  // Agents listening on the local bridge (Hermes etc.) get the same events.
+  bridgeBroadcast(channel, payload)
 }
 
 async function runNow(trigger: 'manual' | 'scheduled' | 'catchup' | 'cli' = 'manual'): Promise<void> {
@@ -117,7 +120,7 @@ async function bootstrap(): Promise<void> {
     return
   }
 
-  registerIpc({
+  const { agent } = registerIpc({
     db,
     secrets,
     runNow: () => runNow('manual'),
@@ -125,6 +128,7 @@ async function bootstrap(): Promise<void> {
     skillsDir: join(app.getPath('userData'), 'skills'),
     broadcast
   })
+  app.on('before-quit', () => agent.closeWindow())
   createWindow()
   createTray()
 

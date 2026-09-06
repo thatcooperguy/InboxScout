@@ -83,3 +83,40 @@ export function extractCredentials(kind: SetupKind, text: string): Captured {
   return out
 }
 
+const APP_PASSWORD_PATTERNS: Record<'gmail' | 'yahoo' | 'icloud', RegExp> = {
+  // Google shows "abcd efgh ijkl mnop" in a box; Yahoo shows 16 lowercase letters; Apple shows xxxx-xxxx-xxxx-xxxx.
+  gmail: /\b([a-z]{4})[  ]?([a-z]{4})[  ]?([a-z]{4})[  ]?([a-z]{4})\b/,
+  yahoo: /\b([a-z]{16})\b/,
+  icloud: /\b([a-z]{4}-[a-z]{4}-[a-z]{4}-[a-z]{4})\b/
+}
+
+const COMMON_WORDS = new Set(
+  (
+    'this that with from your have more will been they when what here sign code name mail save help back next done page user info ' +
+    'menu home data true null json html text link copy open file edit view list type size time date year week left last long only ' +
+    'also into over such than then them were some most many much make like just take know good well work need want look find give ' +
+    'keep send read show turn step your'
+  ).split(' ')
+)
+
+/** Pull a freshly generated app password out of page text (null when not visible). */
+export function extractAppPassword(provider: 'gmail' | 'yahoo' | 'icloud', text: string): string | null {
+  const re = new RegExp(APP_PASSWORD_PATTERNS[provider].source, 'g')
+  let m: RegExpExecArray | null
+  while ((m = re.exec(text))) {
+    if (provider === 'gmail') {
+      const groups = [m[1], m[2], m[3], m[4]]
+      // Four real words in a row ("this that with your") are not a password.
+      if (groups.filter((g) => COMMON_WORDS.has(g)).length >= 2) continue
+      return groups.join('')
+    }
+    if (provider === 'yahoo') {
+      const candidate = m[1]
+      if (COMMON_WORDS.has(candidate.slice(0, 4)) && COMMON_WORDS.has(candidate.slice(4, 8))) continue
+      return candidate
+    }
+    return m[1]
+  }
+  return null
+}
+

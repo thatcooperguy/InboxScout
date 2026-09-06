@@ -1,3 +1,13 @@
+export interface BridgeInfo {
+  enabled: boolean
+  running: boolean
+  port: number
+  token: string
+  url: string
+  mcpUrl: string
+  access: 'read' | 'full'
+}
+
 export interface InboxScoutApi {
   getSettings: () => Promise<any>
   setSettings: (settings: unknown) => Promise<any>
@@ -16,6 +26,22 @@ export interface InboxScoutApi {
   exportIcs: () => Promise<{ ok: boolean; filePath?: string; error?: string; count?: number }>
   deliveryCarriers: () => Promise<{ id: string; name: string }[]>
   deliveryTest: (kind: 'email' | 'sms') => Promise<{ ok: boolean; error?: string }>
+  agentRecipes: () => Promise<{ recipes: any[]; aiReady: boolean; autonomy: 'careful' | 'signin' | 'full'; signins: string[] }>
+  agentSetAutonomy: (autonomy: string) => Promise<'careful' | 'signin' | 'full'>
+  signinsList: () => Promise<string[]>
+  signinsSave: (email: string, password: string) => Promise<string[]>
+  signinsDelete: (email: string) => Promise<string[]>
+  agentStart: (input: unknown) => Promise<{ ok: boolean; summary?: string }>
+  agentAnswer: (text: string) => Promise<boolean>
+  agentContinue: () => Promise<boolean>
+  agentStop: () => Promise<boolean>
+  agentStatus: () => Promise<{ status: string; log: string[]; captured: Record<string, string>; task: any }>
+  agentCloseWindow: () => Promise<boolean>
+  onAgentEvent: (cb: (e: any) => void) => () => void
+  bridgeInfo: () => Promise<BridgeInfo>
+  bridgeSetEnabled: (enabled: boolean) => Promise<BridgeInfo>
+  bridgeRegenerate: () => Promise<BridgeInfo>
+  bridgeSetAccess: (access: string) => Promise<BridgeInfo>
   setupInfo: () => Promise<{
     google: { steps: any[]; configured: boolean; baked: boolean }
     microsoft: { steps: any[]; configured: boolean; baked: boolean }

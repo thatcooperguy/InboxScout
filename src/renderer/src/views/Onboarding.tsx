@@ -155,7 +155,8 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
           <h1>Step 3 of 3 — You're set{connected ? ' ✓' : ''}</h1>
           <p>
             InboxScout will scan every morning at 7:30 and save your brief to Documents. The free built-in engine is
-            active — visit <strong>Connect AI</strong> anytime to upgrade to a smarter (still free) AI backend.
+            active — visit <strong>Setup → AI helper</strong> anytime to add a smarter (still free) AI, which also
+            unlocks the <strong>Assistant</strong> that can do web chores like creating app passwords for you.
           </p>
           <div style={{ display: 'flex', gap: 8 }}>
             {connected ? (

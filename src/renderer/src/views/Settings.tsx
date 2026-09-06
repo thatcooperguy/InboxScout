@@ -2,6 +2,74 @@ import { useEffect, useState } from 'react'
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
+/** Local API for Hermes and other agents on this computer. */
+function BridgeCard({ settings, update }: { settings: any; update: (patch: any) => void }): JSX.Element {
+  const [info, setInfo] = useState<any | null>(null)
+  const [showToken, setShowToken] = useState(false)
+  useEffect(() => {
+    void window.inboxScout.bridgeInfo().then(setInfo)
+  }, [])
+  if (!info) return <div />
+  const hermesConfig = `mcp_servers:\n  inboxscout:\n    url: ${info.mcpUrl}\n    headers:\n      Authorization: Bearer ${showToken ? info.token : '<token>'}`
+  return (
+    <div className="card">
+      <h3>🤝 Agent bridge (Hermes &amp; friends)</h3>
+      <p className="hint">
+        Lets another AI agent on this computer — such as Hermes — use InboxScout as a tool: read your brief, search mail,
+        check email now, connect accounts, and drive the Assistant. Local only (127.0.0.1), token-protected, off by default.
+      </p>
+      <label className="field">
+        <span>Agent bridge</span>
+        <select
+          value={info.enabled ? 'on' : 'off'}
+          onChange={(e) => void window.inboxScout.bridgeSetEnabled(e.target.value === 'on').then(setInfo)}
+        >
+          <option value="off">Off</option>
+          <option value="on">On — other agents on this PC may call InboxScout</option>
+        </select>
+      </label>
+      {info.enabled && (
+        <>
+          <label className="field">
+            <span>What may they do?</span>
+            <select value={info.access} onChange={(e) => void window.inboxScout.bridgeSetAccess(e.target.value).then(setInfo)}>
+              <option value="read">Read only — brief, issues, mail search, status</option>
+              <option value="full">Full — also check email now, connect accounts, save sign-ins, change preferences, run the Assistant</option>
+            </select>
+          </label>
+          <div className="hint" style={{ fontFamily: 'monospace', fontSize: 12.5, lineHeight: 1.8 }}>
+            REST: {info.url} {info.running ? '(running)' : '(starting…)'}
+            <br />
+            MCP: {info.mcpUrl}
+            <br />
+            Token: {showToken ? info.token : '••••••••••••••••••••••••'}{' '}
+            <button className="ghost tiny" onClick={() => setShowToken(!showToken)}>
+              {showToken ? 'Hide' : 'Show'}
+            </button>{' '}
+            <button className="ghost tiny" onClick={() => void window.inboxScout.bridgeRegenerate().then(setInfo)}>
+              New token
+            </button>
+            <br />
+            Spec: {info.url}/openapi.json · Events: {info.url}/events
+          </div>
+          <p className="hint" style={{ marginBottom: 4 }}>Hermes: paste this into ~/.hermes/config.yaml (or add it as an MCP server in any MCP client):</p>
+          <pre style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 8, padding: 10, fontSize: 12, overflowX: 'auto', margin: '0 0 10px' }}>{hermesConfig}</pre>
+        </>
+      )}
+      <label className="field" style={{ marginTop: 8 }}>
+        <span>Also send each new brief to an agent webhook (e.g. Hermes) — URL, blank = off</span>
+        <input value={settings.agentWebhookUrl} onChange={(e) => update({ agentWebhookUrl: e.target.value })} placeholder="https://… or http://127.0.0.1:…" />
+      </label>
+      {settings.agentWebhookUrl && (
+        <label className="field">
+          <span>Webhook bearer token (optional)</span>
+          <input type="password" value={settings.agentWebhookToken} onChange={(e) => update({ agentWebhookToken: e.target.value })} />
+        </label>
+      )}
+    </div>
+  )
+}
+
 interface Props {
   onSaved?: () => void
 }
@@ -203,6 +271,7 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
             hidden or redacted.
           </p>
         </div>
+        <BridgeCard settings={settings} update={update} />
         <div className="card">
           <h3>Advanced</h3>
           <label className="field">

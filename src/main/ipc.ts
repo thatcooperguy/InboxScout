@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import { BrowserWindow, Notification, app, dialog, ipcMain, shell } from 'electron'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { signInWithDeviceCode } from './mail/graph'
@@ -8,6 +8,12 @@ import { googleClient, microsoftClientId, hasBakedClients } from './config'
 import { GOOGLE_STEPS, MICROSOFT_STEPS, SetupAssistant, type SetupKind } from './setup/assistant'
 import { eventsFromBrief, toCsv, toIcs, trackerRows } from './reports/exports'
 import { SMS_GATEWAYS, pickOutbox, sendMail, smsAddress } from './delivery/email'
+import { AgentRunner } from './agent/runner'
+import { RECIPES } from './agent/policy'
+import { resolveModel } from './ai/provider'
+import { bridgeInfo, regenerateBridgeToken, syncBridge, type BridgeDeps } from './api/local'
+import { deleteSignin, getSignin, listSignins, pickSigninForHost, saveSignin } from './signins'
+import { speakWithOs } from './voice'
 import { randomUUID } from 'node:crypto'
 import type { DB } from './db/index'
 import * as repo from './db/repo'
@@ -29,12 +35,206 @@ export interface IpcContext {
   broadcast: (channel: string, payload: unknown) => void
 }
 
-export function registerIpc(ctx: IpcContext): void {
+export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
   const { db, secrets } = ctx
+
+  // ---- Assistant browser (AI-operated browser with guardrails) ----
+  const VISION_PROVIDERS = new Set(['gemini', 'openai', 'anthropic', 'xai', 'openrouter', 'custom'])
+  const agent = new AgentRunner({
+    getModel: async () => {
+      const settings = loadSettings(db)
+      if (settings.ai.provider === 'builtin') return null
+      const apiKey = secrets.get(providerSecretName(settings.ai.provider)) ?? ''
+      if (!apiKey && !LOCAL_PROVIDERS.includes(settings.ai.provider) && settings.ai.provider !== 'custom') return null
+      try {
+        return { model: resolveModel(settings.ai, apiKey), vision: VISION_PROVIDERS.has(settings.ai.provider) }
+      } catch {
+        return null
+      }
+    },
+    onEvent: (e) => ctx.broadcast('agent:event', e)
+  })
+  const hostOf = (url: string): string => {
+    try {
+      return new URL(url).hostname
+    } catch {
+      return ''
+    }
+  }
+  /** Finish a recipe's job with what the assistant captured (connect the account, save IDs). */
+  const finishRecipe = async (recipeId: string, params: Record<string, string>, captured: Record<string, string>): Promise<string> => {
+    const recipe = RECIPES.find((r) => r.id === recipeId)
+    if (!recipe) return ''
+    if (recipe.captures === 'appPassword' && captured.appPassword && params.email) {
+      const preset = PROVIDER_PRESETS[recipe.provider ?? 'imap']
+      const account: AccountConfig = {
+        id: randomUUID(),
+        label: params.email,
+        email: params.email.trim(),
+        provider: recipe.provider ?? 'imap',
+        host: preset.host,
+        port: preset.port,
+        folders: preset.sentFolder ? ['INBOX', preset.sentFolder] : ['INBOX'],
+        createdAt: new Date().toISOString()
+      }
+      await testConnection(account, captured.appPassword)
+      repo.upsertAccount(db, account)
+      secrets.set(accountSecretName(account.id), captured.appPassword)
+      return `✅ ${params.email} is connected. You're all set.`
+    }
+    if (recipe.captures === 'googleClient' && captured.googleClientId) {
+      const s = loadSettings(db)
+      saveSettings(db, { ...s, googleClientId: captured.googleClientId, googleClientSecret: captured.googleClientSecret ?? s.googleClientSecret })
+      return '✅ Google sign-in is configured. "Sign in with Google" now works.'
+    }
+    if (recipe.captures === 'microsoftClientId' && captured.microsoftClientId) {
+      const s = loadSettings(db)
+      saveSettings(db, { ...s, microsoftClientId: captured.microsoftClientId })
+      return '✅ Microsoft sign-in is configured. "Sign in with Microsoft" now works.'
+    }
+    return ''
+  }
+  const startAgent = (input: {
+    recipeId?: string
+    params?: Record<string, string>
+    goal?: string
+    startUrl?: string
+    allowedDomains?: string[]
+    /** Saved sign-in to use; defaults to the recipe's email or a saved sign-in matching the site. */
+    signinEmail?: string
+  }): { ok: boolean; summary?: string } => {
+    const recipe = input.recipeId ? (RECIPES.find((r) => r.id === input.recipeId) ?? null) : null
+    const params = input.params ?? {}
+    const settings = loadSettings(db)
+    const base = recipe
+      ? { recipe, params, goal: recipe.goal(params), startUrl: recipe.startUrl(params), allowedDomains: recipe.allowedDomains }
+      : {
+          recipe: null,
+          params,
+          goal: input.goal ?? '',
+          startUrl: input.startUrl ?? 'about:blank',
+          allowedDomains: input.allowedDomains?.length ? input.allowedDomains : [hostOf(input.startUrl ?? '')].filter(Boolean)
+        }
+    const wanted = (input.signinEmail || params.email || '').trim()
+    const signin =
+      settings.assistantAutonomy === 'careful'
+        ? null
+        : (wanted ? getSignin(db, secrets, wanted) : null) ?? pickSigninForHost(db, secrets, hostOf(base.startUrl))
+    const task = { ...base, autonomy: settings.assistantAutonomy, signin }
+    if (!task.goal) return { ok: false, summary: 'Tell the assistant what to do.' }
+    if (agent.isBusy()) return { ok: false, summary: 'The assistant is already working on something.' }
+    // Runs in the background; the app follows along via agent:event.
+    void agent.start(task).then(async (result) => {
+      if (!result.ok || !recipe) return
+      try {
+        const msg = await finishRecipe(recipe.id, params, result.captured)
+        if (msg) ctx.broadcast('agent:event', { type: 'status', status: 'done', message: msg })
+      } catch (err: any) {
+        ctx.broadcast('agent:event', { type: 'error', message: `The assistant finished, but connecting failed: ${String(err?.message ?? err)}` })
+      }
+    })
+    return { ok: true }
+  }
+  ipcMain.handle('agent:recipes', () => ({
+    recipes: RECIPES.map((r) => ({ id: r.id, name: r.name, icon: r.icon, description: r.description, params: r.params })),
+    aiReady: loadSettings(db).ai.provider !== 'builtin',
+    autonomy: loadSettings(db).assistantAutonomy,
+    signins: listSignins(db)
+  }))
+  ipcMain.handle('agent:setAutonomy', (_e, autonomy: AppSettings['assistantAutonomy']) => {
+    const s = loadSettings(db)
+    saveSettings(db, { ...s, assistantAutonomy: ['careful', 'signin', 'full'].includes(autonomy) ? autonomy : s.assistantAutonomy })
+    return loadSettings(db).assistantAutonomy
+  })
+  ipcMain.handle('signins:list', () => listSignins(db))
+  ipcMain.handle('signins:save', (_e, email: string, password: string) => saveSignin(db, secrets, email, password))
+  ipcMain.handle('signins:delete', (_e, email: string) => deleteSignin(db, secrets, email))
+  ipcMain.handle('agent:start', (_e, input) => startAgent(input))
+  ipcMain.handle('agent:answer', (_e, text: string) => {
+    agent.answer(text)
+    return true
+  })
+  ipcMain.handle('agent:continue', () => {
+    agent.continueAfterHandoff()
+    return true
+  })
+  ipcMain.handle('agent:stop', () => {
+    agent.stop()
+    return true
+  })
+  ipcMain.handle('agent:status', () => agent.getStatus())
+  ipcMain.handle('agent:closeWindow', () => {
+    agent.closeWindow()
+    return true
+  })
+
+  // ---- Local bridge for Hermes and other agents ----
+  const listSkillsPlain = (): { id: string; name: string; description: string; enabled: boolean; builtin: boolean }[] => {
+    const settings = loadSettings(db)
+    const custom = loadCustomSkills(ctx.skillsDir)
+    const { all, enabled } = resolveSkills(settings.profileId, settings.enabledSkillIds, custom.skills)
+    const enabledIds = new Set(enabled.map((s) => s.id))
+    return all.map((s) => ({ id: s.id, name: s.name, description: s.description, enabled: enabledIds.has(s.id), builtin: !s.custom }))
+  }
+  const bridgeDeps: BridgeDeps = {
+    db,
+    secrets,
+    version: app.getVersion(),
+    agent,
+    startAgent,
+    runNow: () => ctx.runNow(),
+    isRunning: () => ctx.isRunning(),
+    connectAccount: async (input) => {
+      const provider = (['gmail', 'yahoo', 'icloud', 'imap'].includes(input.provider) ? input.provider : 'imap') as AccountConfig['provider']
+      const preset = PROVIDER_PRESETS[provider] ?? PROVIDER_PRESETS.imap
+      const account: AccountConfig = {
+        id: randomUUID(),
+        label: input.label || input.email,
+        email: input.email.trim(),
+        provider,
+        host: (input.host || preset.host).trim(),
+        port: Number(input.port) || preset.port || 993,
+        folders: preset.sentFolder ? ['INBOX', preset.sentFolder] : ['INBOX'],
+        createdAt: new Date().toISOString()
+      }
+      await testConnection(account, input.password)
+      repo.upsertAccount(db, account)
+      secrets.set(accountSecretName(account.id), input.password)
+      return account
+    },
+    notify: (title, body) => {
+      if (Notification.isSupported()) new Notification({ title, body: body.slice(0, 240) }).show()
+    },
+    speak: (text) => speakWithOs(text),
+    listSkills: listSkillsPlain,
+    setEnabledSkills: (ids) => {
+      const s = loadSettings(db)
+      saveSettings(db, { ...s, enabledSkillIds: ids })
+    }
+  }
+  ipcMain.handle('bridge:info', () => bridgeInfo(bridgeDeps))
+  ipcMain.handle('bridge:setEnabled', (_e, enabled: boolean) => {
+    const s = loadSettings(db)
+    saveSettings(db, { ...s, bridgeEnabled: enabled })
+    syncBridge(bridgeDeps)
+    return bridgeInfo(bridgeDeps)
+  })
+  ipcMain.handle('bridge:regenerate', () => {
+    regenerateBridgeToken(bridgeDeps)
+    syncBridge(bridgeDeps)
+    return bridgeInfo(bridgeDeps)
+  })
+  ipcMain.handle('bridge:setAccess', (_e, access: AppSettings['bridgeAccess']) => {
+    const s = loadSettings(db)
+    saveSettings(db, { ...s, bridgeAccess: access === 'read' ? 'read' : 'full' })
+    return bridgeInfo(bridgeDeps)
+  })
+  syncBridge(bridgeDeps)
 
   ipcMain.handle('settings:get', () => loadSettings(db))
   ipcMain.handle('settings:set', (_e, settings: AppSettings) => {
     saveSettings(db, settings)
+    syncBridge(bridgeDeps)
     return loadSettings(db)
   })
 
@@ -340,4 +540,6 @@ export function registerIpc(ctx: IpcContext): void {
     repo.setCorrection(db, input.messageId, input.category, null)
     return true
   })
+
+  return { agent }
 }

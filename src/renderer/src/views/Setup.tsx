@@ -4,8 +4,9 @@ import AiSettings from './AiSettings'
 import Skills from './Skills'
 import SettingsView from './Settings'
 import SetupAssistant from './SetupAssistant'
+import Assistant from './Assistant'
 
-type Sub = 'hub' | 'accounts' | 'ai' | 'skills' | 'prefs' | 'helper'
+type Sub = 'hub' | 'accounts' | 'ai' | 'skills' | 'prefs' | 'helper' | 'assistant'
 
 interface Props {
   onSettingsChanged: () => void
@@ -26,6 +27,7 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
         {sub === 'skills' && <Skills />}
         {sub === 'prefs' && <SettingsView onSaved={onSettingsChanged} />}
         {sub === 'helper' && <SetupAssistant />}
+        {sub === 'assistant' && <Assistant />}
       </div>
     )
   }
@@ -49,6 +51,11 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
           <span className="icon">🧠</span>
           <strong>AI helper</strong>
           <span className="sub">Works free out of the box. Optionally connect a smarter AI.</span>
+        </button>
+        <button className="hub-btn" onClick={() => setSub('assistant')}>
+          <span className="icon">🤖</span>
+          <strong>Assistant</strong>
+          <span className="sub">Let InboxScout do the web chores for you — app passwords, Google/Microsoft setup, and more — in its own window.</span>
         </button>
         <button className="hub-btn" onClick={() => setSub('helper')}>
           <span className="icon">🧑‍💻</span>

@@ -58,9 +58,16 @@
 - **Voice**: **Read it to me** in-app and optional spoken **voice summaries** via the OS voice when a scheduled brief is ready (works with the window closed); **Draft reply** (opens the mail app pre-filled), **CSV export**, **calendar (.ics) export**.
 - **Google Docs + Sheets export** via `drive.file` when signed in with Google.
 
-## 🟠 Gaps — v0.7
+## ✅ v0.7 — shipped (the Assistant + Hermes)
 
-- **Fully autonomous console agent** (LLM + vision driving Google/Microsoft consoles) — deliberately not shipped: brittle against UI changes and unnecessary once IDs are baked into builds. Revisit only if a real need appears.
+- **AI-operated browser** with recipes (Gmail/Yahoo/iCloud app-password + auto-connect, Google OAuth client registration, add test user, Microsoft app registration, custom tasks), observe→decide→act loop on any AI backend (screenshots when the backend has vision). `docs/ASSISTANT.md`.
+- **Autonomy levels** (Careful / Sign in for me / Full) and **saved sign-ins**: the assistant logs in as you via keyboard-swapped placeholders, so the model never sees a password; 2-factor always comes back to you. Always-on: visible window, live log, Stop, step cap, isolated session.
+- **Agent bridge** for Hermes and friends: MCP server (`/mcp`), REST + OpenAPI (`/v1`), Server-Sent Events (`/v1/events`), bearer token, Read-only/Full access switch, 30 operations (brief, issues, mail, scan, accounts, sign-ins, Assistant, notify, speak, skills, safe settings). `integrations/hermes/`.
+- **Brief webhook**: every new brief POSTed to an agent URL (Hermes gateway) with optional bearer token.
+
+## 🟠 Gaps — v0.8
+
+- ~~Autonomous console agent~~ — ✅ shipped in v0.7 as the Assistant, with handoffs where a bot would be brittle.
 - **Voice commands** (talk to InboxScout) — Chromium speech recognition in Electron needs a Google key and is unreliable offline; revisit with a local model (e.g. whisper.cpp).
 - **Real phone calls / two-way SMS** — needs a paid provider (Twilio); not aligned with "free out of the box". Read-aloud and carrier texts cover the need for now.
 

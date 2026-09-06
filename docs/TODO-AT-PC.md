@@ -20,14 +20,21 @@ exact page. Most take under 10 minutes. Tick them off as you go.
 
 So nobody who installs InboxScout ever registers an app with Google or Microsoft:
 
-- [ ] Open InboxScout → **Setup → Connect helper → Google → Start** (it captures the client ID + secret for you),
-      or follow `docs/GOOGLE.md`
-- [ ] Same for **Microsoft** (captures the app ID), or follow `docs/OUTLOOK.md`
+- [ ] Open InboxScout → **Setup → Assistant → "Register the Google sign-in app" → Start** (it clicks through for you;
+      you only sign in), or **Setup → Connect helper** to click yourself, or follow `docs/GOOGLE.md`
+- [ ] Same for **Microsoft** (Assistant → "Register the Microsoft sign-in app"), or follow `docs/OUTLOOK.md`
 - [ ] Add three repository secrets at https://github.com/thatcooperguy/InboxScout/settings/secrets/actions:
       `INBOXSCOUT_GOOGLE_CLIENT_ID`, `INBOXSCOUT_GOOGLE_CLIENT_SECRET`, `INBOXSCOUT_MS_CLIENT_ID`
 - [ ] Cut a release (Actions → Release → *Run workflow*). From then on "Sign in with Google / Microsoft" just works.
 - [ ] Google only: in the Cloud console's OAuth **Audience** page either add family members' Gmail addresses as
       test users, or click **Publish app** so sign-ins don't expire weekly.
+
+## 2b. Optional: let Hermes use InboxScout  (~3 min)
+
+- [ ] InboxScout → **Setup → Preferences → Agent bridge → On**, choose **Full** (or Read only), press **Show** on the token
+- [ ] Paste the `mcp_servers:` snippet shown there into `~/.hermes/config.yaml`; restart Hermes → it now has
+      `get_brief`, `search_mail`, `assistant_start`, … (`integrations/hermes/README.md`)
+- [ ] Optional: under the same card, set a **webhook URL** so every new brief is POSTed to Hermes
 
 ## 3. Try it on your own inbox  (~5 min)
 

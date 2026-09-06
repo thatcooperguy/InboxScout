@@ -212,7 +212,28 @@ export interface AppSettings {
   googleDriveExport: boolean
   /** Speak a short summary out loud whenever a scheduled brief is ready. */
   speakBriefs: boolean
+  /** Local HTTP bridge so Hermes and other agents on this computer can use InboxScout as a tool. */
+  bridgeEnabled: boolean
+  bridgePort: number
+  /** What other agents may do through the bridge: read-only, or everything (scan, connect, drive the Assistant). */
+  bridgeAccess: BridgeAccess
+  /** How far the Assistant browser may go on its own. */
+  assistantAutonomy: AssistantAutonomy
+  /** POST each new brief to an agent (e.g. a Hermes webhook) after every run ('' = off). */
+  agentWebhookUrl: string
+  /** Optional bearer token sent with the webhook. */
+  agentWebhookToken: string
 }
+
+/** read: look but don't touch; full: also scan, connect accounts, change preferences, and drive the Assistant. */
+export type BridgeAccess = 'read' | 'full'
+
+/**
+ * careful: hands every sign-in and risky page to the person.
+ * signin: uses saved sign-ins to log in for the person; pauses on risky pages so they can say yes.
+ * full: signs in, proceeds through risky pages, and may leave the task's sites — only 2-factor codes are handed over.
+ */
+export type AssistantAutonomy = 'careful' | 'signin' | 'full'
 
 export const DEFAULT_SETTINGS: AppSettings = {
   profileId: 'general',
@@ -234,7 +255,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   smsPhone: '',
   smsCarrier: '',
   googleDriveExport: false,
-  speakBriefs: false
+  speakBriefs: false,
+  bridgeEnabled: false,
+  bridgePort: 47311,
+  bridgeAccess: 'full',
+  assistantAutonomy: 'signin',
+  agentWebhookUrl: '',
+  agentWebhookToken: ''
 }
 
 export interface RunProgress {

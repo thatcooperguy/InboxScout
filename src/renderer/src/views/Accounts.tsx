@@ -13,6 +13,38 @@ export default function Accounts(): JSX.Element {
   const [error, setError] = useState('')
   const [ok, setOk] = useState('')
   const [deviceCode, setDeviceCode] = useState<{ userCode: string; verificationUri: string } | null>(null)
+  const [assistantNote, setAssistantNote] = useState('')
+  const [signinPassword, setSigninPassword] = useState('')
+  const [autonomy, setAutonomy] = useState<'careful' | 'signin' | 'full'>('signin')
+
+  useEffect(() => {
+    void window.inboxScout.agentRecipes().then((r) => setAutonomy(r.autonomy))
+    return window.inboxScout.onAgentEvent((e: any) => {
+      if (e.message) setAssistantNote(e.message)
+      if (e.status === 'done') load()
+    })
+  }, [])
+
+  const letAssistant = async (): Promise<void> => {
+    setError('')
+    const willSignIn = autonomy !== 'careful' && signinPassword.trim()
+    if (willSignIn) {
+      try {
+        await window.inboxScout.signinsSave(email, signinPassword)
+      } catch (err: any) {
+        setError(String(err?.message ?? err))
+        return
+      }
+    }
+    setAssistantNote(
+      willSignIn
+        ? 'Starting the assistant… it will sign in for you and only ask if a code is needed.'
+        : 'Starting the assistant… a browser window will open. Sign in when it asks; it never sees your password.'
+    )
+    const recipeId = provider === 'gmail' ? 'gmail-app-password' : provider === 'yahoo' ? 'yahoo-app-password' : 'icloud-app-password'
+    const r = await window.inboxScout.agentStart({ recipeId, params: { email } })
+    if (!r.ok) setAssistantNote(r.summary ?? 'Could not start the assistant.')
+  }
 
   useEffect(() => window.inboxScout.onOutlookDeviceCode((info: any) => setDeviceCode(info)), [])
 
@@ -185,6 +217,26 @@ export default function Accounts(): JSX.Element {
             <span>Email address</span>
             <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
           </label>
+          {(provider === 'gmail' || provider === 'yahoo' || provider === 'icloud') && (
+            <div className="card" style={{ background: 'var(--good-soft)', borderColor: 'var(--good)' }}>
+              <strong>🤖 Don't want to hunt for an app password? Let the assistant do it.</strong>
+              <p className="hint" style={{ margin: '4px 0 10px' }}>
+                It opens {provider === 'gmail' ? "Google's" : provider === 'yahoo' ? "Yahoo's" : "Apple's"} page in its own window, you sign in, and it creates the
+                app password and connects the account for you. (Needs an AI helper — free Gemini or Groq works.)
+              </p>
+              {autonomy !== 'careful' && (
+                <label className="field">
+                  <span>Your {provider === 'gmail' ? 'Google' : provider === 'yahoo' ? 'Yahoo' : 'Apple'} password (optional — lets it sign in for you; saved encrypted on this computer, never shown to the AI)</span>
+                  <input type="password" value={signinPassword} onChange={(e) => setSigninPassword(e.target.value)} placeholder="Leave blank to sign in yourself" />
+                </label>
+              )}
+              {assistantNote && <div className="hint" style={{ marginBottom: 8 }}>{assistantNote}</div>}
+              <button className="primary" onClick={() => void letAssistant()} disabled={!email || busy}>
+                Let the assistant do it
+              </button>
+              <p className="hint" style={{ margin: '10px 0 0' }}>Or paste an app password yourself below.</p>
+            </div>
+          )}
           <label className="field">
             <span>App password</span>
             <input
