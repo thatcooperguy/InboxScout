@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <sub>Free · no account needed · updates itself · <a href="#-install">first-time install tips</a></sub>
+  <sub>Free · no account needed · updates itself · <a href="#-install">first-time install tips</a> · <a href="https://inboxscout.ai">inboxscout.ai</a></sub>
 </p>
 
 <p align="center">
@@ -115,7 +115,7 @@ npm run package      # build local installers (no publish)
 
 Headless scan: `inboxscout --sync`. Stack: Electron · TypeScript · React · better-sqlite3 (FTS5) · imapflow + mailparser · Microsoft Graph (MSAL) · Vercel AI SDK · node-cron · electron-updater.
 
-Design docs: [Proposal](docs/PROPOSAL.md) · [Roadmap](docs/ROADMAP.md) · [Skills](docs/SKILLS.md) · [Google setup](docs/GOOGLE.md) · [Outlook setup](docs/OUTLOOK.md) · [Contributing](CONTRIBUTING.md)
+Website: [inboxscout.ai](https://inboxscout.ai) ([how it's hosted](docs/WEBSITE.md)) · Design docs: [Proposal](docs/PROPOSAL.md) · [Roadmap](docs/ROADMAP.md) · [Skills](docs/SKILLS.md) · [Google setup](docs/GOOGLE.md) · [Outlook setup](docs/OUTLOOK.md) · [Contributing](CONTRIBUTING.md)
 
 ## 📜 License
 
