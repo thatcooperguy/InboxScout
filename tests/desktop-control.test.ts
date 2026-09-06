@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { openDatabase } from '../src/main/db/index'
@@ -139,7 +139,8 @@ describe.skipIf(!posix)('DesktopControl commands and files', () => {
     expect(slow.timedOut).toBe(true)
     await expect(d.run('ls', 'Hermes', { cwd: '/' })).rejects.toThrow(/outside your home folder/)
     mkdirSync(join(home, 'proj'), { recursive: true })
-    expect((await d.run('pwd', 'Hermes', { cwd: '~/proj' })).stdout.trim()).toBe(join(home, 'proj'))
+    // macOS temp folders are symlinks (/var → /private/var), so compare real paths.
+    expect(realpathSync((await d.run('pwd', 'Hermes', { cwd: '~/proj' })).stdout.trim())).toBe(realpathSync(join(home, 'proj')))
   })
 
   it('dangerous commands go through the popup even when run is Always', async () => {
