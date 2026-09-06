@@ -13,6 +13,7 @@ import { RECIPES } from './agent/policy'
 import { DesktopControl } from './desktop/control'
 import { resolveModel } from './ai/provider'
 import { bridgeInfo, regenerateBridgeToken, syncBridge, type BridgeDeps } from './api/local'
+import { phoneInfo, regeneratePhoneToken, syncPhone } from './api/phone'
 import { deleteSignin, getSignin, listSignins, pickSigninForHost, saveSignin } from './signins'
 import { speakWithOs } from './voice'
 import { randomUUID } from 'node:crypto'
@@ -289,6 +290,21 @@ export function registerIpc(ctx: IpcContext): IpcHooks {
     return bridgeInfo(bridgeDeps)
   })
   syncBridge(bridgeDeps)
+
+  // ---- InboxScout on your phone: the same ops machinery, its own server and key (api/phone.ts) ----
+  ipcMain.handle('phone:info', () => phoneInfo(bridgeDeps))
+  ipcMain.handle('phone:set', (_e, on: boolean) => {
+    const s = loadSettings(db)
+    saveSettings(db, { ...s, phoneAccess: on ? 'on' : 'off' })
+    syncPhone(bridgeDeps)
+    return phoneInfo(bridgeDeps)
+  })
+  ipcMain.handle('phone:regenerate', () => {
+    regeneratePhoneToken(bridgeDeps)
+    return phoneInfo(bridgeDeps)
+  })
+  syncPhone(bridgeDeps)
+
   // First health pass shortly after startup (the bridge needs a moment to start listening before it is judged).
   setTimeout(() => void healthRepair().catch((err) => log('error', 'health', 'startup check failed', err)), 4000)
 
@@ -296,6 +312,7 @@ export function registerIpc(ctx: IpcContext): IpcHooks {
   ipcMain.handle('settings:set', (_e, settings: AppSettings) => {
     saveSettings(db, settings)
     syncBridge(bridgeDeps)
+    syncPhone(bridgeDeps)
     return loadSettings(db)
   })
 

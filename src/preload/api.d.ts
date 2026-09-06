@@ -10,6 +10,21 @@ export interface BridgeInfo {
   access: 'read' | 'full'
 }
 
+/** "InboxScout on your phone" (Setup → On your phone). */
+export interface PhoneInfo {
+  enabled: boolean
+  running: boolean
+  port: number
+  /** This computer's Wi‑Fi address, or null when it is not on a network. */
+  address: string | null
+  /** The link the QR code holds (null without an address). */
+  url: string | null
+  qrDataUrl: string | null
+  token: string
+  /** Plain-words reason the server is not running when it should be ('' when fine). */
+  error: string
+}
+
 export interface ProfileSummary {
   id: string
   name: string
@@ -74,6 +89,9 @@ export interface InboxScoutApi {
   bridgeSetEnabled: (enabled: boolean) => Promise<BridgeInfo>
   bridgeRegenerate: () => Promise<BridgeInfo>
   bridgeSetAccess: (access: string) => Promise<BridgeInfo>
+  phoneInfo: () => Promise<PhoneInfo>
+  phoneSet: (on: boolean) => Promise<PhoneInfo>
+  phoneRegenerate: () => Promise<PhoneInfo>
   setupInfo: () => Promise<{
     google: { steps: any[]; configured: boolean; baked: boolean }
     microsoft: { steps: any[]; configured: boolean; baked: boolean }

@@ -339,6 +339,12 @@ export interface AppSettings {
   agentWebhookUrl: string
   /** Optional bearer token sent with the webhook. */
   agentWebhookToken: string
+  /**
+   * "InboxScout on your phone": serve a phone-friendly copy of the brief on the home Wi‑Fi (opened by scanning a
+   * QR code, installable with Add to Home Screen). Off by default because it opens a door on the local network.
+   */
+  phoneAccess: 'on' | 'off'
+  phonePort: number
 }
 
 /** read: look but don't touch; full: also scan, connect accounts, change preferences, and drive the Assistant. */
@@ -388,7 +394,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   bridgeAccess: 'full',
   assistantAutonomy: 'full',
   agentWebhookUrl: '',
-  agentWebhookToken: ''
+  agentWebhookToken: '',
+  phoneAccess: 'off',
+  phonePort: 47321
 }
 
 export interface RunProgress {

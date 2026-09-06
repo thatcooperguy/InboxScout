@@ -421,7 +421,7 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
     const v = getSetting(settings, d.key)
     if (d.key === 'storeFullBodies') return v === false
     if (d.key === 'assistantAutonomy' || d.key === 'bridgeAccess') return v === 'full'
-    if (d.key === 'systemControl') return v === 'on'
+    if (d.key === 'systemControl' || d.key === 'phoneAccess') return v === 'on'
     if (d.key === 'systemDangerousOverride') return v === true
     return true
   }

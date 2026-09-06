@@ -5,9 +5,10 @@ import Skills from './Skills'
 import SettingsView from './Settings'
 import SetupAssistant from './SetupAssistant'
 import Assistant from './Assistant'
+import Phone from './Phone'
 import { useLevel } from '../useLevel'
 
-type Sub = 'hub' | 'accounts' | 'ai' | 'skills' | 'prefs' | 'helper' | 'assistant'
+type Sub = 'hub' | 'accounts' | 'ai' | 'skills' | 'prefs' | 'helper' | 'assistant' | 'phone'
 
 interface Props {
   onSettingsChanged: () => void
@@ -34,9 +35,11 @@ interface HubState {
   microsoft: boolean | null
   /** Health check: number of items needing attention; null until known, 0 when everything works. */
   attention: number | null
+  /** "On your phone" switched on; null until known. */
+  phone: boolean | null
 }
 
-const EMPTY: HubState = { accounts: null, aiName: null, aiBuiltin: true, watchers: null, webReady: null, google: null, microsoft: null, attention: null }
+const EMPTY: HubState = { accounts: null, aiName: null, aiBuiltin: true, watchers: null, webReady: null, google: null, microsoft: null, attention: null, phone: null }
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 
@@ -74,6 +77,7 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
       .healthStatus()
       .then((r) => alive && setHub((h) => ({ ...h, attention: r.ok ? 0 : r.items.filter((i) => i.status === 'warn' || i.status === 'fail').length || 1 })))
       .catch(() => undefined)
+    void api.phoneInfo().then((p) => alive && setHub((h) => ({ ...h, phone: p.enabled }))).catch(() => undefined)
     return () => {
       alive = false
     }
@@ -93,6 +97,7 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
   const levelState = level === 'simple' ? 'Simple view' : level === 'pro' ? 'Pro view' : 'Standard view'
   const needsAttention = hub.attention !== null && hub.attention > 0
   const prefsState = needsAttention ? `${plural(hub.attention!, 'thing needs', 'things need')} attention` : levelState
+  const phoneState = hub.phone === null ? '' : hub.phone ? 'On · scan the code' : 'Off — tap to show a code'
 
   // Order is fixed at every level: Email accounts first, then What to watch for, Preferences, then the helpers.
   const allTiles: Tile[] = [
@@ -119,6 +124,13 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
       tone: needsAttention ? 'amber' : undefined
     },
     {
+      id: 'phone',
+      icon: '📱',
+      label: 'On your phone',
+      sub: simple ? 'See your brief on your phone. Scan a code, no app store.' : 'Your brief on your phone over home Wi‑Fi: scan a code, add it to your home screen. No app store.',
+      state: phoneState
+    },
+    {
       id: 'ai',
       icon: '🧠',
       label: simple ? 'Smarter sorting' : 'Smarter sorting (AI)',
@@ -142,7 +154,7 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
   ]
   const tiles = allTiles.filter((t) => t.id !== 'helper' || showSignin)
 
-  const frontIds: Tile['id'][] = simple ? ['accounts', 'prefs', 'assistant'] : tiles.map((t) => t.id)
+  const frontIds: Tile['id'][] = simple ? ['accounts', 'prefs', 'phone', 'assistant'] : tiles.map((t) => t.id)
   const front = frontIds.map((id) => tiles.find((t) => t.id === id)).filter((t): t is Tile => !!t)
   const more = tiles.filter((t) => !frontIds.includes(t.id))
 
@@ -158,6 +170,7 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
         {sub === 'prefs' && <SettingsView onSaved={onSettingsChanged} />}
         {sub === 'helper' && <SetupAssistant onConnectAccount={() => setSub('accounts')} />}
         {sub === 'assistant' && <Assistant />}
+        {sub === 'phone' && <Phone />}
       </div>
     )
   }

@@ -187,6 +187,20 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
     minLevel: 'standard'
   },
   {
+    key: 'phoneAccess',
+    group: 'get',
+    label: 'Show my brief on my phone',
+    what: 'Lets your phone open your brief over your home Wi‑Fi: scan the code under Setup → On your phone, then add it to your home screen like an app. You can check email and tick things off from the phone.',
+    why: 'Off because it opens a door on your home network. Your computer has to be on and on the same Wi‑Fi as the phone.',
+    who: 'Anyone who wants the brief in their pocket without installing anything.',
+    caution: 'Anyone who has the code link can read your brief. Tap "New code" under Setup → On your phone to cut them off.',
+    kind: 'select',
+    options: [
+      { value: 'on', label: 'On — my phone can open my brief' },
+      { value: 'off', label: 'Off' }
+    ]
+  },
+  {
     key: 'speakBriefs',
     group: 'get',
     label: 'Speak my brief out loud',
@@ -373,6 +387,16 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
     why: 'An unusual number that nothing else uses.',
     kind: 'number',
     showWhen: (s) => s.bridgeEnabled,
+    minLevel: 'pro'
+  },
+  {
+    key: 'phonePort',
+    group: 'advanced',
+    label: 'Door number for my phone (advanced)',
+    what: 'The network door number your phone uses to reach InboxScout over Wi‑Fi. Change it only if something else on this computer already uses it; then scan a fresh code.',
+    why: 'An unusual number that nothing else uses.',
+    kind: 'number',
+    showWhen: (s) => s.phoneAccess === 'on',
     minLevel: 'pro'
   }
 ]

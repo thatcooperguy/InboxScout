@@ -101,7 +101,18 @@
 - **Self-healing**: a health check runs before every scan and on demand — accounts, the AI helper, the reports folder, the database, the bridge port, the schedule. Safe repairs happen on their own (reconnecting an account with a saved sign-in, falling back to the built-in engine when the AI helper fails, moving the reports folder, picking a free bridge port, re-syncing a broken account) and show up as one calm line on Today ("Fixed on its own: …"). What cannot be fixed alone is said in plain words under **Settings → Health** with one **Fix it for me** button, plus "Copy diagnostics" and "Show the log file" behind a disclosure. Bridge tools `health_check` / `health_repair` for Hermes. `docs/SELF-HEALING.md`.
 - **Complete control by default**: the first-launch terms now default every choice on — the master switch, every kind of computer use, *and* the full-autonomy override — so the Assistant and connected agents finish jobs without interruptions out of the box. Dangerous commands ask only when the override is turned off (**Settings → Who can help**); the warning stays visible wherever it is on.
 
-## 🟠 Gaps — v1.3
+## ✅ v1.3 — shipped (Linux + your phone)
+
+- **Linux**: AppImage and .deb installers from the same release pipeline (`InboxScout-x64.AppImage`, `InboxScout-x64.deb`), a "Password storage" health check that explains how to install a keyring, an AppImage-aware updater, and launch-at-login via XDG autostart. `docs/LINUX.md`.
+- **iPhone & Android without an app store**: **Setup → On your phone** shows a QR code; scanning it on the home Wi‑Fi opens a phone-sized InboxScout served by the desktop (check email, what needs you, bills, this week, past briefs) that can be added to the home screen. Its own token, LAN only, an allow-listed read-mostly API, "New code" to revoke. `docs/PHONE.md`.
+
+## 🔵 Planned — v1.4 (trusted helpers, conversation, quality & speed)
+
+- **Trusted helpers**: name a family member, guardian, or friend and choose what they may see (only when I ask / what needs me / everything). One-tap **Ask for help** on any item, a helper digest with "all fine" when quiet, and heads-ups for scam-looking mail, sensitive documents, a failing account, or someone gone quiet. Spec: `docs/design/FAMILY-AND-CONVERSATION.md`.
+- **Ask InboxScout**: plain-words questions on Today and on the phone page ("Did the dentist write back?", "What do I owe this month?", "Tell Jane I'll sign it Friday" → a draft), answered from local mail first and the AI helper when one is set.
+- **Quality & speed sweep**: first-brief time, incremental sync, startup, perceived speed, error copy, empty states, accessibility.
+
+## 🟠 Gaps
 
 - ~~Autonomous console agent~~ — ✅ shipped in v0.7 as the Assistant, with handoffs where a bot would be brittle.
 - **Voice commands** (talk to InboxScout) — Chromium speech recognition in Electron needs a Google key and is unreliable offline; revisit with a local model (e.g. whisper.cpp).
@@ -121,7 +132,7 @@
 ## ⚪ Distribution debt
 
 17. **Code signing** — Windows SmartScreen warning (Azure Trusted Signing ~$10/mo) and macOS notarization (Apple Developer ID $99/yr; Sequoia blocks unsigned apps hard). Required before handing installers to non-technical users.
-18. **Intel Mac build** — the `.dmg` is Apple Silicon only; add `x64`/universal target.
+18. ~~Intel Mac build~~ — ✅ both `InboxScout-arm64.dmg` and `InboxScout-x64.dmg` ship since v1.1; Linux since v1.3.
 19. ~~Gmail API BYO-client mode~~ — ✅ shipped as "Sign in with Google" in v0.5.
 
 ## Deliberately out of scope (unchanged)
