@@ -28,7 +28,7 @@ echo "→ Setting custom domain $DOMAIN…"
 api PUT /pages "{\"cname\":\"$DOMAIN\",\"build_type\":\"workflow\"}" >/dev/null && echo "  set"
 
 echo "→ Running the Website deploy workflow…"
-api POST /actions/workflows/pages.yml/dispatches '{"ref":"claude/email-intelligence-app-design-sh8tmz"}' >/dev/null && echo "  queued"
+api POST /actions/workflows/pages.yml/dispatches '{"ref":"main"}' >/dev/null && echo "  queued"
 
 echo
 echo "Done on the GitHub side. Now add the DNS records at Squarespace (docs/PHONE-SETUP.md, Part 2),"

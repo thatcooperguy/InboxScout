@@ -49,7 +49,4 @@ So nobody who installs InboxScout ever registers an app with Google or Microsoft
       and an Apple Developer ID ($99/yr) — `docs/RELEASING.md`
 - [ ] **Trademark** "InboxScout" (USPTO, ~$250–350) — the license protects the code, not the name
 - [ ] Put your legal name in `LICENSE.md` (currently `thatcooperguy (github.com/thatcooperguy)`)
-- [ ] Make `main` the default branch (1 min): https://github.com/thatcooperguy/InboxScout/settings/branches →
-      the switch icon next to the default branch → choose `main` → Update. `main` already holds everything
-      (it is identical to `claude/email-intelligence-app-design-sh8tmz`); only the default-branch setting itself
-      needs your click — repository settings can't be changed from Claude's session.
+- [x] `main` is the default branch and the only branch; all work lands there.
