@@ -6,6 +6,9 @@ import Reports from './views/Reports'
 import People from './views/People'
 import Setup from './views/Setup'
 import Onboarding from './views/Onboarding'
+import { LEVEL_BLURB, LEVEL_LABEL } from '../../shared/adapt'
+
+type UiLevelInfo = Awaited<ReturnType<typeof window.inboxScout.uiLevel>>
 
 type TabId = 'today' | 'reports' | 'people' | 'setup' | 'dashboard' | 'review'
 
@@ -29,6 +32,7 @@ export default function App(): JSX.Element {
   const [refreshKey, setRefreshKey] = useState(0)
   const [onboarding, setOnboarding] = useState<boolean | null>(null)
   const [settings, setSettings] = useState<any | null>(null)
+  const [ui, setUi] = useState<UiLevelInfo | null>(null)
 
   const loadSettings = useCallback(() => {
     void window.inboxScout.getSettings().then((s) => {
@@ -36,7 +40,13 @@ export default function App(): JSX.Element {
       // Text size for all ages: zoom the whole UI rather than restyling every element.
       ;(document.body.style as any).zoom = ZOOM[s.textSize] ?? '1'
     })
+    void window.inboxScout.uiLevel().then(setUi)
   }, [])
+
+  const goTo = (id: TabId): void => {
+    setTab(id)
+    void window.inboxScout.track('tab', id)
+  }
 
   useEffect(() => {
     loadSettings()
@@ -84,14 +94,21 @@ export default function App(): JSX.Element {
     )
   }
 
-  const tabs = settings.simpleMode ? SIMPLE_TABS : [...SIMPLE_TABS, ...ADVANCED_TABS]
+  // The level decides how much to show; an explicit "advanced tools" choice still works at Standard.
+  const level = ui?.level ?? 'standard'
+  const tabs =
+    level === 'simple'
+      ? SIMPLE_TABS.filter((t) => t.id !== 'people')
+      : level === 'pro' || !settings.simpleMode
+        ? [...SIMPLE_TABS, ...ADVANCED_TABS]
+        : SIMPLE_TABS
 
   return (
-    <div className="layout">
+    <div className={`layout level-${level}`}>
       <nav className="sidebar">
         <div className="brand">📬 InboxScout</div>
         {tabs.map((t) => (
-          <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => setTab(t.id)}>
+          <button key={t.id} className={tab === t.id ? 'active' : ''} onClick={() => goTo(t.id)}>
             {t.label}
           </button>
         ))}
@@ -102,7 +119,20 @@ export default function App(): JSX.Element {
         </button>
       </nav>
       <main className="content">
-        {tab === 'today' && <Today key={`t${refreshKey}`} running={running} onRun={() => void runNow()} />}
+        {ui?.announce && (
+          <div className="success" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+            <span>
+              InboxScout switched to the <strong>{LEVEL_LABEL[ui.level]}</strong> layout — {ui.reasons.slice(0, 2).join(', ')}. {LEVEL_BLURB[ui.level]}
+            </span>
+            <button className="primary" onClick={() => void window.inboxScout.uiAckLevel().then(setUi)}>
+              Sounds good
+            </button>
+            <button className="ghost" onClick={() => void window.inboxScout.uiRevertLevel().then(setUi)}>
+              Keep it the way it was
+            </button>
+          </div>
+        )}
+        {tab === 'today' && <Today key={`t${refreshKey}`} running={running} onRun={() => void runNow()} level={level} />}
         {tab === 'reports' && <Reports key={`r${refreshKey}`} />}
         {tab === 'people' && <People key={`p${refreshKey}`} />}
         {tab === 'setup' && (

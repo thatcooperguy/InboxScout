@@ -18,6 +18,7 @@ export default function Review(): JSX.Element {
   useEffect(load, [])
 
   const correct = async (messageId: string, category: string): Promise<void> => {
+    void window.inboxScout.track('feature', 'correct')
     await window.inboxScout.correctMessage({ messageId, category })
     load()
   }
@@ -27,6 +28,7 @@ export default function Review(): JSX.Element {
       setResults(null)
       return
     }
+    void window.inboxScout.track('feature', 'search')
     setResults(await window.inboxScout.searchMessages(query.trim()))
   }
 

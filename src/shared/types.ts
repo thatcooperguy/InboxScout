@@ -280,6 +280,8 @@ export interface AppSettings {
   schedule: ScheduleSettings
   ai: AiSettings
   simpleMode: boolean
+  /** How much to show: 'auto' lets InboxScout pick Simple / Standard / Pro from how you use it. */
+  uiLevel: 'auto' | 'simple' | 'standard' | 'pro'
   storeFullBodies: boolean
   launchAtLogin: boolean
   reportsDir: string
@@ -338,6 +340,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   schedule: { frequency: 'daily', hour: 7, minute: 30, weekday: 1 },
   ai: { provider: 'builtin', model: '', ollamaBaseUrl: 'http://127.0.0.1:11434/v1', customBaseUrl: '' },
   simpleMode: true,
+  uiLevel: 'auto',
   storeFullBodies: true,
   launchAtLogin: true,
   reportsDir: '',

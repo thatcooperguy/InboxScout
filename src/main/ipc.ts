@@ -23,6 +23,7 @@ import { PROVIDER_PRESETS, testConnection } from './mail/imap'
 import { testProvider, PROVIDER_LABELS, DEFAULT_MODELS, LOCAL_PROVIDERS } from './ai/provider'
 import { PROFILES, PROFILE_GROUPS, PROFILE_LIST, getProfile, type WorkProfile } from './profiles/profiles'
 import { detectNow, dismissSuggestion, readSuggestion } from './profiles/auto'
+import { acknowledgeLevel, evaluateLevel, recordFeature, recordTab, revertLevel } from './usage'
 import { loadCustomSkills, resolveSkills } from './skills/engine'
 import { existsSync, mkdirSync } from 'node:fs'
 import type { AccountConfig, AppSettings } from '../shared/types'
@@ -557,6 +558,25 @@ export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
 
   ipcMain.handle('issues:list', () => repo.listIssues(db, false))
   ipcMain.handle('projects:list', () => repo.listProjects(db, false))
+  // ---- Evolving UI: local usage signals and the Simple / Standard / Pro level ----
+  ipcMain.handle('usage:track', (_e, kind: 'tab' | 'feature', name: string) => {
+    if (kind === 'tab') recordTab(db, String(name).slice(0, 40))
+    else recordFeature(db, String(name).slice(0, 40))
+    return true
+  })
+  ipcMain.handle('ui:level', () => evaluateLevel(db))
+  ipcMain.handle('ui:ackLevel', () => {
+    acknowledgeLevel(db)
+    return evaluateLevel(db)
+  })
+  ipcMain.handle('ui:revertLevel', () => revertLevel(db))
+  ipcMain.handle('ui:setLevel', (_e, setting: AppSettings['uiLevel']) => {
+    const s = loadSettings(db)
+    saveSettings(db, { ...s, uiLevel: ['auto', 'simple', 'standard', 'pro'].includes(setting) ? setting : 'auto' })
+    acknowledgeLevel(db)
+    return evaluateLevel(db)
+  })
+
   // ---- People (your circle) ----
   ipcMain.handle('people:list', () => repo.listPeople(db))
   ipcMain.handle('people:mark', (_e, address: string, how: 'important' | 'quiet' | 'clear') => {

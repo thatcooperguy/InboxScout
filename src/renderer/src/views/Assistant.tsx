@@ -58,6 +58,7 @@ export default function Assistant({ preset }: Props): JSX.Element {
   const busy = status === 'running' || status === 'waiting_user' || status === 'waiting_answer'
 
   const start = async (): Promise<void> => {
+    void window.inboxScout.track('feature', 'assistant')
     setLog([])
     setCaptured({})
     setBanner('')

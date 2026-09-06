@@ -24,6 +24,15 @@ export interface ProfileSuggestion {
   why: string
 }
 
+export interface UiLevelInfo {
+  level: 'simple' | 'standard' | 'pro'
+  setting: 'auto' | 'simple' | 'standard' | 'pro'
+  suggested: 'simple' | 'standard' | 'pro'
+  reasons: string[]
+  announce: boolean
+  previous?: 'simple' | 'standard' | 'pro'
+}
+
 export interface InboxScoutApi {
   getSettings: () => Promise<any>
   setSettings: (settings: unknown) => Promise<any>
@@ -94,6 +103,11 @@ export interface InboxScoutApi {
   listIssues: () => Promise<any[]>
   listProjects: () => Promise<any[]>
   recentMessages: (limit: number) => Promise<any[]>
+  track: (kind: 'tab' | 'feature', name: string) => Promise<boolean>
+  uiLevel: () => Promise<UiLevelInfo>
+  uiAckLevel: () => Promise<UiLevelInfo>
+  uiRevertLevel: () => Promise<UiLevelInfo>
+  uiSetLevel: (setting: 'auto' | 'simple' | 'standard' | 'pro') => Promise<UiLevelInfo>
   listPeople: () => Promise<any[]>
   markPerson: (address: string, how: 'important' | 'quiet' | 'clear') => Promise<boolean>
   searchMessages: (query: string) => Promise<any[]>

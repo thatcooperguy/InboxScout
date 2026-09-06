@@ -2,16 +2,33 @@ import { useEffect, useState } from 'react'
 import { replyMailto } from '../../../shared/mailto'
 import { briefToSpeech } from '../../../shared/speech'
 
+/** "Why am I seeing this?" — one calm sentence per card, on request. */
+function Why({ text }: { text: string }): JSX.Element {
+  const [open, setOpen] = useState(false)
+  return (
+    <span style={{ marginLeft: 'auto', fontWeight: 400 }}>
+      <button className="ghost tiny" aria-label="Why am I seeing this?" title="Why am I seeing this?" onClick={() => setOpen(!open)}>
+        {open ? '✕' : 'ⓘ'}
+      </button>
+      {open && <div className="hint" style={{ fontSize: 13, marginTop: 4, width: '100%' }}>{text}</div>}
+    </span>
+  )
+}
+
 interface Props {
   running: boolean
   onRun: () => void
+  /** Simple: one button and only what needs you. Pro: everything at a glance. */
+  level?: 'simple' | 'standard' | 'pro'
 }
 
 /**
  * The one screen most people need: what needs you, what you're waiting on,
  * what's coming up - and one big button.
  */
-export default function Today({ running, onRun }: Props): JSX.Element {
+export default function Today({ running, onRun, level = 'standard' }: Props): JSX.Element {
+  const simple = level === 'simple'
+  const pro = level === 'pro'
   const [latest, setLatest] = useState<any | null | undefined>(undefined)
   const [accounts, setAccounts] = useState<any[]>([])
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set())
@@ -34,8 +51,9 @@ export default function Today({ running, onRun }: Props): JSX.Element {
       setSpeaking(false)
       return
     }
-    const utter = new SpeechSynthesisUtterance(briefToSpeech(brief))
-    utter.rate = 0.95
+    void window.inboxScout.track('feature', 'voice')
+    const utter = new SpeechSynthesisUtterance(briefToSpeech(brief, { short: simple }))
+    utter.rate = simple ? 0.9 : 0.95
     utter.onend = () => setSpeaking(false)
     window.speechSynthesis.cancel()
     window.speechSynthesis.speak(utter)
@@ -43,15 +61,34 @@ export default function Today({ running, onRun }: Props): JSX.Element {
   }
 
   const exportCsv = async (): Promise<void> => {
+    void window.inboxScout.track('feature', 'export')
     const r = await window.inboxScout.exportCsv()
     setExportMsg(r.ok ? `Saved ${r.filePath}` : r.error ?? '')
   }
   const exportIcs = async (): Promise<void> => {
+    void window.inboxScout.track('feature', 'export')
     const r = await window.inboxScout.exportIcs()
     setExportMsg(r.ok ? `Saved ${r.count} date${r.count === 1 ? '' : 's'} to ${r.filePath} — open it to add them to your calendar.` : r.error ?? '')
   }
+  /** Pro: a plain-text version of the brief for handing to an assistant or pasting into a note. */
+  const copyBrief = async (): Promise<void> => {
+    if (!brief) return
+    void window.inboxScout.track('feature', 'export')
+    const lines: string[] = [brief.headline, '']
+    if (brief.topIssues.length) lines.push('Needs you:', ...brief.topIssues.map((i: any) => `- ${i.title} → ${i.nextStep}`), '')
+    if (brief.waitingOnYou.length) lines.push('Waiting for my reply:', ...brief.waitingOnYou.map((w: string) => `- ${w}`), '')
+    for (const d of brief.schedule?.days ?? []) if (d.events.length) lines.push(`${d.label}:`, ...d.events.map((e: any) => `- ${e.time ? `${e.time} ` : ''}${e.title}`), '')
+    if (promises.length) lines.push('Promises I made:', ...promises.map((p: any) => `- To ${p.to}: ${p.text}${p.due ? ` (by ${new Date(p.due).toDateString()})` : ''}`), '')
+    try {
+      await navigator.clipboard.writeText(lines.join('\n').trim())
+      setExportMsg('Copied — paste it into a note, a message, or hand it to your assistant.')
+    } catch {
+      setExportMsg('Could not copy.')
+    }
+  }
 
   const markDone = async (id: string): Promise<void> => {
+    void window.inboxScout.track('feature', 'done')
     await window.inboxScout.resolveIssue(id)
     setDoneIds((prev) => new Set([...prev, id]))
   }
@@ -96,7 +133,7 @@ export default function Today({ running, onRun }: Props): JSX.Element {
               Last checked {when.toLocaleString()}
             </p>
           )}
-          {inboxes.length > 1 && (
+          {!simple && inboxes.length > 1 && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
               {inboxes.map((ib: any) => (
                 <span key={ib.accountId} className="hint" style={{ border: '1px solid var(--line)', borderRadius: 999, padding: '2px 10px', fontSize: 12.5 }}>
@@ -112,15 +149,24 @@ export default function Today({ running, onRun }: Props): JSX.Element {
           </button>
           {brief && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-              <button className="ghost" onClick={readAloud}>
+              <button className={simple ? 'big-btn' : 'ghost'} style={simple ? { fontSize: 18 } : {}} onClick={readAloud}>
                 {speaking ? '⏹ Stop reading' : '🔊 Read it to me'}
               </button>
-              <button className="ghost" onClick={() => void exportIcs()}>
-                📅 Add dates to calendar
-              </button>
-              <button className="ghost" onClick={() => void exportCsv()}>
-                📄 Export list (CSV)
-              </button>
+              {!simple && (
+                <button className="ghost" onClick={() => void exportIcs()}>
+                  📅 Add dates to calendar
+                </button>
+              )}
+              {pro && (
+                <>
+                  <button className="ghost" onClick={() => void exportCsv()}>
+                    📄 Export list (CSV)
+                  </button>
+                  <button className="ghost" onClick={() => void copyBrief()} title="Copy a plain-text brief to paste anywhere">
+                    📋 Copy for my assistant
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -140,9 +186,9 @@ export default function Today({ running, onRun }: Props): JSX.Element {
         <div className="today-grid">
           {brief.topIssues.length > 0 && (
             <div className="today-card attention">
-              <h3>⚠ Needs you</h3>
+              <h3>⚠ Needs you<Why text="Open items InboxScout found in your mail that seem to need a decision or action from you, most urgent first. Press Done when it is handled." /></h3>
               <ul>
-                {brief.topIssues.map((i: any, idx: number) => (
+                {(simple ? brief.topIssues.slice(0, 3) : brief.topIssues).map((i: any, idx: number) => (
                   <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                     <span>
                       <strong>{i.title}</strong>
@@ -160,9 +206,11 @@ export default function Today({ running, onRun }: Props): JSX.Element {
           )}
           {brief.waitingOnYou.length > 0 && (
             <div className="today-card">
-              <h3>✉ Waiting for your reply</h3>
+              <h3>✉ Waiting for your reply<Why text="Threads where the other person spoke last and it looks like they expect an answer from you." /></h3>
               <ul>
-                {(brief.waitingOnYouDetails?.length ? brief.waitingOnYouDetails : brief.waitingOnYou.map((t: string) => ({ subject: t, counterpart: '', address: '' }))).map(
+                {(brief.waitingOnYouDetails?.length ? brief.waitingOnYouDetails : brief.waitingOnYou.map((t: string) => ({ subject: t, counterpart: '', address: '' })))
+                  .slice(0, simple ? 3 : 50)
+                  .map(
                   (t: any, idx: number) => (
                     <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                       <span>
@@ -185,11 +233,11 @@ export default function Today({ running, onRun }: Props): JSX.Element {
               <p className="hint">Draft reply opens your own mail app with a starter message — you review and send.</p>
             </div>
           )}
-          {promises.length > 0 && (
+          {(simple ? promises.filter((p: any) => p.overdue) : promises).length > 0 && (
             <div className="today-card">
-              <h3>🤝 Promises you made</h3>
+              <h3>🤝 Promises you made<Why text="Sentences in your own sent mail that read like a commitment, with the date you gave. They disappear once you write again in that thread." /></h3>
               <ul>
-                {promises.slice(0, 6).map((p: any, idx: number) => (
+                {(simple ? promises.filter((p: any) => p.overdue) : promises).slice(0, simple ? 2 : 6).map((p: any, idx: number) => (
                   <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                     <span>
                       <strong>
@@ -210,7 +258,7 @@ export default function Today({ running, onRun }: Props): JSX.Element {
           )}
           {scheduleHas ? (
             <div className="today-card">
-              <h3>🗓 This week</h3>
+              <h3>🗓 This week<Why text="Every dated thing across all your inboxes: deadlines, appointments, travel, bills, shifts, and promises — with overlaps and overdue items flagged." /></h3>
               <ul>
                 {schedule.overdue.slice(0, 3).map((o: string, idx: number) => (
                   <li key={`o${idx}`} style={{ color: 'var(--red, #c0392f)' }}>
@@ -218,7 +266,7 @@ export default function Today({ running, onRun }: Props): JSX.Element {
                   </li>
                 ))}
                 {schedule.days
-                  .filter((d: any) => d.events.length)
+                  .filter((d: any) => d.events.length && (!simple || d.label === 'Today' || d.label === 'Tomorrow'))
                   .map((d: any) => (
                     <li key={d.date}>
                       <strong>{d.label}</strong>
@@ -232,7 +280,7 @@ export default function Today({ running, onRun }: Props): JSX.Element {
                       ))}
                     </li>
                   ))}
-                {schedule.recurring.length > 0 && (
+                {!simple && schedule.recurring.length > 0 && (
                   <li>
                     <span className="hint">Regulars: {schedule.recurring.slice(0, 3).join(' · ')}</span>
                   </li>
@@ -242,7 +290,7 @@ export default function Today({ running, onRun }: Props): JSX.Element {
           ) : (
             brief.deadlines.length > 0 && (
               <div className="today-card">
-                <h3>📅 Coming up</h3>
+                <h3>📅 Coming up<Why text="Dates and deadlines InboxScout found in recent mail." /></h3>
                 <ul>
                   {brief.deadlines.map((d: string, idx: number) => (
                     <li key={idx}>{d}</li>
@@ -253,12 +301,12 @@ export default function Today({ running, onRun }: Props): JSX.Element {
           )}
           {circleHas && (
             <div className="today-card">
-              <h3>👥 Your circle</h3>
+              <h3>👥 Your circle<Why text="Learned from who you exchange mail with. Someone going quiet means the silence is well past their usual rhythm." /></h3>
               <ul>
                 {circle.goingQuiet.map((g: string, idx: number) => (
                   <li key={`q${idx}`}>{g}</li>
                 ))}
-                {circle.newFaces.map((n: string, idx: number) => (
+                {(simple ? [] : circle.newFaces).map((n: string, idx: number) => (
                   <li key={`n${idx}`}>{n}</li>
                 ))}
               </ul>
@@ -266,6 +314,7 @@ export default function Today({ running, onRun }: Props): JSX.Element {
           )}
           {(brief.skillSections ?? [])
             .filter((s: any) => s.lines.length > 0)
+            .slice(0, simple ? 2 : 20)
             .map((s: any) => (
               <div className="today-card" key={s.skillId}>
                 <h3>
@@ -278,9 +327,9 @@ export default function Today({ running, onRun }: Props): JSX.Element {
                 </ul>
               </div>
             ))}
-          {brief.pulse.length > 0 && (
+          {!simple && brief.pulse.length > 0 && (
             <div className="today-card">
-              <h3>📊 How things are going</h3>
+              <h3>📊 How things are going<Why text="The projects, deals, jobs, or cases InboxScout is tracking across runs, with what changed most recently." /></h3>
               <ul>
                 {brief.pulse.map((p: any, idx: number) => (
                   <li key={idx}>
@@ -291,9 +340,9 @@ export default function Today({ running, onRun }: Props): JSX.Element {
               </ul>
             </div>
           )}
-          {brief.waitingOnThem.length > 0 && (
+          {!simple && brief.waitingOnThem.length > 0 && (
             <div className="today-card">
-              <h3>⏳ Others owe you a reply</h3>
+              <h3>⏳ Others owe you a reply<Why text="Threads where you spoke last and nobody has answered for a couple of days." /></h3>
               <ul>
                 {brief.waitingOnThem.map((t: string, idx: number) => (
                   <li key={idx}>{t}</li>
@@ -301,9 +350,9 @@ export default function Today({ running, onRun }: Props): JSX.Element {
               </ul>
             </div>
           )}
-          {(brief.resolvedRecently ?? []).length > 0 && (
+          {!simple && (brief.resolvedRecently ?? []).length > 0 && (
             <div className="today-card">
-              <h3>✅ Done recently</h3>
+              <h3>✅ Done recently<Why text="Items you marked Done since the last brief." /></h3>
               <ul>
                 {brief.resolvedRecently.map((r: string, idx: number) => (
                   <li key={idx}>{r}</li>
@@ -311,9 +360,9 @@ export default function Today({ running, onRun }: Props): JSX.Element {
               </ul>
             </div>
           )}
-          {brief.personal.length > 0 && (
+          {!simple && brief.personal.length > 0 && (
             <div className="today-card">
-              <h3>🏠 Personal</h3>
+              <h3>🏠 Personal<Why text="Personal items worth noticing — family, home, health — kept separate from work." /></h3>
               <ul>
                 {brief.personal.map((p: string, idx: number) => (
                   <li key={idx}>{p}</li>
@@ -323,7 +372,7 @@ export default function Today({ running, onRun }: Props): JSX.Element {
           )}
           {brief.sensitiveNotices.length > 0 && (
             <div className="today-card">
-              <h3>🔒 Sensitive items noticed</h3>
+              <h3>🔒 Sensitive items noticed<Why text="A heads-up that a message contains private or company-confidential details. Nothing is hidden or redacted." /></h3>
               <p className="hint">A heads-up only — nothing is hidden.</p>
               <ul>
                 {brief.sensitiveNotices.map((s: string, idx: number) => (

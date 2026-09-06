@@ -11,6 +11,7 @@ import { briefToSpeech } from '../shared/speech'
 import { speakWithOs } from './voice'
 import { latestBrief } from './db/repo'
 import { bridgeBroadcast } from './api/local'
+import { recordRun, recordSession } from './usage'
 
 let db: DB
 let secrets: SecretStore
@@ -51,6 +52,7 @@ async function runNow(trigger: 'manual' | 'scheduled' | 'catchup' | 'cli' = 'man
       const latest = latestBrief(db)
       if (latest) speakWithOs(`Your InboxScout brief is ready. ${briefToSpeech(latest.brief, { short: true })}`)
     }
+    if (!result.error) recordRun(db, result.messagesScanned, result.issueCount)
     broadcast('run:finished', result)
   } finally {
     running = false
@@ -120,6 +122,7 @@ async function bootstrap(): Promise<void> {
     return
   }
 
+  recordSession(db)
   const { agent } = registerIpc({
     db,
     secrets,
