@@ -201,6 +201,46 @@ describe('bridge operations', () => {
     saveSettings(deps.db, { ...DEFAULT_SETTINGS })
   })
 
+  // ---- Reads attachments and photos (v1.5) ----
+  it('lists and reads attachments as read ops; opening one is a write op that needs the desktop', async () => {
+    const { deps } = makeDeps()
+    const ops = buildOps(deps)
+    expect(ops.find((o) => o.name === 'list_attachments')?.write).toBe(false)
+    expect(ops.find((o) => o.name === 'read_attachment')?.write).toBe(false)
+    expect(ops.find((o) => o.name === 'open_attachment')?.write).toBe(true)
+    expect(await runOp(ops, 'list_attachments', { messageId: 'nope' }, true)).toEqual([])
+    expect(await runOp(ops, 'read_attachment', { id: 'nope' }, true)).toBeNull()
+    await expect(runOp(ops, 'list_attachments', {}, true)).rejects.toThrow(/Missing required argument "messageId"/)
+    await expect(runOp(ops, 'open_attachment', { id: 'x' }, true)).rejects.toThrow(/read-only/)
+    // No openPath on a lean host: a plain error, never a crash.
+    await expect(runOp(ops, 'open_attachment', { id: 'x' }, false)).rejects.toThrow(/only available on the computer/)
+    const opened: string[] = []
+    const desktopOps = buildOps({ ...deps, openPath: async (p) => (opened.push(p), '') })
+    await expect(runOp(desktopOps, 'open_attachment', { id: 'x' }, false)).rejects.toThrow(/No such attachment/)
+    expect(opened).toEqual([])
+    // A real attachment: listed without its path, readable with text and facts, openable.
+    const { saveIncoming, extractPending } = await import('../src/main/attachments/index')
+    const { mkdtempSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    repo.insertMessage(deps.db, { id: 'm-1', accountId: 'acc-1', folder: 'INBOX', uid: 1, messageId: '<m1@x>', threadKey: 't', fromAddress: 'a@b.com', fromName: 'A', toAddresses: 'me@x', subject: 'Invoice', date: '2026-09-05T00:00:00.000Z', snippet: '', bodyText: '', fromMe: false, listUnsubscribe: null, hasAttachments: true })
+    const data = new TextEncoder().encode('INVOICE\nAmount due: $450.00\n')
+    saveIncoming(deps.db, mkdtempSync(join(tmpdir(), 'inboxscout-ops-')), { messageId: 'm-1', accountId: 'acc-1', filename: 'invoice.txt', contentType: 'text/plain', size: data.length, data })
+    await extractPending(deps.db, { limit: 5, ocr: false })
+    const listed: any[] = (await runOp(ops, 'list_attachments', { messageId: 'm-1' }, true)) as any[]
+    expect(listed).toHaveLength(1)
+    expect(listed[0]).toMatchObject({ filename: 'invoice.txt', status: 'done', hasFile: true })
+    expect(listed[0]).not.toHaveProperty('path')
+    expect(listed[0]).not.toHaveProperty('text')
+    const read: any = await runOp(ops, 'read_attachment', { id: listed[0].id }, true)
+    expect(read.filename).toBe('invoice.txt')
+    expect(read.text).toContain('$450.00')
+    expect(read.facts.amounts).toContain('$450.00')
+    expect(await runOp(desktopOps, 'open_attachment', { id: listed[0].id }, false)).toEqual({ ok: true, filename: 'invoice.txt' })
+    expect(opened).toHaveLength(1)
+    expect(opened[0]).toMatch(/invoice\.txt$/)
+  })
+
   it('exposes system control as write ops and surfaces a refused popup as consent_denied', async () => {
     const { deps, calls } = makeDeps()
     const ops = buildOps(deps)

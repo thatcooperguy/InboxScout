@@ -1,7 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { PublicClientApplication, type ICachePlugin, type TokenCacheContext } from '@azure/msal-node'
 import type { AccountConfig, MessageRecord, ProviderHints } from '../../shared/types'
+import type { IncomingAttachment } from '../attachments/types'
+import { SyncBudget, shouldKeep } from './attachmentsPolicy'
 import { makeSnippet, threadKeyFor } from './imap'
+import type { FetchedMessage } from './types'
 
 /**
  * Outlook.com / Hotmail / Live via Microsoft Graph.
@@ -170,6 +173,59 @@ const SELECT =
   'id,subject,from,toRecipients,receivedDateTime,sentDateTime,bodyPreview,body,conversationId,internetMessageId,hasAttachments,' +
   'inferenceClassification,importance,isRead,flag'
 
+/** One row of `GET /me/messages/{id}/attachments` (metadata only; bytes come from `/$value`). */
+export interface GraphAttachmentInfo {
+  '@odata.type'?: string
+  id: string
+  name?: string | null
+  contentType?: string | null
+  size?: number | null
+  isInline?: boolean | null
+}
+
+const FILE_ATTACHMENT = '#microsoft.graph.fileattachment'
+
+/**
+ * Download the file attachments of one message that pass the policy and the budgets (v1.5).
+ * Reference and item attachments (links, embedded mails) are skipped. Never throws: a failed
+ * listing returns []; a failed download skips that one file.
+ */
+export async function fetchGraphAttachments(accessToken: string, messageId: string, sync: SyncBudget = new SyncBudget()): Promise<IncomingAttachment[]> {
+  const headers = { Authorization: `Bearer ${accessToken}` }
+  const base = `${GRAPH}/me/messages/${encodeURIComponent(messageId)}/attachments`
+  const out: IncomingAttachment[] = []
+  let list: GraphAttachmentInfo[]
+  try {
+    const res = await fetch(`${base}?$select=id,name,contentType,size,isInline`, { headers })
+    if (!res.ok) return out
+    list = ((await res.json()) as { value?: GraphAttachmentInfo[] }).value ?? []
+  } catch {
+    return out
+  }
+  const budget = sync.forMessage()
+  for (const info of list) {
+    if (budget.exhausted) break
+    if (String(info['@odata.type'] ?? '').toLowerCase() !== FILE_ATTACHMENT) continue
+    const filename = info.name || 'attachment'
+    const contentType = (info.contentType || 'application/octet-stream').toLowerCase()
+    const size = Number(info.size ?? 0)
+    const inline = info.isInline === true
+    if (!shouldKeep({ filename, contentType, size, inline })) continue
+    if (!budget.take(size)) continue
+    try {
+      const res = await fetch(`${base}/${encodeURIComponent(info.id)}/$value`, { headers })
+      if (!res.ok) continue
+      const data = new Uint8Array(await res.arrayBuffer())
+      if (data.byteLength === 0) continue
+      budget.adjust(size, data.byteLength)
+      out.push({ filename, contentType, size: data.byteLength, data, inline: inline || undefined })
+    } catch {
+      // one bad attachment never blocks the message
+    }
+  }
+  return out
+}
+
 /**
  * Fetch messages newer than `sinceMs` (epoch ms) from a well-known folder
  * ("inbox" or "sentitems"). Returns the new watermark.
@@ -179,8 +235,9 @@ export async function syncGraphFolder(
   account: AccountConfig,
   folder: string,
   sinceMs: number,
-  storeFullBodies: boolean
-): Promise<{ messages: MessageRecord[]; lastMs: number }> {
+  storeFullBodies: boolean,
+  budget: SyncBudget = new SyncBudget()
+): Promise<{ messages: FetchedMessage[]; lastMs: number }> {
   const headers = { Authorization: `Bearer ${accessToken}`, Prefer: 'outlook.body-content-type="text"' }
   const dateField = folder === 'sentitems' ? 'sentDateTime' : 'receivedDateTime'
   let url: string
@@ -192,7 +249,8 @@ export async function syncGraphFolder(
   } else {
     url = `${GRAPH}/me/mailFolders/${folder}/messages?$select=${SELECT}&$orderby=${dateField} desc&$top=${Math.min(50, MAX_INITIAL)}`
   }
-  const messages: MessageRecord[] = []
+  const messages: FetchedMessage[] = []
+  const withAttachments: { record: FetchedMessage; graphId: string }[] = []
   let lastMs = sinceMs
   let fetched = 0
   while (url && fetched < MAX_INITIAL) {
@@ -200,12 +258,28 @@ export async function syncGraphFolder(
     if (!res.ok) throw new Error(`Microsoft Graph error ${res.status}: ${(await res.text()).slice(0, 200)}`)
     const page = (await res.json()) as { value: GraphMessage[]; '@odata.nextLink'?: string }
     for (const raw of page.value ?? []) {
-      const m = mapGraphMessage(raw, account, folder, storeFullBodies)
+      const m: FetchedMessage = mapGraphMessage(raw, account, folder, storeFullBodies)
       messages.push(m)
+      if (raw.hasAttachments) withAttachments.push({ record: m, graphId: raw.id })
       lastMs = Math.max(lastMs, new Date(m.date).getTime())
       fetched++
     }
     url = page['@odata.nextLink'] ?? ''
   }
+  // Attachment bytes (v1.5): four messages at a time; never fails the sync.
+  const queue = [...withAttachments]
+  const worker = async (): Promise<void> => {
+    while (queue.length) {
+      const item = queue.shift()!
+      if (budget.exhausted) continue
+      try {
+        const attachments = await fetchGraphAttachments(accessToken, item.graphId, budget)
+        if (attachments.length) item.record.attachments = attachments
+      } catch {
+        // attachments are a bonus; the message itself always goes through
+      }
+    }
+  }
+  await Promise.all([worker(), worker(), worker(), worker()])
   return { messages, lastMs }
 }

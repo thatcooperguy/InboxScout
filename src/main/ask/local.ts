@@ -4,6 +4,10 @@ import { parseLooseDate } from '../reports/exports'
 import { briefToSpeech } from '../../shared/speech'
 import { redactText } from './redact'
 import type { Answer, AskAction, AskSource, Brief, HealthReport, MessageRecord, PromiseLine, ScheduleEvent } from '../../shared/types'
+// Reads attachments (v1.5): "what was in the pdf from Jane?"
+import { attachmentsFor, searchAttachments } from '../attachments/index'
+import type { StoredAttachment } from '../attachments/types'
+import { recentMessageIdsWithAttachments } from '../pipeline/attachments'
 
 /**
  * Conversation (v1.4, Part B): the local answerer. Always runs first and must return in < 2 s:
@@ -11,7 +15,7 @@ import type { Answer, AskAction, AskSource, Brief, HealthReport, MessageRecord, 
  * people, schedule, and promises. Pure code, no network, Electron-free — the built-in engine of "Ask".
  *
  * Intents (first match wins, B2): wrote_back, owe, when_is, waiting, promises, tell, whats_new, from_x,
- * schedule_day, health, read, then the FTS fallback (marked `unsure`).
+ * schedule_day, health, read, attachment (v1.5), then the FTS fallback (marked `unsure`).
  */
 
 export interface LocalDeps {
@@ -37,6 +41,7 @@ export type AskIntent =
   | 'schedule_day'
   | 'health'
   | 'read'
+  | 'attachment'
   | 'fallback'
 
 // ---- Latest brief, cached per run (B6). ----
@@ -200,12 +205,19 @@ const P = {
   from_x: /anything (?:new )?from (.+)|(?:emails?|mails?|messages?|news|word) from (.+)|did (.+?) (?:send|email|write) (?:me )?anything/i,
   schedule_day: /what(?:'s| is| do i have)?(?: on| happening| scheduled| up| planned)?(?: on| for)? (today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|this week|next week)\b/i,
   health: /is (?:anything|something) (?:wrong|broken|off)|why (?:didn'?t|hasn'?t|isn'?t|is not|won'?t|did not|has not)|is it working|are you (?:working|ok|okay)/i,
-  read: /^(?:please )?read (?:it|that|this|the brief|my brief|my mail|it back)(?: to me| aloud| out loud| again)?\s*[.!?]*$|^say (?:it|that) again/i
+  read: /^(?:please )?read (?:it|that|this|the brief|my brief|my mail|it back)(?: to me| aloud| out loud| again)?\s*[.!?]*$|^say (?:it|that) again/i,
+  // Reads attachments (v1.5): "what was in the pdf from Jane?", "what did the invoice say?", "show me the photo from Mom".
+  attachment:
+    /(?:what(?:'s| is| was| does| did)?|show(?: me)?|read(?: me)?|open|summari[sz]e)\s+(?:(?:is |was )?(?:in|inside|on) )?(?:the |that |this |my |her |his |their )?(?:(?:attached|latest|last|new) )?(pdf|attachment|attached file|file|photo|picture|scan|image|document|invoice|form|contract|statement|receipt|spreadsheet|bill)s?(?:\s+(?:say|show|says|showed|contain|contains|about|for))?(?:\s+(?:from|that|by)\s+(.+?))?\s*[?.!]*$/i
 }
+
+/** The file words the attachment intent understands, so a bare "what was in the file?" still routes. */
+export const ATTACHMENT_WORDS = /\b(pdf|attachment|attached file|file|photo|picture|scan|image|document|invoice|form|contract|statement|receipt|spreadsheet|bill)s?\b/i
 
 export function detectIntent(q: string): AskIntent {
   const s = q.trim()
   if (P.read.test(s)) return 'read'
+  if (P.attachment.test(s) && ATTACHMENT_WORDS.test(s)) return 'attachment'
   if (P.wrote_back.test(s)) return 'wrote_back'
   if (P.owe.test(s)) return 'owe'
   if (P.schedule_day.test(s)) return 'schedule_day'
@@ -248,6 +260,8 @@ export async function answerLocally(deps: LocalDeps, question: string): Promise<
       return fromX(ctx, q)
     case 'health':
       return health(ctx)
+    case 'attachment':
+      return attachment(ctx, q)
     default:
       return fallback(ctx, q)
   }
@@ -500,6 +514,82 @@ async function health(ctx: Ctx): Promise<Answer> {
   if (still.length) parts.push(still.map((i) => `• ${i.title}: ${i.detail}`).join('\n'))
   if (fixed.length) parts.push(`Fixed on its own: ${fixed.map((i) => i.fixedBy || i.title).join('; ')}.`)
   return answer(parts.join('\n'), { actions: [{ kind: 'go_to', tab: 'setup', label: 'Open Setup' }] })
+}
+
+// ---- Reads attachments (v1.5): what was in the file ----
+
+/** Attachments that were actually read, newest message first. */
+function readableAttachments(db: DB, messageId: string): StoredAttachment[] {
+  try {
+    return attachmentsFor(db, messageId).filter((a) => a.status === 'done' && (a.summary || a.text))
+  } catch {
+    return []
+  }
+}
+
+function attachmentLine(a: StoredAttachment): string {
+  const facts: string[] = []
+  if (a.facts?.amounts?.length) facts.push(`amounts: ${a.facts.amounts.slice(0, 3).join(', ')}`)
+  if (a.facts?.dates?.length) facts.push(`dates: ${a.facts.dates.slice(0, 3).join(', ')}`)
+  const summary = clip(a.summary || a.text || '', 220)
+  return `${a.filename}: ${summary}${facts.length ? ` (${facts.join('; ')})` : ''}`
+}
+
+function attachment(ctx: Ctx, q: string): Answer {
+  const m = q.match(P.attachment)
+  const kind = (m?.[1] ?? 'file').toLowerCase()
+  const raw = (m?.[2] ?? '').trim().replace(/[?.!]+$/, '').replace(/^(?:the|my|our)\s+/i, '')
+  // The file kind narrows the list when the person named one ("the invoice", "the photo").
+  const kindMatches = (a: StoredAttachment): boolean => {
+    if (/^(?:attachment|attached file|file|document)$/.test(kind)) return true
+    if (/^(?:photo|picture|image|scan)$/.test(kind)) return a.kind === 'image' || /photo|screenshot|scan/i.test(a.facts?.documentType ?? '')
+    if (kind === 'pdf') return /pdf/i.test(a.contentType) || /\.pdf$/i.test(a.filename)
+    if (kind === 'spreadsheet') return /sheet|excel|csv/i.test(a.contentType) || /\.(xlsx?|csv)$/i.test(a.filename)
+    const type = a.facts?.documentType ?? ''
+    return new RegExp(kind === 'bill' ? 'invoice|bill|statement' : kind, 'i').test(`${type} ${a.filename} ${a.summary ?? ''}`)
+  }
+  let candidateIds: string[] = []
+  let who = ''
+  if (raw) {
+    const r = resolvePerson(ctx.db, raw)
+    if (r.kind === 'many') return whichOne(raw, r.people, q)
+    if (r.kind === 'one') {
+      who = r.person.name
+      candidateIds = repo.searchMessagesFrom(ctx.db, r.person.address, 15).map((h) => h.id)
+    }
+    if (candidateIds.length === 0) candidateIds = repo.searchMessagesFrom(ctx.db, raw, 15).map((h) => h.id)
+    if (candidateIds.length === 0) {
+      // Not a person: maybe a topic ("the invoice from the roof job") — search the file text itself.
+      try {
+        candidateIds = searchAttachments(ctx.db, raw, 10).map((h) => h.attachment.messageId)
+      } catch {
+        candidateIds = []
+      }
+    }
+  } else {
+    candidateIds = recentMessageIdsWithAttachments(ctx.db, 20)
+  }
+  const seen = new Set<string>()
+  for (const id of candidateIds) {
+    if (seen.has(id)) continue
+    seen.add(id)
+    const files = readableAttachments(ctx.db, id)
+    const matching = files.filter(kindMatches)
+    const chosen = matching.length ? matching : []
+    if (chosen.length === 0) continue
+    const msg = repo.getMessages(ctx.db, [id])[0]
+    if (!msg) continue
+    const from = who || msg.fromName || msg.fromAddress
+    const lines = chosen.slice(0, 3).map(attachmentLine)
+    const sensitive = repo.getClassifications(ctx.db, [id]).some((c) => c.sensitivity.length > 0)
+    const head = `${chosen.length === 1 ? `The ${kind === 'file' ? 'attachment' : kind}` : `${chosen.length} files`} from ${from} (${sayDate(msg.date, ctx.now)}, "${clip(msg.subject || '(no subject)', 60)}"):`
+    return answer(`${head}\n${lines.map((l) => `• ${l}`).join('\n')}${sensitive ? '\nThis one looks private — open it to read the details.' : ''}`, {
+      sources: [sourceOf(msg, ctx.now)],
+      actions: [{ kind: 'open_message', messageId: msg.id, label: 'Open it' }]
+    })
+  }
+  if (raw && !who && candidateIds.length === 0) return answer(`I can't find a ${kind === 'file' ? 'file' : kind} from "${cap(raw)}".`, { unsure: true })
+  return answer(who ? `I can't see a ${kind === 'file' ? 'file' : kind} from ${who} that I have read.` : `I can't see a ${kind === 'file' ? 'file' : kind} I have read yet.`, { unsure: true })
 }
 
 function readIt(ctx: Ctx): Answer {

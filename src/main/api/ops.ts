@@ -9,6 +9,9 @@ import { recentDetectInput } from '../profiles/auto'
 import type { DesktopControl } from '../desktop/control'
 import type { AccountConfig, Answer, AppSettings, HealthReport } from '../../shared/types'
 import { askAndWait } from '../ask/index'
+// Reads attachments (v1.5)
+import { attachmentText, attachmentsFor } from '../attachments/index'
+import { findAttachment, publicAttachment } from '../pipeline/attachments'
 // Trusted helpers (v1.4, A5)
 import { addHelper, cancelAsk, listHelperLog, listHelpers, maskHelper, pauseAll, removeHelper, scheduleAsk, updateHelper, type HelperDeps } from '../helpers/index'
 
@@ -68,7 +71,15 @@ export interface OpsDeps {
    * 8-second budget. Optional: without it the op answers with the local engine alone (lean hosts, tests).
    */
   ask?: (q: string) => Promise<Answer>
+  /**
+   * Reads attachments (v1.5): open a stored attachment file with the computer's default app (shell.openPath).
+   * Desktop only — absent on lean hosts, and never offered to the phone.
+   */
+  openPath?: (path: string) => Promise<string>
 }
+
+/** read_attachment returns at most this much text; the full text stays searchable in the database. */
+export const READ_ATTACHMENT_MAX_CHARS = 20000
 
 /** Shown in the consent popup so the person knows who is asking. */
 const BRIDGE_REQUESTER = 'Another agent (bridge)'
@@ -194,6 +205,53 @@ export function buildOps(deps: OpsDeps): Op[] {
       write: false,
       input: obj({ id: { type: 'string' } }, ['id']),
       run: (a) => repo.getMessages(db, [String(a.id)])[0] ?? null
+    },
+    // ---- Reads attachments and photos (v1.5) ----
+    {
+      name: 'list_attachments',
+      description: 'Files attached to one message (from search_mail, recent_mail, or read_message): id, filename, kind, summary, facts (amounts, dates, people, documentType), status. Never the file path.',
+      write: false,
+      input: obj({ messageId: { type: 'string' } }, ['messageId']),
+      run: (a) => {
+        try {
+          return attachmentsFor(db, String(a.messageId)).map(publicAttachment)
+        } catch {
+          return []
+        }
+      }
+    },
+    {
+      name: 'read_attachment',
+      description: `What an attached file said, by attachment id: {id, filename, summary, facts, text} with text capped at ${READ_ATTACHMENT_MAX_CHARS} characters. Null when unknown.`,
+      write: false,
+      input: obj({ id: { type: 'string' } }, ['id']),
+      run: (a) => {
+        const id = String(a.id)
+        const att = findAttachment(db, id, { attachmentsFor })
+        if (!att) return null
+        let text = ''
+        try {
+          text = attachmentText(db, id, READ_ATTACHMENT_MAX_CHARS) ?? ''
+        } catch {
+          text = ''
+        }
+        return { id: att.id, messageId: att.messageId, filename: att.filename, kind: att.kind, summary: att.summary, facts: att.facts, status: att.status, text: text.slice(0, READ_ATTACHMENT_MAX_CHARS) }
+      }
+    },
+    {
+      name: 'open_attachment',
+      description: "Open an attached file on the person's computer with the default app for it (desktop only; the file must still be kept — files are cleared after the keep-days setting).",
+      write: true,
+      input: obj({ id: { type: 'string' } }, ['id']),
+      run: async (a) => {
+        if (!deps.openPath) throw new Error('Opening files is only available on the computer InboxScout runs on.')
+        const att = findAttachment(db, String(a.id), { attachmentsFor })
+        if (!att) throw new Error('No such attachment.')
+        if (!att.path) throw new Error('That file was cleared to save space; what it said is still searchable (read_attachment).')
+        const problem = await deps.openPath(att.path)
+        if (problem) throw new Error(problem)
+        return { ok: true, filename: att.filename }
+      }
     },
     {
       name: 'list_reports',

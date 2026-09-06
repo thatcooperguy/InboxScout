@@ -96,6 +96,9 @@ const api = {
   markPerson: (address: string, how: string) => ipcRenderer.invoke('people:mark', address, how),
   searchMessages: (query: string) => ipcRenderer.invoke('messages:search', query),
   correctMessage: (input: unknown) => ipcRenderer.invoke('messages:correct', input),
+  // Reads attachments and photos (v1.5): what the files said, and Open for the ones still kept.
+  listAttachments: (messageIds: string | string[]) => ipcRenderer.invoke('attachments:list', messageIds),
+  openAttachment: (id: string) => ipcRenderer.invoke('attachments:open', id),
 
   // Self-healing (v1.2): quiet health checks, one-button repair, copyable diagnostics.
   healthStatus: () => ipcRenderer.invoke('health:status'),

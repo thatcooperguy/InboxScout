@@ -1,7 +1,7 @@
 import { generateObject, type LanguageModel } from 'ai'
 import type { MessageRecord } from '../../shared/types'
 import type { WorkProfile } from '../profiles/profiles'
-import { classificationBatchSchema, type MessageClassificationOutput } from './schemas'
+import { classificationBatchSchema, type ClassifiableMessage, type MessageClassificationOutput } from './schemas'
 
 export const BATCH_SIZE = 20
 /** Chunks classified at the same time (item 3): ~8 serial calls on a 150-message first sync become ~3 rounds. */
@@ -67,9 +67,13 @@ export interface CorrectionExample {
   category: string
 }
 
+/** Reads attachments (v1.5): the one sentence that tells the model what the `Attachments:` block is. */
+export const ATTACHMENTS_PROMPT_LINE =
+  'Some emails include "Attachments": the contents of files attached to this message — treat amounts, dates, and requests in them as part of the message.'
+
 export function buildClassificationPrompt(
   profile: WorkProfile,
-  messages: MessageRecord[],
+  messages: ClassifiableMessage[],
   corrections: CorrectionExample[],
   promptHints = ''
 ): string {
@@ -88,6 +92,7 @@ export function buildClassificationPrompt(
     'Also flag sensitivity: personal_private for sensitive personal data (financial details, medical, government IDs,',
     'credentials), company_confidential for confidential business information. This is a heads-up flag only.'
   )
+  if (messages.some((m) => m.attachments)) lines.push('', ATTACHMENTS_PROMPT_LINE)
   if (promptHints) lines.push(promptHints)
   if (corrections.length > 0) {
     lines.push('', 'The user has corrected past classifications - follow these precedents:')
@@ -104,6 +109,7 @@ export function buildClassificationPrompt(
       `Date: ${m.date}`,
       ...(m.providerHints ? [`Provider signals: ${describeHints(m.providerHints)}`] : []),
       `Body (truncated): ${m.bodyText.slice(0, 1200)}`,
+      ...(m.attachments ? [`Attachments (contents of the attached files): ${m.attachments.slice(0, 3000)}`] : []),
       ''
     )
   })
@@ -124,7 +130,7 @@ function describeHints(h: NonNullable<MessageRecord['providerHints']>): string {
 export async function classifyBatch(
   model: LanguageModel,
   profile: WorkProfile,
-  messages: MessageRecord[],
+  messages: ClassifiableMessage[],
   corrections: CorrectionExample[],
   promptHints = ''
 ): Promise<Map<string, MessageClassificationOutput>> {

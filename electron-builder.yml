@@ -7,6 +7,10 @@ files:
   - package.json
 asarUnpack:
   - "**/*.node"
+  # Offline OCR (reads photos and scans): the WASM engine, its worker, and the English data must be real files on disk.
+  - "node_modules/tesseract.js/**"
+  - "node_modules/tesseract.js-core/**"
+  - "node_modules/@tesseract.js-data/**"
 win:
   # Stable names so the README's "latest" links never go stale.
   artifactName: InboxScout-Setup.${ext}

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLevel } from '../useLevel'
+import type { AttachmentInfo } from '../../../shared/types'
 
 const CATEGORIES = ['work', 'personal', 'promotions_noise'] as const
 
@@ -37,12 +38,50 @@ export default function Review(): JSX.Element {
   const [accountFilter, setAccountFilter] = useState<string>('all')
   const [accounts, setAccounts] = useState<any[]>([])
   const [lastFix, setLastFix] = useState<LastFix | null>(null)
+  // Reads attachments (v1.5): messageId → the files that were read, for the 📎 lines under each message.
+  const [attachments, setAttachments] = useState<Map<string, AttachmentInfo[]>>(new Map())
+  const [openNote, setOpenNote] = useState('')
 
   const load = (): void => {
     void window.inboxScout.recentMessages(120).then(setMessages)
     void window.inboxScout.listAccounts().then(setAccounts)
   }
   useEffect(load, [])
+
+  // One call for every visible message, not one per row.
+  useEffect(() => {
+    const ids = (results ?? messages).map((m) => m.id).filter((id) => !attachments.has(id))
+    if (ids.length === 0) return
+    let alive = true
+    void window.inboxScout
+      .listAttachments(ids)
+      .then((list) => {
+        if (!alive) return
+        setAttachments((prev) => {
+          const next = new Map(prev)
+          for (const id of ids) if (!next.has(id)) next.set(id, [])
+          for (const a of list) next.set(a.messageId, [...(next.get(a.messageId) ?? []), a])
+          return next
+        })
+      })
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [messages, results]) // `attachments` is deliberately not a dependency: it is what this effect fills in
+
+  const openAttachment = async (a: AttachmentInfo): Promise<void> => {
+    void window.inboxScout.track('feature', 'attachment')
+    const problem = await window.inboxScout.openAttachment(a.id)
+    setOpenNote(problem || `Opened ${a.filename}.`)
+    window.setTimeout(() => setOpenNote(''), 5000)
+  }
+  const attachmentLine = (a: AttachmentInfo): string => {
+    if (a.status === 'done') return a.summary || 'Read, nothing notable.'
+    if (a.status === 'pending') return 'Not read yet.'
+    if (a.status === 'skipped') return a.error || 'Too large to read.'
+    return a.error ? `Could not read it (${a.error}).` : 'Could not read it.'
+  }
 
   const correct = async (m: any, category: string): Promise<void> => {
     void window.inboxScout.track('feature', 'correct')
@@ -179,6 +218,7 @@ export default function Review(): JSX.Element {
         {chip('cold_pitch', screenFilter, setScreenFilter, SCREENING_LABEL.cold_pitch)}
       </div>
       <div role="status" aria-live="polite">
+        {openNote && <div className="hint">{openNote}</div>}
         {lastFix && (
           <div className="success" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <span>
@@ -227,6 +267,19 @@ export default function Review(): JSX.Element {
                       )}
                     </div>
                     <div className="hint">{m.snippet?.slice(0, 140)}</div>
+                    {(attachments.get(m.id) ?? []).map((a) => (
+                      <div key={a.id} className="hint" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }} data-attachment>
+                        <span>
+                          <span aria-hidden="true">📎 </span>
+                          <strong>{a.filename}</strong> — {attachmentLine(a)}
+                        </span>
+                        {a.hasFile && (
+                          <button className="ghost" style={{ minHeight: 32, padding: '4px 10px' }} onClick={() => void openAttachment(a)} title={`Open ${a.filename} with the app for it`}>
+                            Open
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </td>
                   <td>
                     {m.category ? (

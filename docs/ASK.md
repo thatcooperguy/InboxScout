@@ -38,6 +38,7 @@ One function, two engines, behind `ask(deps, question, { onLocal, onAi })` in `s
 | `schedule_day` | What's on Friday? | `brief.schedule.days` by label/date; overlaps flagged |
 | `health` | Is anything wrong? | `healthStatus()` items that are not ok, in their own words |
 | `read` | Read it to me | A `speak` action with the last answer, or the short brief |
+| `attachment` (v1.5) | What was in the pdf from Ron? / What did the invoice say? | People → that sender's newest message with a file that was read (else the newest message with attachments, else FTS over the files' text); the file's summary and facts, *Open it* |
 | fallback | anything else | FTS top 5 (subject, sender, date, snippet ≤ 160 chars), `unsure: true` |
 
 Names resolve against `people.name`, the first token of an address, then senders in the mail (case-insensitive

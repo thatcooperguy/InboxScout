@@ -110,6 +110,9 @@ function RunBar({ progress, level, lastSeconds }: { progress: RunProgress | null
 /** Rows that J/K can walk and D can finish (Standard/Pro). */
 const rowProps = { 'data-row': true, tabIndex: -1 } as const
 
+/** Reads attachments (v1.5): an issue whose facts came from an attached file says so in its sources. */
+export const fromAttachment = (issue: { sources?: string[] }): boolean => (issue.sources ?? []).some((s) => /\battached\b/i.test(s))
+
 /**
  * The one screen most people need: what needs you, who is waiting on you,
  * what's coming up - and one big button. Adapts to the layout level.
@@ -368,6 +371,11 @@ export default function Today({ running, onRun, level = 'standard', status = '',
             <li key={idx} {...rowProps} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
               <span>
                 <strong>{i.title}</strong>
+                {fromAttachment(i) && (
+                  <span className="hint" style={{ marginLeft: 6, fontWeight: 400 }} title="Part of this came from an attached file" aria-label="from an attached file">
+                    📎
+                  </span>
+                )}
                 <div className="next">→ {i.nextStep}</div>
                 {!simple && i.whyNow && <div className="next">Because: {i.whyNow}</div>}
                 {pro && i.sources?.length > 0 && <div className="next">From: {i.sources.slice(0, 2).join('; ')}</div>}

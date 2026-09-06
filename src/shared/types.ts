@@ -356,6 +356,11 @@ export interface AppSettings {
   setupBy: 'me' | 'someone_else' | null
   /** Today shows the "X gets a copy of what needs you" line until this date (ISO); null = nothing to show. */
   helperNoticeUntil: string | null
+  // ---- Reads attachments and photos (v1.5) ----
+  /** Read what is inside attached files and photos (invoices, forms, scans) so it feeds the brief. Off = files are listed, never opened. */
+  readAttachments: 'on' | 'off'
+  /** Keep the attachment files themselves this many days; what they said stays searchable after the file is cleared. */
+  attachmentsKeepDays: number
 }
 
 /** read: look but don't touch; full: also scan, connect accounts, change preferences, and drive the Assistant. */
@@ -412,7 +417,31 @@ export const DEFAULT_SETTINGS: AppSettings = {
   helpers: [],
   helpersPaused: false,
   setupBy: null,
-  helperNoticeUntil: null
+  helperNoticeUntil: null,
+  // Reads attachments and photos (v1.5)
+  readAttachments: 'on',
+  attachmentsKeepDays: 90
+}
+
+// ---- Reads attachments and photos (v1.5): what the renderer, the phone, and the bridge see of an attachment ----
+/** A stored attachment without its file path (the path stays in the main process; "Open" goes through IPC). */
+export interface AttachmentInfo {
+  id: string
+  messageId: string
+  accountId: string
+  filename: string
+  contentType: string
+  size: number
+  kind: 'document' | 'image' | 'other'
+  summary: string | null
+  facts: { amounts: string[]; dates: string[]; people: string[]; documentType: string | null }
+  status: 'pending' | 'done' | 'skipped' | 'failed'
+  via: string | null
+  error: string | null
+  createdAt: string
+  extractedAt: string | null
+  /** True while the file itself is still on disk (it is cleared after `attachmentsKeepDays`; the text stays). */
+  hasFile: boolean
 }
 
 // ---- Conversation (v1.4, Part B): "Ask about your mail…" ----

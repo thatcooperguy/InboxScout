@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { openDatabase } from '../src/main/db/index'
 import * as repo from '../src/main/db/repo'
 import { answerLocally, detectIntent, invalidateAskCache, resolvePerson, sayDate, type LocalDeps } from '../src/main/ask/local'
+import { extractPending, saveIncoming } from '../src/main/attachments/index'
 import type { Brief, HealthReport, MessageRecord } from '../src/shared/types'
 
 /**
@@ -331,6 +335,52 @@ describe('local answerer — pieces', () => {
     expect(sayDate('2026-09-07T08:00:00', NOW)).toBe('tomorrow')
     expect(sayDate('2026-09-01T08:00:00', NOW)).toBe('Tuesday')
     expect(sayDate('2026-08-10T08:00:00', NOW)).toBe('Aug 10')
+  })
+
+  // ---- Reads attachments and photos (v1.5): "what was in the pdf from Ron?" ----
+  it('routes questions about attached files to the attachment intent, and nothing else', () => {
+    for (const q of [
+      'What was in the pdf from Ron?',
+      'What did the invoice say?',
+      "What's in the attachment from Jane Park?",
+      'Show me the photo from Mom',
+      'What is in the file?',
+      'What was in the contract from Jane Ruiz'
+    ]) {
+      expect(detectIntent(q), q).toBe('attachment')
+    }
+    // The twelve original questions keep their intents.
+    expect(detectIntent('Why is the invoice from Acme urgent?')).toBe('fallback')
+    expect(detectIntent('Anything from the bank?')).toBe('from_x')
+    expect(detectIntent('What do I owe this month?')).toBe('owe')
+    expect(detectIntent('Read it to me')).toBe('read')
+  })
+
+  it('answers from a file that was read: summary, facts, the sender, and an Open button', async () => {
+    const deps = fixture()
+    const dir = mkdtempSync(join(tmpdir(), 'inboxscout-ask-'))
+    const body = 'INVOICE #7\nRoof repair — final\nAmount due: $3,200.00\nDue date: Sep 20, 2026\n'
+    const data = new TextEncoder().encode(body)
+    saveIncoming(deps.db, dir, { messageId: 'm-roof-3', accountId: 'acc-1', filename: 'roof-invoice.txt', contentType: 'text/plain', size: data.length, data })
+    deps.db.prepare('UPDATE messages SET has_attachments = 1 WHERE id = ?').run('m-roof-3')
+    await extractPending(deps.db, { limit: 5, ocr: false })
+    // By sender.
+    const a = await timed(deps, 'What was in the invoice from Ron?')
+    expect(a.unsure).toBe(false)
+    expect(a.text).toMatch(/^The invoice from Ron Roofer \(Tuesday, "Roof repair done"\):/)
+    expect(a.text).toContain('roof-invoice.txt')
+    expect(a.text).toContain('$3,200.00')
+    expect(a.sources[0].messageId).toBe('m-roof-3')
+    expect(a.actions[0]).toMatchObject({ kind: 'open_message', messageId: 'm-roof-3' })
+    // No sender: the newest message with attachments.
+    const b = await timed(deps, 'What was in the attachment?')
+    expect(b.text).toContain('roof-invoice.txt')
+    // The wrong kind of file, or a person with none: an honest "can't see".
+    expect((await timed(deps, 'Show me the photo from Ron')).unsure).toBe(true)
+    expect((await timed(deps, 'What was in the pdf from Sam?')).text).toBe("I can't see a pdf from Sam Lee that I have read.")
+    expect((await timed(deps, 'What was in the file from zzz?')).unsure).toBe(true)
+    // Two Janes: the same "which one?" chips as every other intent.
+    expect((await timed(deps, 'What was in the contract from Jane?')).text).toBe('Which Jane — Jane Park or Jane Ruiz?')
   })
 
   it('caches the brief per run and drops it when a new report lands', async () => {

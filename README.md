@@ -69,6 +69,7 @@ The same app shows more as you use more. **Simple** is one big button, three car
 |---|---|
 | 📬 **Reads all your mail, read-only** | Gmail, Yahoo, iCloud, Outlook.com, Hotmail, any IMAP mailbox, several at once. It can never send, delete, or move anything. |
 | 🧠 **Sorts personal from work** | Plus what needs a reply, what's a newsletter, what's a receipt, and a quiet heads-up when something contains sensitive information. |
+| 📎 **Reads attachments and photos** | Opens the PDF, the Word file, the spreadsheet, or the photo of a bill and reads what is inside, so an invoice in an attachment counts like the email itself. Documents are read on your computer; photos go to your AI helper only if it can see images, otherwise a built-in reader does it offline. One switch turns it off. [Attachments →](docs/ATTACHMENTS.md) |
 | 🔎 **Watches for what matters to you** | Bills, appointments, deals, work orders, deliveries, travel, school, health, job search, customer requests, the people you care about. Tick what fits. [Skills →](docs/SKILLS.md) |
 | 🧭 **Knows who you are** | 56 profiles: nurse, contractor, teacher, landlord, retiree, developer, pastor, caregiver, restaurant owner and more. Each tunes what counts as work, what's urgent, and what your brief tracks. [Profiles →](docs/PROFILES.md) |
 | 👥 **Knows your people and your week** | Learns who matters across every inbox, tells you when someone has gone quiet, gathers the week's dates from all your accounts, and remembers what you promised. Nothing to set up. [Insights →](docs/INSIGHTS.md) |

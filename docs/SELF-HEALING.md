@@ -17,6 +17,7 @@ what it cannot, and where to look when you want the details.
 | **Scheduled scans** | On a daily or weekly schedule, the last scan is not more than two periods old. |
 | **Desktop control** | On Linux with system control on, `xdotool` is installed for mouse and keyboard control. |
 | **Disk space** | At least 500 MB is free where InboxScout keeps its data. |
+| **Attachment files** | The attached files InboxScout kept (v1.5) take less than 2 GB and none is older than the keep-days setting. Fix it for me clears the old files; what they said stays searchable. |
 
 Each check gives one item: a short title, a status (`ok`, `warn`, `fail`, or `fixed`), a plain-language
 detail, and whether InboxScout can repair it by itself.
@@ -35,6 +36,8 @@ so InboxScout applies them without asking, then re-checks:
   in the bridge details.
 - **Re-syncing a broken account** from a clean bookmark when its delta sync has gotten stuck.
 - **Retrying the AI helper** when you press Fix it for me, and switching back to it as soon as it answers.
+- **Clearing old attachment files** (v1.5) when they outgrow 2 GB or the keep-days setting — only the files; what
+  they said stays in the database and stays searchable.
 
 A scan that is overdue, a Linux desktop without `xdotool`, and a nearly full disk are reported with the exact step to
 take, since those need a person.

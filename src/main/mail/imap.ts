@@ -1,17 +1,51 @@
 import { ImapFlow } from 'imapflow'
-import { simpleParser } from 'mailparser'
+import { simpleParser, type ParsedMail } from 'mailparser'
 import { createHash, randomUUID } from 'node:crypto'
-import type { AccountConfig, MessageRecord } from '../../shared/types'
+import type { AccountConfig } from '../../shared/types'
+import type { IncomingAttachment } from '../attachments/types'
+import { SyncBudget, shouldKeep } from './attachmentsPolicy'
+import type { FetchedMessage } from './types'
 
 export interface FolderSyncResult {
   folder: string
   uidValidity: number
   lastUid: number
-  messages: MessageRecord[]
+  messages: FetchedMessage[]
 }
 
 const MAX_BODY_CHARS = 20000
 const MAX_INITIAL_MESSAGES = 200
+
+/**
+ * Attachment bytes from a mailparser result that pass the policy and the budgets (v1.5).
+ * Pure; never throws — a part that cannot be read is skipped. Pass one `SyncBudget` per sync;
+ * a per-message budget is drawn from it here.
+ */
+export function attachmentsFromParsed(parsed: Pick<ParsedMail, 'attachments'>, sync: SyncBudget = new SyncBudget()): IncomingAttachment[] {
+  const out: IncomingAttachment[] = []
+  const budget = sync.forMessage()
+  for (const att of parsed.attachments ?? []) {
+    if (budget.exhausted) break
+    try {
+      const data = att.content
+      if (!data || !Buffer.isBuffer(data)) continue
+      const contentType = (att.contentType || 'application/octet-stream').toLowerCase()
+      const inline = att.contentDisposition === 'inline' || att.related === true
+      const filename = att.filename || defaultFilename(contentType, out.length + 1)
+      if (!shouldKeep({ filename, contentType, size: data.length, inline })) continue
+      if (!budget.take(data.length)) continue
+      out.push({ filename, contentType, size: data.length, data: new Uint8Array(data.buffer, data.byteOffset, data.byteLength), inline: inline || undefined })
+    } catch {
+      // one unreadable part never blocks the message
+    }
+  }
+  return out
+}
+
+function defaultFilename(contentType: string, n: number): string {
+  const ext = contentType.split('/')[1]?.split('+')[0]?.replace(/[^a-z0-9]/g, '') || 'bin'
+  return `attachment-${n}.${ext === 'jpeg' ? 'jpg' : ext}`
+}
 
 export function threadKeyFor(subject: string, references: string[], messageId: string): string {
   // Root of the References chain groups a thread; otherwise normalized subject.
@@ -48,7 +82,8 @@ export async function syncFolder(
     auth: { user: account.email, pass: password },
     logger: false
   })
-  const messages: MessageRecord[] = []
+  const messages: FetchedMessage[] = []
+  const budget = new SyncBudget()
   await client.connect()
   try {
     const lock = await client.getMailboxLock(folder, { readOnly: true })
@@ -85,9 +120,11 @@ export async function syncFolder(
         const bodyFull = (parsed.text ?? '').slice(0, MAX_BODY_CHARS)
         const snippet = makeSnippet(bodyFull)
         const listUnsub = parsed.headers.get('list-unsubscribe')
+        const attachments = attachmentsFromParsed(parsed, budget)
         messages.push({
           listUnsubscribe: typeof listUnsub === 'string' ? listUnsub : listUnsub ? String(listUnsub) : null,
           hasAttachments: (parsed.attachments ?? []).length > 0,
+          attachments: attachments.length ? attachments : undefined,
           id: randomUUID(),
           accountId: account.id,
           folder,

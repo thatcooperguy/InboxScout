@@ -1,4 +1,12 @@
 import { z } from 'zod'
+import type { MessageRecord } from '../../shared/types'
+
+/**
+ * Reads attachments and photos (v1.5): the message on its way to the classifier, plus what its attached
+ * files said — file name, what it is, the facts, an excerpt — as plain text (≤ 3 000 chars, built by
+ * `attachmentContext` in src/main/pipeline/attachments.ts). Absent when nothing was attached or read.
+ */
+export type ClassifiableMessage = MessageRecord & { attachments?: string }
 
 export const messageClassificationSchema = z.object({
   index: z.number().int().describe('Index of the message in the presented batch, starting at 0'),

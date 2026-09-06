@@ -6,6 +6,8 @@ import * as repo from '../db/repo'
 import { loadSettings, saveSettings } from '../settings'
 import { getSignin, type SecretsLike } from '../signins'
 import { type HealthCtx, metaSyncFails } from './checks'
+// Reads attachments (v1.5): the file cache the "Attachment files" check measures and clears.
+import { cleanupFiles, storageStats } from '../attachments/index'
 
 /**
  * Self-healing, part 2: the repairs that touch the real world (database, disk,
@@ -145,6 +147,13 @@ export function createHealthContext(w: HealthWiring): HealthCtx {
     resetSync: (id) => void resetSync(w, id),
     reauthAccount: (id) => reauthAccount(w, id),
     // Trusted helpers (v1.4)
-    lastHelperSend: (helperId) => repo.lastHelperSend(w.db, helperId)
+    lastHelperSend: (helperId) => repo.lastHelperSend(w.db, helperId),
+    // Reads attachments (v1.5): files under userData/attachments; the text stays in the database.
+    attachmentStorage: () => storageStats(w.db, w.userData),
+    cleanupAttachments: (days) => {
+      const r = cleanupFiles(w.db, w.userData, days)
+      w.log?.('info', 'attachments', 'cleared old attachment files', { days, ...r })
+      return r
+    }
   }
 }

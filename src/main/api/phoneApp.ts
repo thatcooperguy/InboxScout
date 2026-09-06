@@ -248,7 +248,10 @@ const JS = `
         return '<li class="row" data-idx="' + idx + '"><div class="txt"><div class="title">' + esc(i.title) +
           (i.severity ? '<span class="pill ' + esc(i.severity) + '">' + esc(i.severity) + '</span>' : '') + '</div>' +
           (i.nextStep ? '<div class="next">→ ' + esc(i.nextStep) + '</div>' : '') +
-          (i.whyNow ? '<div class="why">' + esc(i.whyNow) + '</div>' : '') + '<div class="ask-slot"></div></div>' +
+          (i.whyNow ? '<div class="why">' + esc(i.whyNow) + '</div>' : '') +
+          // Reads attachments (v1.5): the source lines that name an attached file, as a small 📎 line.
+          (i.sources || []).filter(function (s) { return /\\battached\\b/i.test(String(s)); }).slice(0, 2).map(function (s) { return '<div class="why">📎 ' + esc(s) + '</div>'; }).join('') +
+          '<div class="ask-slot"></div></div>' +
           '<div class="acts">' +
           (i.issueId ? '<button class="ghost done" data-done="' + esc(i.issueId) + '">Done</button>' : '') +
           (helpers.length && !helpersPaused ? '<button class="ghost" data-ask="' + idx + '">Ask for help</button>' : '') +

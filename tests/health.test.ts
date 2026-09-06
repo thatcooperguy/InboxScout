@@ -96,7 +96,7 @@ describe('health checks', () => {
   it('all green on a healthy app', () => {
     const report = runHealth(fakeCtx().ctx)
     expect(report.ok).toBe(true)
-    expect(report.items.map((i) => i.id)).toEqual(['db', 'reportsDir', 'accounts', 'ai', 'schedule', 'bridge', 'desktop-linux', 'keyring-linux', 'disk', 'helpers'])
+    expect(report.items.map((i) => i.id)).toEqual(['db', 'reportsDir', 'accounts', 'ai', 'schedule', 'bridge', 'desktop-linux', 'keyring-linux', 'disk', 'helpers', 'attachments'])
     expect(report.items.every((i) => i.status === 'ok')).toBe(true)
     expect(report.checkedAt).toBe(NOW.toISOString())
   })
@@ -250,6 +250,37 @@ describe('health checks', () => {
     expect(detect('helpers', fakeCtx({ accounts: () => [] }, { helpers: [sarah], helpersPaused: true })).status).toBe('ok')
     expect(detect('helpers', fakeCtx({ accounts: () => [] }, { helpers: [{ ...sarah, paused: true }] })).status).toBe('ok')
     expect(check('helpers').repair).toBeUndefined()
+  })
+
+  // ---- Reads attachments and photos (v1.5) ----
+  it('attachments: quiet while small and fresh, warns past 2 GB or the keep-days, and the repair clears old files', async () => {
+    const day = 86400000
+    expect(detect('attachments', fakeCtx())).toMatchObject({ status: 'ok', title: 'Attachment files' }) // lean host: nothing to measure
+    expect(detect('attachments', fakeCtx({ attachmentStorage: () => ({ files: 0, bytes: 0, oldestAt: null }) }, { readAttachments: 'off' })).detail).toContain('off')
+    const fresh = fakeCtx({ attachmentStorage: () => ({ files: 12, bytes: 40 * 1024 * 1024, oldestAt: new Date(NOW.getTime() - 30 * day).toISOString() }) })
+    expect(detect('attachments', fresh)).toMatchObject({ status: 'ok' })
+    expect(detect('attachments', fresh).detail).toContain('12 attachment files (40 MB) kept for 90 days')
+    // Too old for the keep-days setting.
+    const cleared: number[] = []
+    const old = fakeCtx({
+      attachmentStorage: () => ({ files: 3, bytes: 5 * 1024 * 1024, oldestAt: new Date(NOW.getTime() - 100 * day).toISOString() }),
+      cleanupAttachments: (days) => {
+        cleared.push(days)
+        return { removed: 2, bytes: 3 * 1024 * 1024 }
+      }
+    })
+    const item = detect('attachments', old)
+    expect(item).toMatchObject({ status: 'warn', canRepair: true })
+    expect(item.detail).toContain('older than the 90 days')
+    expect(item.detail).toContain('what they said stays searchable')
+    expect(await check('attachments').repair!(old.ctx, item)).toBe('Cleared 3 MB of old attachment files; what they said is still searchable')
+    expect(cleared).toEqual([90])
+    // A shorter keep-days setting is honoured; too big is a warning too.
+    const big = fakeCtx({ attachmentStorage: () => ({ files: 900, bytes: 3 * 1024 * 1024 * 1024, oldestAt: new Date(NOW.getTime() - 10 * day).toISOString() }), cleanupAttachments: () => ({ removed: 0, bytes: 0 }) }, { attachmentsKeepDays: 30 })
+    expect(detect('attachments', big).detail).toContain('more than the 2 GB')
+    await expect(check('attachments').repair!(big.ctx, detect('attachments', big))).rejects.toThrow(/older than 30 days/)
+    // Without a cleaner there is nothing to press.
+    expect(detect('attachments', fakeCtx({ attachmentStorage: () => ({ files: 1, bytes: 1, oldestAt: new Date(NOW.getTime() - 400 * day).toISOString() }) })).canRepair).toBe(false)
   })
 
   it('a check that throws becomes a fail item instead of breaking the report', () => {

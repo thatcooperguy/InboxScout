@@ -63,7 +63,9 @@ async function runNow(trigger: 'manual' | 'scheduled' | 'catchup' | 'cli' = 'man
     const result = await runPipeline(db, secrets, trigger, (p) => broadcast('run:progress', p), {
       skillsDir: join(app.getPath('userData'), 'skills'),
       reauthAccount: hooks ? (id) => hooks!.reauthAccount(id) : undefined,
-      log
+      log,
+      // Reads attachments (v1.5): files live under userData/attachments.
+      userDataDir: app.getPath('userData')
     })
     if (result.error) log('error', 'pipeline', `run failed (${trigger})`, { runId: result.runId, error: result.error })
     else log('info', 'pipeline', `run finished (${trigger})`, { runId: result.runId, messages: result.messagesScanned, issues: result.issueCount, notices: result.notices })

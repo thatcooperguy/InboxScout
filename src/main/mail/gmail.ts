@@ -1,8 +1,11 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import type { AccountConfig, MessageRecord, ProviderHints } from '../../shared/types'
+import type { IncomingAttachment } from '../attachments/types'
+import { SyncBudget, shouldKeep } from './attachmentsPolicy'
 import { makeSnippet, threadKeyFor } from './imap'
 import { htmlToText } from './graph'
+import type { FetchedMessage } from './types'
 
 /**
  * Gmail via "Sign in with Google" (OAuth 2.0 for installed apps: browser +
@@ -148,9 +151,81 @@ async function gmailGet(token: string, url: string): Promise<any> {
 
 export interface GmailPart {
   mimeType?: string
-  body?: { data?: string; size?: number }
+  body?: { data?: string; size?: number; attachmentId?: string }
   parts?: GmailPart[]
   filename?: string
+  headers?: { name: string; value: string }[]
+}
+
+/** One attachment part of a Gmail payload, before its bytes are fetched. */
+export interface GmailAttachmentPart {
+  filename: string
+  mimeType: string
+  attachmentId: string
+  size: number
+  inline: boolean
+}
+
+function partHeader(p: GmailPart, name: string): string {
+  return p.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value ?? ''
+}
+
+/** Every part with a filename and an attachment id, in payload order (pure). */
+export function collectAttachmentParts(payload?: GmailPart): GmailAttachmentPart[] {
+  const out: GmailAttachmentPart[] = []
+  const walk = (p?: GmailPart): void => {
+    if (!p) return
+    if (p.filename && p.filename.length > 0 && p.body?.attachmentId) {
+      const disposition = partHeader(p, 'Content-Disposition').trim().toLowerCase()
+      out.push({
+        filename: p.filename,
+        mimeType: (p.mimeType || 'application/octet-stream').toLowerCase(),
+        attachmentId: p.body.attachmentId,
+        size: Number(p.body.size ?? 0),
+        inline: disposition.startsWith('inline') || partHeader(p, 'Content-ID').length > 0
+      })
+    }
+    for (const child of p.parts ?? []) walk(child)
+  }
+  walk(payload)
+  return out
+}
+
+/** Decode an `attachments.get` reply (base64url `data`) to bytes. */
+export function decodeAttachmentData(data?: string): Uint8Array {
+  if (!data) return new Uint8Array(0)
+  const buf = Buffer.from(data, 'base64url')
+  return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength)
+}
+
+/**
+ * Download the attachments of one message that pass the policy and the budgets (v1.5).
+ * One request per attachment; a failed download is skipped and never fails the sync.
+ * The budget is consulted with Gmail's `body.size` before any bytes move.
+ */
+export async function fetchGmailAttachments(
+  token: string,
+  messageId: string,
+  parts: GmailAttachmentPart[],
+  sync: SyncBudget = new SyncBudget()
+): Promise<IncomingAttachment[]> {
+  const out: IncomingAttachment[] = []
+  const budget = sync.forMessage()
+  for (const part of parts) {
+    if (budget.exhausted) break
+    if (!shouldKeep({ filename: part.filename, contentType: part.mimeType, size: part.size, inline: part.inline })) continue
+    if (!budget.take(part.size)) continue
+    try {
+      const reply = await gmailGet(token, `${API}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(part.attachmentId)}`)
+      const data = decodeAttachmentData(reply?.data)
+      if (data.byteLength === 0) continue
+      budget.adjust(part.size, data.byteLength)
+      out.push({ filename: part.filename, contentType: part.mimeType, size: data.byteLength, data, inline: part.inline || undefined })
+    } catch {
+      // one bad attachment never blocks the message
+    }
+  }
+  return out
 }
 
 export interface GmailMessage {
@@ -312,9 +387,20 @@ async function gmailBatch(token: string, ids: string[]): Promise<BatchPart[]> {
   return parseBatchResponse(text, replyBoundary)
 }
 
+/** A mapped message plus the attachment parts still to download (Gmail id needed for `attachments.get`). */
+interface MappedGmailMessage {
+  record: FetchedMessage
+  gmailId: string
+  parts: GmailAttachmentPart[]
+}
+
+function mapForFetch(raw: GmailMessage, account: AccountConfig, storeFullBodies: boolean): MappedGmailMessage {
+  return { record: mapGmailMessage(raw, account, storeFullBodies), gmailId: raw.id, parts: collectAttachmentParts(raw.payload) }
+}
+
 /** The original path: four workers, one `messages.get` each. Still used when a batch cannot be read. */
-async function fetchMessagesOneByOne(token: string, ids: string[], account: AccountConfig, storeFullBodies: boolean): Promise<MessageRecord[]> {
-  const out: MessageRecord[] = []
+async function fetchMessagesOneByOne(token: string, ids: string[], account: AccountConfig, storeFullBodies: boolean): Promise<MappedGmailMessage[]> {
+  const out: MappedGmailMessage[] = []
   const queue = [...ids]
   const worker = async (): Promise<void> => {
     while (queue.length) {
@@ -322,7 +408,7 @@ async function fetchMessagesOneByOne(token: string, ids: string[], account: Acco
       try {
         const raw = (await gmailGet(token, `${API}/messages/${id}?format=full`)) as GmailMessage
         if ((raw.labelIds ?? []).some((l) => SKIP_LABELS.has(l))) continue
-        out.push(mapGmailMessage(raw, account, storeFullBodies))
+        out.push(mapForFetch(raw, account, storeFullBodies))
       } catch {
         // one bad message never blocks the run
       }
@@ -332,13 +418,38 @@ async function fetchMessagesOneByOne(token: string, ids: string[], account: Acco
   return out
 }
 
+/** Download attachment bytes for every mapped message, four messages at a time, then return the records. */
+async function attachAll(token: string, items: MappedGmailMessage[], budget: SyncBudget): Promise<FetchedMessage[]> {
+  const queue = items.filter((it) => it.parts.length > 0)
+  const worker = async (): Promise<void> => {
+    while (queue.length) {
+      const item = queue.shift()!
+      if (budget.exhausted) continue
+      try {
+        const attachments = await fetchGmailAttachments(token, item.gmailId, item.parts, budget)
+        if (attachments.length) item.record.attachments = attachments
+      } catch {
+        // attachments are a bonus; the message itself always goes through
+      }
+    }
+  }
+  await Promise.all([worker(), worker(), worker(), worker()])
+  return items.map((it) => it.record)
+}
+
 /**
  * Batched fetch: 50 `format=full` reads per round trip (a 300-message first sync is 6 requests, not 300).
  * Any batch that fails or cannot be parsed hands its ids to the one-by-one path; a part that answers
  * 404 (message gone) is skipped, any other non-200 part is retried one by one.
  */
-export async function fetchMessages(token: string, ids: string[], account: AccountConfig, storeFullBodies: boolean): Promise<MessageRecord[]> {
-  const out: MessageRecord[] = []
+export async function fetchMessages(
+  token: string,
+  ids: string[],
+  account: AccountConfig,
+  storeFullBodies: boolean,
+  budget: SyncBudget = new SyncBudget()
+): Promise<FetchedMessage[]> {
+  const out: MappedGmailMessage[] = []
   const leftovers: string[] = []
   for (let i = 0; i < ids.length; i += GMAIL_BATCH_SIZE) {
     const group = ids.slice(i, i + GMAIL_BATCH_SIZE)
@@ -364,7 +475,7 @@ export async function fetchMessages(token: string, ids: string[], account: Accou
       try {
         const raw = JSON.parse(part.body) as GmailMessage
         if ((raw.labelIds ?? []).some((l) => SKIP_LABELS.has(l))) return
-        out.push(mapGmailMessage(raw, account, storeFullBodies))
+        out.push(mapForFetch(raw, account, storeFullBodies))
       } catch {
         leftovers.push(id)
       }
@@ -374,7 +485,7 @@ export async function fetchMessages(token: string, ids: string[], account: Accou
     })
   }
   if (leftovers.length) out.push(...(await fetchMessagesOneByOne(token, leftovers, account, storeFullBodies)))
-  return out
+  return attachAll(token, out, budget)
 }
 
 /**
@@ -386,7 +497,7 @@ export async function syncGmail(
   account: AccountConfig,
   historyId: string | null,
   storeFullBodies: boolean
-): Promise<{ messages: MessageRecord[]; historyId: string }> {
+): Promise<{ messages: FetchedMessage[]; historyId: string }> {
   const ids = new Set<string>()
   let newHistoryId = historyId ?? ''
   if (historyId) {

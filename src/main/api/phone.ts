@@ -47,7 +47,10 @@ export const PHONE_OPS = [
   'helper_ask',
   'helper_cancel',
   // Conversation (v1.4, Part B): the box at the top of the phone page. Read-only; one in flight per client.
-  'ask'
+  'ask',
+  // Reads attachments (v1.5): what a file said, never the file itself (open_attachment is desktop only).
+  'list_attachments',
+  'read_attachment'
 ] as const
 
 export const DEFAULT_PHONE_PORT = 47321

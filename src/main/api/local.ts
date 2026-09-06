@@ -142,6 +142,10 @@ const ROUTES: Route[] = [
   { method: 'GET', path: '/v1/search', op: 'search_mail', args: ({ query }) => ({ q: query.get('q') ?? '', limit: Number(query.get('limit')) || undefined }) },
   { method: 'GET', path: '/v1/messages', op: 'recent_mail', args: ({ query }) => ({ limit: Number(query.get('limit')) || undefined }) },
   { method: 'GET', path: '/v1/messages/:id', op: 'read_message' },
+  // Reads attachments (v1.5): what the files said; opening one needs Full access and the desktop.
+  { method: 'GET', path: '/v1/messages/:messageId/attachments', op: 'list_attachments' },
+  { method: 'GET', path: '/v1/attachments/:id', op: 'read_attachment' },
+  { method: 'POST', path: '/v1/attachments/:id/open', op: 'open_attachment' },
   { method: 'GET', path: '/v1/reports', op: 'list_reports', args: ({ query }) => ({ limit: Number(query.get('limit')) || undefined }) },
   { method: 'GET', path: '/v1/reports/:id', op: 'read_report' },
   { method: 'POST', path: '/v1/run', op: 'run_scan' },

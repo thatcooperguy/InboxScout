@@ -5,6 +5,9 @@ import * as repo from '../db/repo'
 import { redact, redactText } from './redact'
 import { wordsMailto } from './local'
 import type { Answer, AskAction, AskSource, Brief } from '../../shared/types'
+// Reads attachments (v1.5): search hits list their files; read_attachment reads one (redacted, ≤ 1500 chars).
+import { attachmentText, attachmentsFor } from '../attachments/index'
+import { findAttachment } from '../pipeline/attachments'
 
 /**
  * Conversation (v1.4, Part B): the AI answerer. Only when `settings.ai.provider !== 'builtin'` and a
@@ -26,12 +29,20 @@ Rules:
 - Do not change settings, accounts, or anything on the computer. You have no tools for that.
 - Today is {today}. The person's name is {ownerName}. Dates in tool results are ISO; say them as weekday + day.`
 
+export interface AttachmentHit {
+  id: string
+  filename: string
+  summary: string | null
+}
+
 export interface MailHit {
   id: string
   subject: string
   from: string
   date: string
   snippet: string
+  /** Reads attachments (v1.5): files attached to this message that were read (empty when none). */
+  attachments?: AttachmentHit[]
 }
 
 export interface AskCtx {
@@ -41,6 +52,8 @@ export interface AskCtx {
   ownerName: string
   searchMail: (ftsQuery: string, limit: number) => MailHit[]
   readMessage: (id: string, chars: number) => { id: string; subject: string; from: string; to: string; date: string; text: string; sensitive: boolean } | null
+  /** Reads attachments (v1.5): one attachment's summary, facts, and the first `chars` of its text. */
+  readAttachment: (id: string, chars: number) => { id: string; messageId: string; filename: string; summary: string | null; facts: unknown; text: string } | null
   compactBrief: () => unknown
   openIssues: () => unknown
   schedule: (day?: string) => unknown
@@ -56,6 +69,15 @@ export function buildAskCtx(db: DB, model: LanguageModel, opts: { now?: Date; ow
   const now = opts.now ?? new Date()
   const ownerName = opts.ownerName || 'the person'
   const latest = (): Brief | null => (repo.latestBrief(db)?.brief as Brief | undefined) ?? null
+  const filesOf = (messageId: string): AttachmentHit[] => {
+    try {
+      return attachmentsFor(db, messageId)
+        .filter((a) => a.status === 'done')
+        .map((a) => ({ id: a.id, filename: a.filename, summary: a.summary }))
+    } catch {
+      return []
+    }
+  }
   return {
     model,
     today: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
@@ -66,8 +88,21 @@ export function buildAskCtx(db: DB, model: LanguageModel, opts: { now?: Date; ow
         subject: String(h.subject ?? ''),
         from: h.from_name ? `${h.from_name} <${h.from_address}>` : String(h.from_address ?? ''),
         date: String(h.date ?? ''),
-        snippet: String(h.snippet ?? '').slice(0, SNIPPET)
+        snippet: String(h.snippet ?? '').slice(0, SNIPPET),
+        attachments: filesOf(h.id)
       })),
+    readAttachment: (id, chars) => {
+      const a = findAttachment(db, id, { attachmentsFor })
+      if (!a) return null
+      const max = Math.min(1500, Math.max(200, chars))
+      let text = ''
+      try {
+        text = attachmentText(db, id, max) ?? ''
+      } catch {
+        text = ''
+      }
+      return { id: a.id, messageId: a.messageId, filename: a.filename, summary: a.summary, facts: a.facts, text: text.slice(0, max) }
+    },
     readMessage: (id, chars) => {
       const m = repo.getMessages(db, [id])[0]
       if (!m) return null
@@ -119,11 +154,11 @@ export function buildAskCtx(db: DB, model: LanguageModel, opts: { now?: Date; ow
   }
 }
 
-/** The eight read-only tools (B3). `toFtsQuery` runs inside searchMessages, so raw words are safe here. */
+/** The nine read-only tools (B3, plus read_attachment in v1.5). `toFtsQuery` runs inside searchMessages, so raw words are safe here. */
 export function askTools(ctx: AskCtx) {
   return {
     search_mail: tool({
-      description: "Full-text search over the person's mail. Returns up to 8 hits: id, subject, from, date, snippet.",
+      description: "Full-text search over the person's mail. Returns up to 8 hits: id, subject, from, date, snippet, and attachments [{id, filename, summary}] for files that were read.",
       inputSchema: z.object({ q: z.string(), limit: z.number().int().min(1).max(8).optional() }),
       execute: async ({ q, limit }) => redact(ctx.searchMail(repo.toFtsQuery(q), limit ?? 8))
     }),
@@ -131,6 +166,11 @@ export function askTools(ctx: AskCtx) {
       description: 'Read one message (first 1500 characters) by id from search_mail.',
       inputSchema: z.object({ id: z.string() }),
       execute: async ({ id }) => redact(ctx.readMessage(id, 1500))
+    }),
+    read_attachment: tool({
+      description: 'Read what an attached file said (summary, facts, first 1500 characters of its text) by attachment id from search_mail.',
+      inputSchema: z.object({ id: z.string() }),
+      execute: async ({ id }) => redact(ctx.readAttachment(id, 1500))
     }),
     get_brief: tool({
       description: 'The latest brief, compact: headline, topIssues (title, nextStep, whyNow), waitingOnYou, deadlines, skill sections.',

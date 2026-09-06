@@ -1,4 +1,4 @@
-import type { Answer, HealthReport, Helper, HelperCadence, HelperLevel, HelperSend } from '../shared/types'
+import type { Answer, AttachmentInfo, HealthReport, Helper, HelperCadence, HelperLevel, HelperSend } from '../shared/types'
 
 export interface BridgeInfo {
   enabled: boolean
@@ -134,6 +134,11 @@ export interface InboxScoutApi {
   markPerson: (address: string, how: 'important' | 'quiet' | 'clear') => Promise<boolean>
   searchMessages: (query: string) => Promise<any[]>
   correctMessage: (input: unknown) => Promise<boolean>
+
+  // Reads attachments and photos (v1.5). One id or many; the result is flat (group by messageId).
+  listAttachments: (messageIds: string | string[]) => Promise<AttachmentInfo[]>
+  /** Opens the stored file with the default app. Resolves to '' when it opened, else a plain-words reason. */
+  openAttachment: (id: string) => Promise<string>
 
   // System control (v1.1). Renderer-side typing added by the UI agent as a last resort so typecheck passes;
   // the preload agent owns the real implementation — if these lines are duplicated after merge, keep one copy.

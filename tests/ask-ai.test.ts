@@ -40,9 +40,10 @@ function ctxWith(model: LanguageModel, d = db()): AskCtx {
 }
 
 describe('ask AI tools', () => {
-  it('exposes exactly the eight read-only tools with zod input schemas', () => {
+  it('exposes exactly the nine read-only tools with zod input schemas', () => {
     const tools = askTools(ctxWith(new MockLanguageModelV2() as unknown as LanguageModel))
-    expect(Object.keys(tools).sort()).toEqual(['draft_reply', 'get_brief', 'get_schedule', 'list_issues', 'list_people', 'list_promises', 'read_message', 'search_mail'])
+    // Eight from v1.4 plus read_attachment (v1.5: reads attachments and photos).
+    expect(Object.keys(tools).sort()).toEqual(['draft_reply', 'get_brief', 'get_schedule', 'list_issues', 'list_people', 'list_promises', 'read_attachment', 'read_message', 'search_mail'])
     for (const t of Object.values(tools)) {
       expect(t.inputSchema).toBeTruthy()
       expect(typeof t.execute).toBe('function')

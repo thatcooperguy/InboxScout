@@ -9,8 +9,9 @@ import type {
   Sensitivity
 } from '../../shared/types'
 import type { WorkProfile } from '../profiles/profiles'
-import type { MessageClassificationOutput } from './schemas'
+import type { ClassifiableMessage, MessageClassificationOutput } from './schemas'
 import type { BriefInputs } from './brief'
+import { attachmentSource, type AttachmentNote } from '../pipeline/attachments'
 
 /**
  * Built-in engine: rule-based classification, issue derivation, and
@@ -44,9 +45,39 @@ const SENSITIVE_COMPANY = /\bconfidential\b|\bnda\b|do not (forward|share|distri
 const DATE_PATTERN =
   /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.? \d{1,2}(?:st|nd|rd|th)?\b|\b\d{1,2}\/\d{1,2}(?:\/\d{2,4})?\b|\btomorrow\b|\bend of (?:day|week|month)\b|\bnext (?:mon|tues|wednes|thurs|fri|satur|sun)day\b|\b(?:mon|tues|wednes|thurs|fri|satur|sun)day\b/i
 
-export function classifyMessageHeuristically(m: MessageRecord, profile: WorkProfile): MessageClassificationOutput {
+// ---- Reads attachments and photos (v1.5): what the built-in engine takes from an attached file's text ----
+const AMOUNT_PATTERN = /(?:\$|USD|€|£)\s?\d[\d,]*(?:\.\d{1,2})?|\b\d[\d,]*(?:\.\d{2})?\s?(?:USD|EUR|GBP|dollars)\b/i
+const BILL_WORDS = /\binvoice\b|\bbill\b|amount due|balance due|total due|\bdue (?:date|by|on)\b|past due|\bstatement\b|\bpayment\b|\breceipt\b|\bpay(?:able)?\b|\bremit/i
+const SENSITIVE_DOCUMENT = /\bw-?2\b|1099\b|tax (?:return|form)|\bpassport\b|driver'?s licen[cs]e|social security|\bssn\b|medical record|diagnosis|prescription|bank statement|routing number|account number|date of birth/i
+
+export interface AttachmentSignals {
+  /** The first money amount seen, e.g. "$450.00". */
+  amount: string | null
+  /** An amount next to bill-ish words: this file is asking for money. */
+  bill: boolean
+  /** A date or deadline phrase seen in the file. */
+  deadline: string | null
+  sensitivity: Sensitivity[]
+}
+
+/** Scan the `attachments` block (file names, facts, excerpts) for money, dates, and private-document words. */
+export function attachmentSignals(text: string | undefined | null): AttachmentSignals {
+  const t = String(text ?? '').slice(0, 6000)
+  if (!t.trim()) return { amount: null, bill: false, deadline: null, sensitivity: [] }
+  const amount = t.match(AMOUNT_PATTERN)?.[0].replace(/\s+/g, '') ?? null
+  const bill = !!amount && BILL_WORDS.test(t)
+  const deadline = t.match(DATE_PATTERN)?.[0] ?? null
+  const sensitivity: Sensitivity[] = []
+  if (SENSITIVE_PERSONAL.test(t) || SENSITIVE_DOCUMENT.test(t)) sensitivity.push('personal_private')
+  if (SENSITIVE_COMPANY.test(t)) sensitivity.push('company_confidential')
+  return { amount, bill, deadline, sensitivity }
+}
+
+export function classifyMessageHeuristically(m: ClassifiableMessage, profile: WorkProfile): MessageClassificationOutput {
   const text = `${m.subject}\n${m.bodyText}`.slice(0, 4000)
   const domain = m.fromAddress.split('@')[1] ?? ''
+  // What the attached files said counts as part of the message (v1.5).
+  const att = attachmentSignals(m.attachments)
 
   const isNoise = NOISE_SENDER.test(m.fromAddress) || NOISE_TEXT.test(text)
   const isTransactional = TRANSACTIONAL.test(text)
@@ -71,9 +102,11 @@ export function classifyMessageHeuristically(m: MessageRecord, profile: WorkProf
   const sensitivity: Sensitivity[] = []
   if (SENSITIVE_PERSONAL.test(text)) sensitivity.push('personal_private')
   if (SENSITIVE_COMPANY.test(text)) sensitivity.push('company_confidential')
+  for (const s of att.sensitivity) if (!sensitivity.includes(s)) sensitivity.push(s)
 
-  const urgent = URGENT.test(text)
-  const important = IMPORTANT.test(text)
+  const urgent = URGENT.test(text) || (att.bill && URGENT.test(m.attachments ?? ''))
+  // An invoice in the PDF is as important as an invoice in the body.
+  const important = IMPORTANT.test(text) || att.bill
   const asksQuestion = /\?/.test(m.subject) || /can you|could you|please (reply|confirm|let me know|advise)|what do you think|are you available/i.test(text)
 
   let screening: Screening
@@ -92,7 +125,8 @@ export function classifyMessageHeuristically(m: MessageRecord, profile: WorkProf
   if (category === 'promotions_noise') importance = 0
 
   const deadlineMatch = category === 'promotions_noise' ? null : text.match(DATE_PATTERN)
-  const deadline = deadlineMatch ? deadlineMatch[0] : null
+  // A due date in the body wins; otherwise the one in the attached file.
+  const deadline = deadlineMatch ? deadlineMatch[0] : category === 'promotions_noise' ? null : att.deadline
   const isActionable = category !== 'promotions_noise' && (importance >= 2 || screening === 'needs_reply')
 
   let actionSummary: string | null = null
@@ -101,7 +135,8 @@ export function classifyMessageHeuristically(m: MessageRecord, profile: WorkProf
       screening === 'needs_reply'
         ? `Reply to ${m.fromName || m.fromAddress} about "${m.subject}"`
         : `Review "${m.subject}" from ${m.fromName || m.fromAddress}`
-    if (deadline) actionSummary += ` (mentions ${deadline})`
+    if (att.bill && att.amount) actionSummary += ` — the attached file shows ${att.amount}${att.deadline ? ` due ${att.deadline}` : ''}`
+    else if (deadline) actionSummary += ` (mentions ${deadline})`
   }
 
   return {
@@ -162,6 +197,29 @@ export function deriveIssues(
 
 const SEVERITY_ORDER: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 }
 
+/**
+ * Reads attachments (v1.5): when an issue's title is the subject of a message whose attached files were read,
+ * say so — "from the attached invoice.pdf" in `sources` and at the end of `whyNow`. Both engines use this
+ * (the built-in brief directly; the AI brief as a safety net after the model answers).
+ */
+export function withAttachmentSources<T extends { title: string; whyNow: string; sources: string[] }>(issues: T[], notes: AttachmentNote[] | undefined): T[] {
+  if (!notes?.length) return issues
+  const byTitle = new Map<string, string[]>()
+  for (const n of notes) {
+    const key = normalizeTitle(n.subject)
+    if (!key) continue
+    byTitle.set(key, [...(byTitle.get(key) ?? []), ...n.filenames])
+  }
+  return issues.map((i) => {
+    const files = byTitle.get(normalizeTitle(i.title))
+    if (!files?.length) return i
+    const source = attachmentSource(files)
+    if (i.sources.some((s) => /\battached\b/i.test(s))) return i
+    const whyNow = /\battached\b/i.test(i.whyNow) ? i.whyNow : `${i.whyNow.replace(/\s*$/, '')} ${source[0].toUpperCase()}${source.slice(1)}.`.trim()
+    return { ...i, whyNow, sources: [...i.sources, source] }
+  })
+}
+
 /** Template brief built purely from tracked data — no AI call. */
 export function buildBasicBrief(inputs: BriefInputs): Brief {
   const { openIssues, projects, personalMessages, sensitiveMessages, deadlines, replies, skillSections } = inputs
@@ -176,14 +234,17 @@ export function buildBasicBrief(inputs: BriefInputs): Brief {
         (urgentCount > 0 ? `, ${urgentCount} high priority — start at the top.` : ' to review when you have a minute.')
   return {
     headline,
-    topIssues: sortedIssues.slice(0, 7).map((i) => ({
-      issueId: i.id,
-      title: i.title,
-      severity: i.severity,
-      whyNow: i.deadline ? `Mentions ${i.deadline}.` : `Flagged ${i.severity} from recent mail.`,
-      nextStep: i.ownerAction ?? 'Open the email and decide.',
-      sources: []
-    })),
+    topIssues: withAttachmentSources(
+      sortedIssues.slice(0, 7).map((i) => ({
+        issueId: i.id,
+        title: i.title,
+        severity: i.severity,
+        whyNow: i.deadline ? `Mentions ${i.deadline}.` : `Flagged ${i.severity} from recent mail.`,
+        nextStep: i.ownerAction ?? 'Open the email and decide.',
+        sources: [] as string[]
+      })),
+      inputs.attachmentNotes
+    ),
     pulse: projects
       .filter((p) => p.state === 'active')
       .slice(0, 8)

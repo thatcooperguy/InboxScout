@@ -28,7 +28,11 @@ import { META_LAST_ATTEMPT_AT } from '../scheduler'
 import { SecretStore, accountSecretName, providerSecretName } from '../secrets'
 import { resolveModel, DEFAULT_MODELS, LOCAL_PROVIDERS } from '../ai/provider'
 import { classifyMessageHeuristically, deriveIssues, buildBasicBrief } from '../ai/builtin'
-import type { MessageClassificationOutput } from '../ai/schemas'
+import type { ClassifiableMessage, MessageClassificationOutput } from '../ai/schemas'
+// Reads attachments and photos (v1.5): the store (Agent 1's module) and the pipeline's plumbing around it.
+import * as attachmentStore from '../attachments/index'
+import type { FetchedMessage } from '../mail/types'
+import { attachmentNotes, buildVision, ingestAttachments, readNewAttachments, supportsVision } from './attachments'
 import {
   applySkillEffects,
   buildSkillSections,
@@ -61,6 +65,8 @@ export interface PipelineOptions {
   reauthAccount?: (accountId: string) => Promise<{ ok: boolean; message: string }>
   /** Diagnostics log (wired by index.ts; silent in tests). */
   log?: (level: 'info' | 'warn' | 'error', area: string, message: string, extra?: unknown) => void
+  /** Reads attachments (v1.5): where attachment files live (`userData/attachments`). Without it, files are listed but never kept or read. */
+  userDataDir?: string
 }
 
 /** Repairs are attempted once a day per account, so a bad night never turns into a loop. */
@@ -136,6 +142,17 @@ export async function runPipeline(
     const newMessages: MessageRecord[] = []
     const syncErrors: string[] = custom.errors.map((e) => `Custom skill problem: ${e}`)
     const accountFailed: { account: (typeof accounts)[number]; message: string; count: number }[] = []
+    // Reads attachments (v1.5): keep the bytes of a new message's files, then drop them from memory.
+    const keepAttachments = settings.readAttachments !== 'off' && !!opts.userDataDir
+    let attachmentsSaved = 0
+    const accept = (fetched: FetchedMessage[]): void => {
+      for (const f of fetched) {
+        const { attachments, ...m } = f
+        if (!repo.insertMessage(db, m)) continue
+        newMessages.push(m)
+        if (keepAttachments && attachments?.length) attachmentsSaved += ingestAttachments(db, opts.userDataDir!, m, attachments, attachmentStore)
+      }
+    }
     for (const account of accounts) {
       // One broken account must never block the others.
       try {
@@ -150,9 +167,7 @@ export async function runPipeline(
           onProgress({ phase: 'fetch', detail: `${account.email} — Gmail` })
           const historyId = repo.getMeta(db, `gmail-history:${account.id}`)
           const result = await syncGmail(tokens.accessToken, account, historyId || null, settings.storeFullBodies)
-          for (const m of result.messages) {
-            if (repo.insertMessage(db, m)) newMessages.push(m)
-          }
+          accept(result.messages)
           if (result.historyId) repo.setMeta(db, `gmail-history:${account.id}`, result.historyId)
           repo.setSyncState(db, account.id, GMAIL_FOLDER, 1, Date.now())
           repo.setMeta(db, metaSyncFails(account.id), '0')
@@ -170,9 +185,7 @@ export async function runPipeline(
             onProgress({ phase: 'fetch', detail: `${account.email} — ${folder}` })
             const state = repo.getSyncState(db, account.id, folder)
             const result = await syncGraphFolder(token, account, folder, state.lastUid, settings.storeFullBodies)
-            for (const m of result.messages) {
-              if (repo.insertMessage(db, m)) newMessages.push(m)
-            }
+            accept(result.messages)
             repo.setSyncState(db, account.id, folder, 1, result.lastMs)
           }
           repo.setMeta(db, metaSyncFails(account.id), '0')
@@ -191,9 +204,7 @@ export async function runPipeline(
             state.lastUid,
             settings.storeFullBodies
           )
-          for (const m of result.messages) {
-            if (repo.insertMessage(db, m)) newMessages.push(m)
-          }
+          accept(result.messages)
           repo.setSyncState(db, account.id, folder, result.uidValidity, result.lastUid)
         }
         repo.setMeta(db, metaSyncFails(account.id), '0')
@@ -234,6 +245,24 @@ export async function runPipeline(
     const accountFailures = syncErrors.length - custom.errors.length
     if (accountFailures === accounts.length && newMessages.length === 0) {
       throw new Error(`Could not check any account. ${syncErrors.join(' | ')}`)
+    }
+
+    // 1c. Reads attachments and photos (v1.5): read what is inside the new files before anything is classified,
+    // so an invoice in a PDF or a bill in a photo counts like the email itself. Documents are read on this
+    // computer; images go to the AI helper only when it can see them, otherwise the built-in reader (OCR).
+    let attachmentContext = new Map<string, string>()
+    let attachmentFiles = new Map<string, string[]>()
+    if (keepAttachments && (attachmentsSaved > 0 || newMessages.some((m) => m.hasAttachments))) {
+      onProgress({ phase: 'classify', detail: attachmentsSaved > 0 ? `Reading ${attachmentsSaved} attachment${attachmentsSaved === 1 ? '' : 's'}…` : 'Reading attachments…' })
+      const vision = model && !aiDown && supportsVision(settings.ai.provider) ? buildVision(model, log) : null
+      const read = await readNewAttachments(db, attachmentStore, { messageIds: newMessages.map((m) => m.id), vision, log, limit: 40 })
+      attachmentContext = read.context
+      attachmentFiles = read.files
+      log('info', 'attachments', `read ${read.done} attachment${read.done === 1 ? '' : 's'}${read.failed ? ` (${read.failed} could not be read)` : ''}`, {
+        saved: attachmentsSaved,
+        withFindings: read.context.size,
+        vision: !!vision
+      })
     }
 
     // 1a. Who is in this person's life (all inboxes). Inner circle counts as important automatically.
@@ -278,12 +307,14 @@ export async function runPipeline(
       }
     }
 
-    // 2. Classify (skip our own sent mail)
-    const toClassify = newMessages.filter((m) => !m.fromMe)
+    // 2. Classify (skip our own sent mail). What the attached files said rides along as plain text (v1.5).
+    const toClassify: ClassifiableMessage[] = newMessages
+      .filter((m) => !m.fromMe)
+      .map((m) => (attachmentContext.has(m.id) ? { ...m, attachments: attachmentContext.get(m.id) } : m))
     onProgress({ phase: 'classify', detail: `Sorting ${toClassify.length} new messages…` })
     const corrections = repo.listCorrections(db, 10)
     const classifications: Classification[] = []
-    const heuristicBatch = (batch: MessageRecord[]): Map<string, MessageClassificationOutput> => {
+    const heuristicBatch = (batch: ClassifiableMessage[]): Map<string, MessageClassificationOutput> => {
       const map = new Map<string, MessageClassificationOutput>()
       for (const m of batch) map.set(m.id, classifyMessageHeuristically(m, profile))
       return map
@@ -292,7 +323,7 @@ export async function runPipeline(
     const obviousNoise = new Set(model ? toClassify.filter(isObviousNoise).map((m) => m.id) : [])
     const forAi = toClassify.filter((m) => !obviousNoise.has(m.id))
     type ChunkResult = { results: Map<string, MessageClassificationOutput>; byRules: boolean }
-    const classifyChunk = async (batch: MessageRecord[]): Promise<ChunkResult> => {
+    const classifyChunk = async (batch: ClassifiableMessage[]): Promise<ChunkResult> => {
       if (!model || aiDown) return { results: heuristicBatch(batch), byRules: true }
       let byRules = false
       const results = await withAiFallback(
@@ -405,7 +436,9 @@ export async function runPipeline(
       replies,
       skillSections,
       promptHints,
-      resolvedRecently
+      resolvedRecently,
+      // Reads attachments (v1.5): lets an issue say "from the attached invoice.pdf".
+      attachmentNotes: attachmentNotes(toClassify, attachmentFiles)
     }
     const brief =
       model && !aiDown

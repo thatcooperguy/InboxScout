@@ -3,6 +3,8 @@ import type { Brief, BriefSection, Classification, IssueRecord, MessageRecord, P
 import type { WorkProfile } from '../profiles/profiles'
 import { briefSchema } from './schemas'
 import type { ReplyTrackerResult } from '../pipeline/replies'
+import type { AttachmentNote } from '../pipeline/attachments'
+import { withAttachmentSources } from './builtin'
 
 export interface BriefInputs {
   profile: WorkProfile
@@ -18,6 +20,8 @@ export interface BriefInputs {
   /** Guidance from enabled skills for the AI. */
   promptHints?: string
   resolvedRecently?: string[]
+  /** Reads attachments (v1.5): messages whose attached files were read this run, so issues can say "from the attached invoice.pdf". */
+  attachmentNotes?: AttachmentNote[]
 }
 
 export function buildBriefPrompt(inputs: BriefInputs): string {
@@ -51,6 +55,10 @@ export function buildBriefPrompt(inputs: BriefInputs): string {
       lines.push(`- "${message.subject}" from ${message.fromName || message.fromAddress} [${classification.sensitivity.join(', ')}]`)
     }
   }
+  if ((inputs.attachmentNotes ?? []).length > 0) {
+    lines.push('', 'Attached files that were read this run (when an issue\'s facts come from one, add "from the attached <file name>" to its sources):')
+    for (const n of inputs.attachmentNotes!.slice(0, 15)) lines.push(`- "${n.subject}": ${n.filenames.slice(0, 3).join(', ')}`)
+  }
   lines.push(
     '',
     'Produce:',
@@ -69,7 +77,7 @@ export async function generateBrief(model: LanguageModel, inputs: BriefInputs): 
   const { object } = await generateObject({ model, schema: briefSchema, prompt })
   return {
     headline: object.headline,
-    topIssues: object.topIssues,
+    topIssues: withAttachmentSources(object.topIssues, inputs.attachmentNotes),
     pulse: object.pulse,
     waitingOnYou: inputs.replies.waitingOnYou.map((t) => `${t.subject} - ${t.counterpart}`),
     waitingOnThem: inputs.replies.waitingOnThem.map((t) => `${t.subject} - ${t.counterpart} (${t.daysWaiting}d)`),

@@ -176,11 +176,52 @@ CREATE TABLE IF NOT EXISTS helper_sends (
 CREATE INDEX IF NOT EXISTS idx_helper_sends_helper ON helper_sends(helper_id, sent_at);
 `
 
+// ---- Reads attachments and photos (v1.5): one row per attached file, text searchable like mail. Additive, never migrated. ----
+// `facts` is JSON ({amounts, dates, people, documentType}); `path` goes null when cleanup deletes the file (row and text stay).
+// External-content FTS5 like messages_fts, plus an UPDATE trigger because text arrives after the row (extraction runs later).
+const ATTACHMENTS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS attachments (
+  id TEXT PRIMARY KEY,
+  message_id TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  filename TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  kind TEXT NOT NULL,
+  path TEXT,
+  text TEXT,
+  summary TEXT,
+  facts TEXT NOT NULL,
+  status TEXT NOT NULL,
+  via TEXT,
+  error TEXT,
+  created_at TEXT NOT NULL,
+  extracted_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_attachments_message ON attachments(message_id);
+
+CREATE VIRTUAL TABLE IF NOT EXISTS attachments_fts USING fts5(
+  filename, text, content='attachments', content_rowid='rowid'
+);
+
+CREATE TRIGGER IF NOT EXISTS attachments_fts_insert AFTER INSERT ON attachments BEGIN
+  INSERT INTO attachments_fts(rowid, filename, text) VALUES (new.rowid, new.filename, new.text);
+END;
+CREATE TRIGGER IF NOT EXISTS attachments_fts_delete AFTER DELETE ON attachments BEGIN
+  INSERT INTO attachments_fts(attachments_fts, rowid, filename, text) VALUES ('delete', old.rowid, old.filename, old.text);
+END;
+CREATE TRIGGER IF NOT EXISTS attachments_fts_update AFTER UPDATE OF filename, text ON attachments BEGIN
+  INSERT INTO attachments_fts(attachments_fts, rowid, filename, text) VALUES ('delete', old.rowid, old.filename, old.text);
+  INSERT INTO attachments_fts(rowid, filename, text) VALUES (new.rowid, new.filename, new.text);
+END;
+`
+
 export function openDatabase(path: string): DB {
   const db = new Database(path)
   db.pragma('journal_mode = WAL')
   db.exec(SCHEMA)
   db.exec(HELPERS_SCHEMA)
+  db.exec(ATTACHMENTS_SCHEMA)
   migrate(db)
   ensureIndexes(db)
   return db

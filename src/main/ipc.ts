@@ -32,7 +32,10 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { CHECKS, runHealth, runRepairs } from './health/checks'
 import { createHealthContext, markAccountHealthy, reauthAccount as repairReauth } from './health/repair'
 import { log, openInFolder, readTail } from './health/diagnostics'
-import type { AccountConfig, AppSettings, HealthReport } from '../shared/types'
+import type { AccountConfig, AppSettings, AttachmentInfo, HealthReport } from '../shared/types'
+// Reads attachments and photos (v1.5)
+import { attachmentsFor } from './attachments/index'
+import { VISION_PROVIDERS, findAttachment, publicAttachment } from './pipeline/attachments'
 // Trusted helpers (v1.4, Part A)
 import { addHelper, cancelAsk, listHelperLog, pauseAll, removeHelper, scheduleAsk, updateHelper, type AskRequest, type HelperDeps, type HelperPatch, type NewHelper } from './helpers/index'
 
@@ -60,7 +63,7 @@ export function registerIpc(ctx: IpcContext): IpcHooks {
   const desktop = new DesktopControl({ db, getWindow: () => BrowserWindow.getAllWindows()[0] ?? null, homeDir: app.getPath('home') })
 
   // ---- Assistant browser (AI-operated browser with guardrails) ----
-  const VISION_PROVIDERS = new Set(['gemini', 'openai', 'anthropic', 'xai', 'openrouter', 'custom'])
+  // VISION_PROVIDERS is shared with the attachment reader (pipeline/attachments.ts) so both decide "can it see images?" the same way.
   const agent = new AgentRunner({
     desktop,
     getModel: async () => {
@@ -318,7 +321,9 @@ export function registerIpc(ctx: IpcContext): IpcHooks {
     setEnabledSkills: (ids) => {
       const s = loadSettings(db)
       saveSettings(db, { ...s, enabledSkillIds: ids })
-    }
+    },
+    // Reads attachments (v1.5): open_attachment on the desktop only.
+    openPath: (path) => shell.openPath(path)
   }
   ipcMain.handle('bridge:info', () => bridgeInfo(bridgeDeps))
   ipcMain.handle('bridge:setEnabled', (_e, enabled: boolean) => {
@@ -757,6 +762,28 @@ export function registerIpc(ctx: IpcContext): IpcHooks {
   ipcMain.handle('messages:correct', (_e, input: { messageId: string; category: string }) => {
     repo.setCorrection(db, input.messageId, input.category, null)
     return true
+  })
+
+  // ---- Reads attachments and photos (v1.5): what the files said, and "Open" for the ones still kept ----
+  ipcMain.handle('attachments:list', (_e, messageIds: string | string[]): AttachmentInfo[] => {
+    const ids = (Array.isArray(messageIds) ? messageIds : [messageIds]).map(String).filter(Boolean).slice(0, 300)
+    const out: AttachmentInfo[] = []
+    for (const id of ids) {
+      try {
+        for (const a of attachmentsFor(db, id)) out.push(publicAttachment(a))
+      } catch {
+        // a missing table on a very old database is not worth breaking the Review screen
+      }
+    }
+    return out
+  })
+  /** Opens the stored file with the default app. Returns '' when it opened, else a plain-words reason. */
+  ipcMain.handle('attachments:open', async (_e, id: string): Promise<string> => {
+    const att = findAttachment(db, String(id), { attachmentsFor })
+    if (!att) return 'That attachment is no longer listed.'
+    if (!att.path) return 'That file was cleared to save space; what it said is still searchable.'
+    const problem = await shell.openPath(att.path)
+    return problem ? `Could not open ${att.filename}: ${problem}` : ''
   })
 
   // ---- Trusted helpers (v1.4, Part A): the person's own screen — full contact details, never masked ----

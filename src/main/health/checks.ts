@@ -68,6 +68,10 @@ export interface HealthCtx {
   reauthAccount: (accountId: string) => Promise<{ ok: boolean; message: string }>
   /** Trusted helpers (v1.4): the newest sent-log row for a helper, so the check can say when the last message failed. Optional for lean hosts. */
   lastHelperSend?: (helperId: string) => HelperSend | null
+  /** Reads attachments (v1.5): how much the attachment files take up and how old the oldest is. Optional for lean hosts. */
+  attachmentStorage?: () => { files: number; bytes: number; oldestAt: string | null }
+  /** Reads attachments (v1.5): delete attachment files (never the text) older than `days`; returns what was freed. */
+  cleanupAttachments?: (days: number) => { removed: number; bytes: number }
 }
 
 export interface Check {
@@ -320,7 +324,39 @@ export const helpersCheck: Check = {
   }
 }
 
-export const CHECKS: Check[] = [dbCheck, reportsDirCheck, accountsCheck, aiCheck, scheduleCheck, bridgeCheck, desktopLinuxCheck, keyringLinuxCheck, diskCheck, helpersCheck]
+// ---- Reads attachments and photos (v1.5): the files are a cache; the text they yielded is what matters ----
+export const ATTACHMENTS_MAX_BYTES = 2 * 1024 * 1024 * 1024
+const MB = 1024 * 1024
+const megabytes = (bytes: number): string => `${Math.max(1, Math.round(bytes / MB))} MB`
+
+export const attachmentsCheck: Check = {
+  id: 'attachments',
+  title: 'Attachment files',
+  detect(ctx) {
+    const s = ctx.settings()
+    if (!ctx.attachmentStorage) return item(this, 'ok', 'Nothing to check here.')
+    const stats = ctx.attachmentStorage()
+    if (stats.files === 0) return item(this, 'ok', s.readAttachments === 'off' ? 'Attachment reading is off; no files are kept.' : 'No attachment files kept yet.')
+    const keepDays = Math.max(1, Math.floor(Number(s.attachmentsKeepDays) || 90))
+    const oldestAge = stats.oldestAt ? ctx.now().getTime() - new Date(stats.oldestAt).getTime() : 0
+    const tooOld = Number.isFinite(oldestAge) && oldestAge > keepDays * 86400000
+    const tooBig = stats.bytes > ATTACHMENTS_MAX_BYTES
+    if (!tooOld && !tooBig) return item(this, 'ok', `${stats.files} attachment file${stats.files === 1 ? '' : 's'} (${megabytes(stats.bytes)}) kept for ${keepDays} days.`)
+    const why = tooBig
+      ? `Attachment files take up ${megabytes(stats.bytes)}, more than the 2 GB InboxScout aims for.`
+      : `Some attachment files are older than the ${keepDays} days you keep them for.`
+    return item(this, 'warn', `${why} Old files can be cleared; what they said stays searchable.`, !!ctx.cleanupAttachments)
+  },
+  async repair(ctx) {
+    if (!ctx.cleanupAttachments) throw new Error('clearing attachment files is not available here')
+    const keepDays = Math.max(1, Math.floor(Number(ctx.settings().attachmentsKeepDays) || 90))
+    const r = ctx.cleanupAttachments(keepDays)
+    if (r.removed === 0) throw new Error(`no attachment files are older than ${keepDays} days; lower "Keep attachment files" in Settings → Advanced to clear more`)
+    return `Cleared ${megabytes(r.bytes)} of old attachment files; what they said is still searchable`
+  }
+}
+
+export const CHECKS: Check[] = [dbCheck, reportsDirCheck, accountsCheck, aiCheck, scheduleCheck, bridgeCheck, desktopLinuxCheck, keyringLinuxCheck, diskCheck, helpersCheck, attachmentsCheck]
 
 // ---- Running them ----
 

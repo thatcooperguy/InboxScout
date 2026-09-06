@@ -228,6 +228,19 @@ describe('phone server', () => {
     expect(PHONE_APP_HTML).toContain('helper_cancel')
   })
 
+  // ---- Reads attachments and photos (v1.5): what a file said, never the file, never "open" ----
+  it('lets the phone list and read attachments but never open one', async () => {
+    expect(PHONE_OPS).toContain('list_attachments')
+    expect(PHONE_OPS).toContain('read_attachment')
+    expect(PHONE_OPS).not.toContain('open_attachment')
+    expect((await post('open_attachment', { id: 'x' })).status).toBe(404)
+    expect(await jsonOf(await call('/api/list_attachments?messageId=nope'))).toEqual([])
+    expect(await jsonOf(await post('read_attachment', { id: 'nope' }))).toBeNull()
+    expect((await post('list_attachments', {})).status).toBe(400)
+    // The Needs-you rows show the attachment source line when the brief carries one.
+    expect(PHONE_APP_HTML).toContain('attached')
+  })
+
   it('cuts old links off with a new code', async () => {
     const old = token()
     regeneratePhoneToken(deps)

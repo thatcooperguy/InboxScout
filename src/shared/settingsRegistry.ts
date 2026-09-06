@@ -154,6 +154,31 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
     kind: 'toggle',
     options: yesNo('On — show them when useful (recommended)', 'Off')
   },
+  // ---- Reads attachments and photos (v1.5) ----
+  {
+    key: 'readAttachments',
+    group: 'looks',
+    label: 'Read attachments and photos',
+    what: 'Opens the files attached to your mail — PDFs, Word files, spreadsheets, and photos or scans — and reads what is inside them, so an invoice in a PDF or a bill in a photo counts just like the email itself. Off means files are listed but never opened.',
+    why: 'On because the important part of many emails is in the attachment, not the message.',
+    who: 'Turn it off if you would rather InboxScout never opened a file.',
+    caution: 'Photos and documents are read on your computer. They go to your AI helper only if you connected one that can see images.',
+    kind: 'select',
+    options: [
+      { value: 'on', label: 'On — read what is inside (recommended)' },
+      { value: 'off', label: 'Off — just list the file names' }
+    ]
+  },
+  {
+    key: 'attachmentsKeepDays',
+    group: 'advanced',
+    label: 'Keep attachment files for this many days',
+    what: 'How long the attached files themselves stay on this computer. After that the files are cleared to save space; what they said stays searchable.',
+    why: 'Ninety days covers most follow-ups without letting the folder grow forever.',
+    kind: 'number',
+    showWhen: (s) => s.readAttachments === 'on',
+    minLevel: 'standard'
+  },
 
   // ---- What I get ----
   {

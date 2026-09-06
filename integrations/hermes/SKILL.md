@@ -1,6 +1,6 @@
 ---
 name: inboxscout
-description: Use InboxScout (the desktop email assistant on this computer) as a tool — read today's brief, list open issues, search and read mail, trigger a scan, connect mailboxes, save sign-ins, notify or speak to the person, drive its Assistant browser to do web chores like creating app passwords, and (with the person's OK via a popup) look at their screen, click and type, open apps and files, run commands, and read or write files in their home folder.
+description: Use InboxScout (the desktop email assistant on this computer) as a tool — read today's brief, list open issues, search and read mail (and what its attached files say), trigger a scan, connect mailboxes, save sign-ins, notify or speak to the person, drive its Assistant browser to do web chores like creating app passwords, and (with the person's OK via a popup) look at their screen, click and type, open apps and files, run commands, and read or write files in their home folder.
 ---
 
 # InboxScout skill for Hermes (and any HTTP- or MCP-capable agent)
@@ -40,6 +40,9 @@ J="content-type: application/json"
 | Find an email | `search_mail {q}` | `GET /search?q=invoice+acme` |
 | Recent mail with classification | `recent_mail {limit}` | `GET /messages?limit=40` |
 | Read one email in full | `read_message {id}` | `GET /messages/{id}` |
+| Files attached to an email, with what each said (summary, facts: amounts, dates, people, document type; never the file path) | `list_attachments {messageId}` | `GET /messages/{messageId}/attachments` |
+| What an attached file said, in full (summary, facts, text ≤ 20 000 chars) | `read_attachment {id}` | `GET /attachments/{id}` |
+| Open an attached file on the person's computer with its default app (Full access; desktop only, and only while the file is still kept) | `open_attachment {id}` | `POST /attachments/{id}/open` |
 | Past briefs | `list_reports`, `read_report {id}` | `GET /reports`, `GET /reports/{id}` |
 | Check email now and rebuild the brief | `run_scan` / `scan_status` | `POST /run` / `GET /run` |
 | Is anything wrong with InboxScout? | `health_check` → `{ok, items[{id, title, status, detail, canRepair, fixedBy?}], recentFixes[]}` | `GET /health` |
