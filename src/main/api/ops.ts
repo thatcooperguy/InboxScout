@@ -7,7 +7,7 @@ import { PROFILES, PROFILE_GROUPS, PROFILE_LIST, getProfile } from '../profiles/
 import { detectProfile } from '../profiles/detect'
 import { recentDetectInput } from '../profiles/auto'
 import type { DesktopControl } from '../desktop/control'
-import type { AccountConfig, AppSettings } from '../../shared/types'
+import type { AccountConfig, AppSettings, HealthReport } from '../../shared/types'
 
 /**
  * Everything another agent may do with InboxScout, as one list of named
@@ -53,6 +53,11 @@ export interface OpsDeps {
   setEnabledSkills: (ids: string[]) => void
   /** Full system control (screen, mouse/keyboard, apps, commands, home-folder files). Each kind may pop up a question for the person. */
   desktop: DesktopControl
+  /** Self-healing: check the app's health / apply the safe automatic repairs. Optional so lean hosts (tests) can skip it. */
+  health?: {
+    status: () => HealthReport | Promise<HealthReport>
+    repair: () => Promise<HealthReport>
+  }
 }
 
 /** Shown in the consent popup so the person knows who is asking. */
@@ -83,6 +88,7 @@ export const SETTINGS_ALLOWLIST: (keyof AppSettings)[] = [
 ]
 
 const obj = (properties: JsonSchema['properties'], required: string[] = []): JsonSchema => ({ type: 'object', properties, required })
+const emptyHealth = (): HealthReport => ({ checkedAt: new Date().toISOString(), ok: true, items: [], recentFixes: [] })
 
 export function buildOps(deps: OpsDeps): Op[] {
   const { db, secrets } = deps
@@ -187,6 +193,20 @@ export function buildOps(deps: OpsDeps): Op[] {
       write: false,
       input: obj({}),
       run: () => ({ running: deps.isRunning(), lastRunAt: loadSettings(db).lastRunAt })
+    },
+    {
+      name: 'health_check',
+      description: 'Is anything wrong with InboxScout? Runs its self-checks (database, reports folder, account syncing, AI helper, schedule, bridge, disk). Items with status warn/fail need attention; "fixed" items were repaired automatically; recentFixes lists what it fixed on its own lately.',
+      write: false,
+      input: obj({}),
+      run: async () => (deps.health ? await deps.health.status() : emptyHealth())
+    },
+    {
+      name: 'health_repair',
+      description: 'Fix what can be fixed automatically (move a blocked reports folder, pick a free bridge port, reset a stale sync, reconnect an account through the Assistant) and re-check. Returns the same shape as health_check.',
+      write: true,
+      input: obj({}),
+      run: async () => (deps.health ? await deps.health.repair() : emptyHealth())
     },
     {
       name: 'list_accounts',
@@ -475,7 +495,7 @@ export function buildOps(deps: OpsDeps): Op[] {
     },
     {
       name: 'desktop_run',
-      description: `Run a shell command on the person's computer (PowerShell on Windows, /bin/sh elsewhere) in the home folder unless cwd is given. Returns {code, stdout, stderr, timedOut}; a non-zero code is returned, not thrown. Dangerous commands (delete, format, shutdown, sudo, payments…) always ask the person. ${POPUP_NOTE}`,
+      description: `Run a shell command on the person's computer (PowerShell on Windows, /bin/sh elsewhere) in the home folder unless cwd is given. Returns {code, stdout, stderr, timedOut}; a non-zero code is returned, not thrown. Dangerous commands (delete, format, shutdown, sudo, payments…) run without asking while the person's Full autonomy choice is on (the default); otherwise they ask every time. ${POPUP_NOTE}`,
       write: true,
       input: obj(
         {

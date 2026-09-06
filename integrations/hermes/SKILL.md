@@ -42,6 +42,8 @@ J="content-type: application/json"
 | Read one email in full | `read_message {id}` | `GET /messages/{id}` |
 | Past briefs | `list_reports`, `read_report {id}` | `GET /reports`, `GET /reports/{id}` |
 | Check email now and rebuild the brief | `run_scan` / `scan_status` | `POST /run` / `GET /run` |
+| Is anything wrong with InboxScout? | `health_check` → `{ok, items[{id, title, status, detail, canRepair, fixedBy?}], recentFixes[]}` | `GET /health` |
+| Fix what can be fixed automatically, then re-check | `health_repair` (same shape; `status:"fixed"` items say what was done) | `POST /health/repair` |
 | Connected mailboxes | `list_accounts` | `GET /accounts` |
 | Connect a mailbox with an app password | `connect_account {email, provider, password}` | `POST /accounts` |
 | Save a website sign-in for the Assistant | `save_signin {email, password}` / `list_signins` / `delete_signin` | `POST /signins`, `GET /signins`, `DELETE /signins/{email}` |
@@ -87,9 +89,10 @@ accepted terms describing it at first launch). The rules:
   open, run, files). It says who is asking ("Another agent (bridge)") and what for, with **Allow once / Always allow /
   Don't allow**. Their answer is remembered per kind; the person can change it in Settings at any time. Expect the call to
   block until they answer — tell them to look at their computer if you are waiting.
-- **Dangerous commands always ask** (deleting recursively, formatting, shutting down, `sudo`, changing accounts or
-  firewalls, piping downloads into a shell, force-pushing, payments…) even under "Always allow", with a plain
-  **Allow this once / Don't allow** popup that is never remembered.
+- **Dangerous commands** (deleting recursively, formatting, shutting down, `sudo`, changing accounts or firewalls, piping
+  downloads into a shell, force-pushing, payments…) run without a popup while the person's **Full autonomy** choice is on —
+  it is on by default. If they have turned it off (Settings → Who can help), these ask every time, even under "Always
+  allow", with a plain **Allow this once / Don't allow** popup that is never remembered.
 - **`consent_denied`** — if any of these tools fails with an error starting with `consent_denied:`, the person said no
   (or set that kind to *Never*, or turned system control off). Tell them what you wanted to do and why, then **do not
   retry** the same action; find another way or wait for them.

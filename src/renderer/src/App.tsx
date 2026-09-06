@@ -36,6 +36,7 @@ export default function App(): JSX.Element {
   const [onboarding, setOnboarding] = useState<boolean | null>(null)
   const [settings, setSettings] = useState<any | null>(null)
   const [ui, setUi] = useState<UiLevelInfo | null>(null)
+  const [lastNotices, setLastNotices] = useState<string[]>([])
 
   const loadSettings = useCallback(() => {
     void window.inboxScout.getSettings().then((s) => {
@@ -91,6 +92,7 @@ export default function App(): JSX.Element {
     const offFinished = window.inboxScout.onRunFinished((r) => {
       setRunning(false)
       setStatus(r.error ? `Problem: ${r.error}` : r.notices?.length ? `Brief ready. ${r.notices[0]}` : 'Brief ready.')
+      setLastNotices(Array.isArray(r.notices) ? r.notices : [])
       setRefreshKey((k) => k + 1)
     })
     return () => {
@@ -176,7 +178,7 @@ export default function App(): JSX.Element {
             </button>
           </div>
         )}
-        {tab === 'today' && <Today key={`t${refreshKey}`} running={running} onRun={() => void runNow()} level={level} status={status} onGoTo={(id) => goTo(id as TabId)} />}
+        {tab === 'today' && <Today key={`t${refreshKey}`} running={running} onRun={() => void runNow()} level={level} status={status} notices={lastNotices} onGoTo={(id) => goTo(id as TabId)} />}
         {tab === 'reports' && <Reports key={`r${refreshKey}`} />}
         {tab === 'people' && <People key={`p${refreshKey}`} />}
         {tab === 'setup' && (

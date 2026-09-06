@@ -159,6 +159,131 @@ function BridgeDetails(): JSX.Element {
   )
 }
 
+type HealthReport = Awaited<ReturnType<typeof window.inboxScout.healthStatus>>
+type HealthItem = HealthReport['items'][number]
+
+/** Status glyphs — never colour alone. */
+const HEALTH_GLYPH: Record<HealthItem['status'], string> = { ok: '✓', warn: '⚠', fail: '✕', fixed: '🔧' }
+const HEALTH_COLOR: Record<HealthItem['status'], string> = {
+  ok: 'var(--good, #2e7d4f)',
+  warn: 'var(--amber, #a6641b)',
+  fail: 'var(--red, #c0392f)',
+  fixed: 'var(--good, #2e7d4f)'
+}
+
+/**
+ * "Health": quiet unless something is wrong or was just fixed. One status line, the items with a glyph each,
+ * one button that applies every safe repair, and the diagnostics under a disclosure. At Simple the whole
+ * section disappears when everything works and shows only the status line + the button when not.
+ */
+function HealthSection({ level }: { level: Level }): JSX.Element {
+  const [report, setReport] = useState<HealthReport | null>(null)
+  const [fixing, setFixing] = useState(false)
+  const [fixed, setFixed] = useState<string[]>([])
+  const [details, setDetails] = useState(false)
+  const [note, setNote] = useState('')
+  useEffect(() => {
+    let alive = true
+    void window.inboxScout
+      .healthStatus()
+      .then((r) => alive && setReport(r))
+      .catch(() => undefined)
+    return () => {
+      alive = false
+    }
+  }, [])
+  if (!report) return <></>
+  const simple = level === 'simple'
+  if (simple && report.ok) return <></>
+
+  const attention = report.items.filter((i) => i.status === 'warn' || i.status === 'fail').length
+  const statusLine = report.ok ? 'Everything is working' : `${attention} thing${attention === 1 ? '' : 's'} need${attention === 1 ? 's' : ''} attention`
+  const canRepair = report.items.some((i) => i.canRepair && (i.status === 'warn' || i.status === 'fail'))
+
+  const repair = async (): Promise<void> => {
+    setFixing(true)
+    setNote('')
+    try {
+      const next = await window.inboxScout.healthRepair()
+      setReport(next)
+      setFixed(next.items.filter((i) => i.fixedBy).map((i) => `${i.title} — ${i.fixedBy}`))
+      if (!next.items.some((i) => i.fixedBy)) setNote(next.ok ? 'Nothing needed fixing.' : 'Some things need you — see the list.')
+    } catch {
+      setNote('Could not run the repairs. Copy the diagnostics and share them with whoever helps you.')
+    } finally {
+      setFixing(false)
+    }
+  }
+  const copyDiagnostics = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(await window.inboxScout.diagnosticsText())
+      setNote('Diagnostics copied — paste them into a message to whoever helps you.')
+    } catch {
+      setNote('Could not copy the diagnostics.')
+    }
+    window.setTimeout(() => setNote(''), 5000)
+  }
+
+  return (
+    <div className="card">
+      <h3>Health</h3>
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span role="status" aria-live="polite" style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600 }}>
+          <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 999, background: report.ok ? 'var(--good, #2e7d4f)' : 'var(--amber, #a6641b)', display: 'inline-block' }} />
+          {statusLine}
+        </span>
+        {(canRepair || (!report.ok && simple)) && (
+          <button className="primary" onClick={() => void repair()} disabled={fixing}>
+            {fixing ? 'Fixing…' : 'Fix it for me'}
+          </button>
+        )}
+        {note && <span className="hint">{note}</span>}
+      </div>
+      {fixed.length > 0 && (
+        <div className="success" role="status" style={{ marginTop: 8 }}>
+          {fixed.map((f) => (
+            <div key={f}>🔧 Fixed: {f}</div>
+          ))}
+        </div>
+      )}
+      {!simple && (
+        <>
+          <ul style={{ listStyle: 'none', padding: 0, margin: '10px 0 0', display: 'grid', gap: 6 }}>
+            {report.items.map((i) => (
+              <li key={i.id} style={{ display: 'grid', gridTemplateColumns: '1.4em 1fr', gap: 6, alignItems: 'baseline', fontSize: 13.5 }}>
+                <span aria-label={i.status} title={i.status} style={{ color: HEALTH_COLOR[i.status], fontWeight: 700 }}>
+                  {HEALTH_GLYPH[i.status]}
+                </span>
+                <span>
+                  <strong>{i.title}</strong>
+                  {i.detail && <div className="hint">{i.detail}</div>}
+                  {i.fixedBy && <div className="hint">Fixed: {i.fixedBy}</div>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <div style={{ marginTop: 10 }}>
+            <button className="ghost tiny" aria-expanded={details} onClick={() => setDetails(!details)}>
+              Details {details ? '▾' : '▸'}
+            </button>
+            {details && (
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 6 }}>
+                <button className="ghost" onClick={() => void copyDiagnostics()}>
+                  Copy diagnostics
+                </button>
+                <button className="ghost" onClick={() => void window.inboxScout.diagnosticsOpen()}>
+                  Show the log file
+                </button>
+                <span className="hint">Last checked {new Date(report.checkedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}.</span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 interface Props {
   onSaved?: () => void
 }
@@ -433,6 +558,7 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
           </div>
         )
       })}
+      {!query && <HealthSection level={level} />}
       {visible.length === 0 && query && <div className="empty">Nothing matches “{query}”. Try another word, like “voice” or “schedule”.</div>}
       <p className="hint">Changes are saved as you make them.</p>
     </div>

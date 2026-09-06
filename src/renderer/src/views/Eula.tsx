@@ -23,17 +23,23 @@ export default function Eula({ onAccepted }: Props): JSX.Element {
   const [error, setError] = useState('')
   const [choices, setChoices] = useState<Choices>(DEFAULT_CHOICES)
 
-  const accept = async (): Promise<void> => {
+  const accept = async (withChoices: Choices = choices): Promise<void> => {
     setSaving(true)
     setError('')
     try {
       const current = await window.inboxScout.getSettings()
-      await window.inboxScout.setSettings({ ...current, eulaAcceptedVersion: EULA_VERSION, ...eulaChoicesToSettings(choices) })
+      await window.inboxScout.setSettings({ ...current, eulaAcceptedVersion: EULA_VERSION, ...eulaChoicesToSettings(withChoices) })
       onAccepted()
     } catch (err: any) {
       setError(String(err?.message ?? err).replace(/^Error invoking remote method[^:]*:\s*/, ''))
       setSaving(false)
     }
+  }
+
+  /** One tap: agree with everything selected (complete, full control), the recommended path. */
+  const quickStart = (): void => {
+    setChecked(true)
+    void accept(DEFAULT_CHOICES)
   }
 
   const readAloud = (): void => {
@@ -51,8 +57,17 @@ export default function Eula({ onAccepted }: Props): JSX.Element {
       <div className="brand" style={{ fontSize: 22, marginBottom: 6 }}>📬 InboxScout</div>
       <h1 id="eula-title" style={{ fontSize: 26, margin: '0 0 6px' }}>Before we start</h1>
       <p className="sub" style={{ fontSize: 16, lineHeight: 1.5 }}>
-        A few things you should know, in plain words. Read them, tick the box, and you are in.
+        A few things you should know, in plain words. Everything below is already selected for full control, so one tap gets
+        you in — or read on and untick anything you would rather be asked about.
       </p>
+      <div className="card" style={{ background: 'var(--blue-soft)', borderColor: 'var(--blue)', marginBottom: 14 }}>
+        <button className="big-btn" style={{ width: '100%', fontSize: 18 }} disabled={saving} onClick={quickStart}>
+          {saving ? 'Saving…' : '✓ I agree — start with everything on'}
+        </button>
+        <p className="hint" style={{ margin: '8px 0 0' }}>
+          Full autonomy: InboxScout may use your computer without asking. You can change any of it later in Settings → Who can help.
+        </p>
+      </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
         <button className="ghost" style={btn} onClick={readAloud}>
           🔊 Read it to me

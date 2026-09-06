@@ -41,11 +41,23 @@ With **Full** access, Hermes also gets the desktop and file tools: `desktop_scre
 (REST: `/v1/desktop/...` and `/v1/files/...`). They go through the same gate as InboxScout's own Assistant:
 the **first time each kind of thing happens, a popup appears on the person's screen** naming Hermes and the
 exact action, with *Allow once / Always allow / Don't allow*; the answer is remembered per kind. Dangerous
-commands (deleting, formatting, shutdown, passwords, `sudo`, payments) **always** ask, and files stay inside
+commands (deleting, formatting, shutdown, passwords, `sudo`, payments) ask unless the full-autonomy choice is on
+(it is on by default; the person turns it off in *Settings → Who can help*), and files stay inside
 the home folder with secret folders (`.ssh`, `.gnupg`, cloud credentials, keychains) off-limits. Expect a
 `consent_denied` error when the person says no — tell them what you wanted and why, and do not retry in a loop.
 The person can turn the whole thing off under *Preferences → Who can help → Let InboxScout use my computer*,
 in which case these tools disappear. Details in `docs/SYSTEM-CONTROL.md`.
+
+## Health (v1.2)
+
+InboxScout looks after itself: before every scan it checks its accounts, AI helper, reports folder, database,
+bridge port, and schedule, and repairs what it safely can. Hermes can ask and help too:
+
+- `health_check` (REST `GET /v1/health`) — the current report: `{ ok, checkedAt, items: [{ id, title, status, detail, canRepair, fixedBy? }], recentFixes }`. `status` is `ok`, `warn`, `fail`, or `fixed`.
+- `health_repair` (REST `POST /v1/health/repair`) — runs every safe automatic repair and returns the refreshed report. Nothing here needs a popup; it only does what InboxScout would do on its own.
+
+If an item stays `warn`/`fail` with `canRepair: false`, read its `detail` to the person in plain words — it
+already says what they need to do. Details in `docs/SELF-HEALING.md`.
 
 The bridge speaks plain HTTP + JSON with a bearer token and publishes an OpenAPI description at
 `/v1/openapi.json`, so the same setup works for OpenClaw-style agents, LangChain tools, or a shell script.

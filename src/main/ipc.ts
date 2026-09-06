@@ -27,7 +27,10 @@ import { detectNow, dismissSuggestion, readSuggestion } from './profiles/auto'
 import { acknowledgeLevel, evaluateLevel, recordFeature, recordTab, revertLevel } from './usage'
 import { loadCustomSkills, resolveSkills } from './skills/engine'
 import { existsSync, mkdirSync } from 'node:fs'
-import type { AccountConfig, AppSettings } from '../shared/types'
+import { CHECKS, runHealth, runRepairs } from './health/checks'
+import { createHealthContext, markAccountHealthy, reauthAccount as repairReauth } from './health/repair'
+import { log, openInFolder, readTail } from './health/diagnostics'
+import type { AccountConfig, AppSettings, HealthReport } from '../shared/types'
 
 export interface IpcContext {
   db: DB
@@ -38,7 +41,15 @@ export interface IpcContext {
   broadcast: (channel: string, payload: unknown) => void
 }
 
-export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
+export interface IpcHooks {
+  agent: AgentRunner
+  /** Self-healing: check everything and apply the safe fixes. index.ts calls it after every finished run. */
+  afterRun: () => Promise<HealthReport>
+  /** Self-healing: get a fresh app password for an account whose sign-in stopped working (used by the pipeline). */
+  reauthAccount: (accountId: string) => Promise<{ ok: boolean; message: string }>
+}
+
+export function registerIpc(ctx: IpcContext): IpcHooks {
   const { db, secrets } = ctx
 
   // ---- Full system control (screen, mouse/keyboard, apps, commands, home-folder files), gated by popups ----
@@ -74,10 +85,13 @@ export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
     if (!recipe) return ''
     if (recipe.captures === 'appPassword' && captured.appPassword && params.email) {
       const preset = PROVIDER_PRESETS[recipe.provider ?? 'imap']
-      const account: AccountConfig = {
+      const email = params.email.trim()
+      // Reconnecting an account that already exists (self-healing) keeps its id, folders, and history.
+      const existing = repo.listAccounts(db).find((a) => a.email.toLowerCase() === email.toLowerCase() && a.provider === (recipe.provider ?? 'imap'))
+      const account: AccountConfig = existing ?? {
         id: randomUUID(),
-        label: params.email,
-        email: params.email.trim(),
+        label: email,
+        email,
         provider: recipe.provider ?? 'imap',
         host: preset.host,
         port: preset.port,
@@ -87,7 +101,9 @@ export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
       await testConnection(account, captured.appPassword)
       repo.upsertAccount(db, account)
       secrets.set(accountSecretName(account.id), captured.appPassword)
-      return `✅ ${params.email} is connected. You're all set.`
+      markAccountHealthy(db, account.id)
+      log('info', 'health', existing ? 'account reconnected with a fresh app password' : 'account connected by the Assistant', { accountId: account.id })
+      return existing ? `✅ ${email} is reconnected and working again.` : `✅ ${email} is connected. You're all set.`
     }
     if (recipe.captures === 'googleClient' && captured.googleClientId) {
       const s = loadSettings(db)
@@ -183,6 +199,40 @@ export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
     const enabledIds = new Set(enabled.map((s) => s.id))
     return all.map((s) => ({ id: s.id, name: s.name, description: s.description, enabled: enabledIds.has(s.id), builtin: !s.custom }))
   }
+  // ---- Self-healing: quiet checks, automatic repairs, diagnostics ----
+  const userData = app.getPath('userData')
+  const probeAi = async (): Promise<{ ok: boolean; error?: string }> => {
+    const s = loadSettings(db)
+    if (s.ai.provider === 'builtin') return { ok: true }
+    return testProvider(s.ai, secrets.get(providerSecretName(s.ai.provider)) ?? '')
+  }
+  const repairDeps = { db, secrets, userData, startAgent, log }
+  const reauthAccount = (accountId: string): Promise<{ ok: boolean; message: string }> => repairReauth(repairDeps, accountId)
+  const healthCtx = createHealthContext({
+    ...repairDeps,
+    bridgeRunning: () => bridgeInfo(bridgeDeps).running,
+    syncBridge: () => syncBridge(bridgeDeps),
+    probeAi
+  })
+  const healthStatus = (): HealthReport => runHealth(healthCtx, CHECKS)
+  const healthRepair = async (): Promise<HealthReport> => {
+    const report = await runRepairs(healthCtx, CHECKS)
+    const fixed = report.items.filter((i) => i.status === 'fixed')
+    const wrong = report.items.filter((i) => i.status === 'warn' || i.status === 'fail')
+    if (fixed.length || wrong.length) {
+      log(wrong.length ? 'warn' : 'info', 'health', `checked: ${fixed.length} fixed, ${wrong.length} still need attention`, {
+        fixed: fixed.map((i) => i.fixedBy),
+        wrong: wrong.map((i) => `${i.id}: ${i.detail}`)
+      })
+    }
+    ctx.broadcast('health:report', report)
+    return report
+  }
+  ipcMain.handle('health:status', () => healthStatus())
+  ipcMain.handle('health:repair', () => healthRepair())
+  ipcMain.handle('diagnostics:text', () => readTail(200))
+  ipcMain.handle('diagnostics:open', () => openInFolder())
+
   const bridgeDeps: BridgeDeps = {
     db,
     secrets,
@@ -190,6 +240,7 @@ export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
     agent,
     desktop,
     startAgent,
+    health: { status: healthStatus, repair: healthRepair },
     runNow: () => ctx.runNow(),
     isRunning: () => ctx.isRunning(),
     connectAccount: async (input) => {
@@ -238,6 +289,8 @@ export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
     return bridgeInfo(bridgeDeps)
   })
   syncBridge(bridgeDeps)
+  // First health pass shortly after startup (the bridge needs a moment to start listening before it is judged).
+  setTimeout(() => void healthRepair().catch((err) => log('error', 'health', 'startup check failed', err)), 4000)
 
   ipcMain.handle('settings:get', () => loadSettings(db))
   ipcMain.handle('settings:set', (_e, settings: AppSettings) => {
@@ -640,5 +693,5 @@ export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
     return true
   })
 
-  return { agent }
+  return { agent, afterRun: healthRepair, reauthAccount }
 }

@@ -2,8 +2,9 @@
 
 Since v1.1 the Assistant — and any agent connected through the bridge, such as Hermes — can use the
 whole computer, not just its own browser window. It is **on by default**: you choose what to allow on the
-terms screen at first launch, anything set to "Ask each time" gets a popup, and dangerous commands stop
-and ask unless you opt out. This page says exactly what that means and how to turn it off.
+terms screen at first launch, anything set to "Ask each time" gets a popup, and dangerous commands ask
+unless the full-autonomy choice is on (it is on by default; turn it off in **Settings → Who can help**).
+This page says exactly what that means and how to turn it off.
 
 ## What it can do
 
@@ -21,15 +22,16 @@ in `src/main/desktop/scripts.ts`; the gate that asks first lives in `src/main/de
 ## Your choices at first launch
 
 The terms screen ends with a **Your choices** card: the master switch *Let InboxScout use my computer*, one
-checkbox per kind above, and the full-autonomy override (off by default). Every ticked kind is remembered
+checkbox per kind above, and the full-autonomy override (all on by default since v1.2 — untick anything you
+would rather be asked about). Every ticked kind is remembered
 as **Always** — no popup for it; every unticked kind is remembered as **Never** — refused quietly until you
 change it. All of it can be changed later under **Settings → Who can help**, including setting a kind back
 to **Ask each time**.
 
 ## The popup
 
-For any kind set to **Ask each time** (and, by default, for dangerous commands), a native dialog appears
-with three buttons:
+For any kind set to **Ask each time** (and for dangerous commands whenever the full-autonomy choice is off),
+a native dialog appears with three buttons:
 
 - **Allow once** — do it this time; ask again next time.
 - **Always allow** — do it now and remember the answer for this kind of thing.
@@ -43,15 +45,17 @@ for everything** forgets them all.
 
 ### Full-autonomy override
 
-**Settings → Who can help → Full autonomy: skip the safety popup for dangerous actions** (off by default,
-`systemDangerousOverride`). When it is on *and* "Run commands" is remembered as **Always**, the
-dangerous-command popup described next is skipped too, so a long job can run completely unattended.
-Everything still shows in the Assistant log, and Stop still works. It is the last safety net, so the
-setting carries a red warning and the "What you've already allowed" row says when it is on.
+**Settings → Who can help → Full autonomy: no safety stop for dangerous actions** (`systemDangerousOverride`,
+**on by default** since v1.2 so chores finish without interruptions). When it is on *and* "Run commands" is
+remembered as **Always**, the dangerous-command popup described next is skipped too, so a long job can run
+completely unattended. Everything still shows in the Assistant log, and Stop still works. Turn it off if you
+would rather be asked before anything drastic; because it is the last safety net, the setting carries a red
+warning and the "What you've already allowed" row says when it is on.
 
-## What always asks
+## What asks even after "Always allow"
 
-Some commands ask **every time**, even after *Always allow* (unless the full-autonomy override above is on) — deleting things, changing accounts or
+Some commands ask **every time**, even after *Always allow*, unless the full-autonomy choice above is on (it
+is on by default; turn it off in **Settings → Who can help**) — deleting things, changing accounts or
 passwords, turning off protection, and money:
 
 - recursive or forced deletes (`rm -rf`, `del /s`, `Remove-Item -Recurse`), formatting disks, `mkfs`, `diskpart`, `dd if=`
@@ -93,8 +97,9 @@ With the **Agent bridge** on and access set to **Full**, the bridge exposes the 
 `desktop_screenshot`, `desktop_click`, `desktop_type`, `desktop_key`, `desktop_open`, `desktop_run`,
 `files_read`, `files_write`, `files_list` — over MCP (`/mcp`) and REST (`/v1/desktop/...`, `/v1/files/...`).
 They go through exactly the same gate as the Assistant: **the popups still appear on your screen**, with
-the agent's name in them, the remembered answers apply, dangerous commands always ask, and the
-home-folder rule holds. With **Read only** access, none of these tools exist. See `integrations/hermes/`.
+the agent's name in them, the remembered answers apply, dangerous commands ask unless the full-autonomy
+choice is on (it is on by default; turn it off in **Settings → Who can help**), and the home-folder rule
+holds. With **Read only** access, none of these tools exist. See `integrations/hermes/`.
 
 ## How to turn it off
 

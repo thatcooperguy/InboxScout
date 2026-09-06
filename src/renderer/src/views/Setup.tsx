@@ -20,6 +20,8 @@ interface Tile {
   sub: string
   /** One short line of current state ("2 accounts connected"). Empty until known. */
   state: string
+  /** Amber when the state line is a heads-up ("1 thing needs attention"). */
+  tone?: 'amber'
 }
 
 interface HubState {
@@ -30,9 +32,11 @@ interface HubState {
   webReady: boolean | null
   google: boolean | null
   microsoft: boolean | null
+  /** Health check: number of items needing attention; null until known, 0 when everything works. */
+  attention: number | null
 }
 
-const EMPTY: HubState = { accounts: null, aiName: null, aiBuiltin: true, watchers: null, webReady: null, google: null, microsoft: null }
+const EMPTY: HubState = { accounts: null, aiName: null, aiBuiltin: true, watchers: null, webReady: null, google: null, microsoft: null, attention: null }
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 
@@ -66,6 +70,10 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
       .setupInfo()
       .then((i) => alive && setHub((h) => ({ ...h, google: i.google.configured, microsoft: i.microsoft.configured })))
       .catch(() => undefined)
+    void api
+      .healthStatus()
+      .then((r) => alive && setHub((h) => ({ ...h, attention: r.ok ? 0 : r.items.filter((i) => i.status === 'warn' || i.status === 'fail').length || 1 })))
+      .catch(() => undefined)
     return () => {
       alive = false
     }
@@ -83,6 +91,8 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
   const signinState =
     hub.google === null ? '' : `Google ${hub.google ? 'ready' : 'not set up'} · Microsoft ${hub.microsoft ? 'ready' : 'not set up'}`
   const levelState = level === 'simple' ? 'Simple view' : level === 'pro' ? 'Pro view' : 'Standard view'
+  const needsAttention = hub.attention !== null && hub.attention > 0
+  const prefsState = needsAttention ? `${plural(hub.attention!, 'thing needs', 'things need')} attention` : levelState
 
   // Order is fixed at every level: Email accounts first, then What to watch for, Preferences, then the helpers.
   const allTiles: Tile[] = [
@@ -105,7 +115,8 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
       icon: simple ? '🔊' : '⚙️',
       label: simple ? 'Text & voice' : 'Preferences',
       sub: simple ? 'Bigger text, read aloud, and how much to show.' : 'Schedule, text size, your kind of work, privacy, advanced tools.',
-      state: levelState
+      state: prefsState,
+      tone: needsAttention ? 'amber' : undefined
     },
     {
       id: 'ai',
@@ -159,7 +170,8 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
       <strong>{t.label}</strong>
       <span className="sub">{t.sub}</span>
       {t.state && (
-        <span className="sub" style={{ display: 'block', marginTop: 8, color: 'var(--ink-soft)', fontWeight: 600 }}>
+        <span className="sub" style={{ display: 'block', marginTop: 8, color: t.tone === 'amber' ? 'var(--amber, #a6641b)' : 'var(--ink-soft)', fontWeight: 600 }}>
+          {t.tone === 'amber' ? '⚠ ' : ''}
           {t.state}
         </span>
       )}

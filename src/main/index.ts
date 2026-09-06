@@ -2,8 +2,9 @@ import { app, BrowserWindow, Menu, Notification, Tray, nativeImage } from 'elect
 import { join } from 'node:path'
 import { openDatabase, type DB } from './db/index'
 import { SecretStore } from './secrets'
-import { registerIpc } from './ipc'
+import { registerIpc, type IpcHooks } from './ipc'
 import { runPipeline } from './pipeline/run'
+import { log } from './health/diagnostics'
 import { Scheduler } from './scheduler'
 import { loadSettings, saveSettings } from './settings'
 import type { RunProgress } from '../shared/types'
@@ -18,8 +19,29 @@ let secrets: SecretStore
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let running = false
+/** Self-healing hooks from registerIpc (null in headless --sync mode). */
+let hooks: IpcHooks | null = null
 
 const isHeadlessSync = process.argv.includes('--sync')
+
+// ---- Self-debugging: never die on an unexpected error; write it down and tell the person calmly, at most every 10 minutes.
+const SNAG_INTERVAL_MS = 10 * 60 * 1000
+let lastSnagAt = 0
+function snag(kind: string, err: unknown): void {
+  log('error', 'process', kind, err instanceof Error ? err : { value: String(err) })
+  const now = Date.now()
+  if (now - lastSnagAt < SNAG_INTERVAL_MS) return
+  lastSnagAt = now
+  try {
+    if (app.isReady() && Notification.isSupported()) {
+      new Notification({ title: 'InboxScout', body: 'InboxScout hit a snag and kept going — see Settings → Health' }).show()
+    }
+  } catch {
+    // a notification that cannot be shown is not worth a second snag
+  }
+}
+process.on('uncaughtException', (err) => snag('uncaughtException', err))
+process.on('unhandledRejection', (reason) => snag('unhandledRejection', reason))
 
 function broadcast(channel: string, payload: unknown): void {
   for (const win of BrowserWindow.getAllWindows()) win.webContents.send(channel, payload)
@@ -32,9 +54,14 @@ async function runNow(trigger: 'manual' | 'scheduled' | 'catchup' | 'cli' = 'man
   running = true
   broadcast('run:progress', { phase: 'fetch', detail: 'Starting…' } satisfies RunProgress)
   try {
+    log('info', 'pipeline', `run started (${trigger})`)
     const result = await runPipeline(db, secrets, trigger, (p) => broadcast('run:progress', p), {
-      skillsDir: join(app.getPath('userData'), 'skills')
+      skillsDir: join(app.getPath('userData'), 'skills'),
+      reauthAccount: hooks ? (id) => hooks!.reauthAccount(id) : undefined,
+      log
     })
+    if (result.error) log('error', 'pipeline', `run failed (${trigger})`, { runId: result.runId, error: result.error })
+    else log('info', 'pipeline', `run finished (${trigger})`, { runId: result.runId, messages: result.messagesScanned, issues: result.issueCount, notices: result.notices })
     if (trigger !== 'manual' && Notification.isSupported()) {
       // Failures must be visible too - a silently skipped brief is worse than an error.
       new Notification(
@@ -54,6 +81,11 @@ async function runNow(trigger: 'manual' | 'scheduled' | 'catchup' | 'cli' = 'man
     }
     if (!result.error) recordRun(db, result.messagesScanned, result.issueCount)
     broadcast('run:finished', result)
+    // Self-healing pass after every run: a failed sync or a silent AI helper gets looked at right away.
+    if (hooks) await hooks.afterRun().catch((err) => log('error', 'health', 'post-run check failed', err))
+  } catch (err) {
+    log('error', 'pipeline', `run crashed (${trigger})`, err)
+    broadcast('run:finished', { runId: '', reportId: null, messagesScanned: 0, issueCount: 0, error: String((err as Error)?.message ?? err), notices: [] })
   } finally {
     running = false
   }
@@ -108,6 +140,8 @@ function createTray(): void {
 
 async function bootstrap(): Promise<void> {
   const dataDir = app.getPath('userData')
+  log('info', 'app', `start v${app.getVersion()}${isHeadlessSync ? ' (--sync)' : ''}`, { platform: process.platform, electron: process.versions.electron })
+  app.on('before-quit', () => log('info', 'app', 'quit'))
   db = openDatabase(join(dataDir, 'inboxscout.db'))
   secrets = new SecretStore(db)
 
@@ -123,7 +157,7 @@ async function bootstrap(): Promise<void> {
   }
 
   recordSession(db)
-  const { agent } = registerIpc({
+  hooks = registerIpc({
     db,
     secrets,
     runNow: () => runNow('manual'),
@@ -131,6 +165,7 @@ async function bootstrap(): Promise<void> {
     skillsDir: join(app.getPath('userData'), 'skills'),
     broadcast
   })
+  const { agent } = hooks
   app.on('before-quit', () => agent.closeWindow())
   createWindow()
   createTray()

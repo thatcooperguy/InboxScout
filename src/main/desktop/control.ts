@@ -11,8 +11,8 @@ import { clickCommand, describeAction, isDangerousCommand, keyCommand, openComma
  * Full system control for the Assistant and connected agents: look at the
  * screen, click and type on the desktop, open apps and files, run commands,
  * read and write files under the home folder. Every kind of action is gated
- * by the person's remembered answer or a popup; dangerous commands always ask
- * (unless the person switched on the full-autonomy override in Settings).
+ * by the person's remembered answer or a popup; dangerous commands ask too
+ * unless the full-autonomy override in Settings is on (it is, by default).
  *
  * Electron: desktopCapturer for screenshots, dialog.showMessageBox for popups,
  * child_process for the OS commands from ./scripts.ts.

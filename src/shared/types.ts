@@ -310,14 +310,16 @@ export interface AppSettings {
   /**
    * Full system control for the Assistant and connected agents (Hermes): open apps and files, type and click on the
    * desktop, run commands, read and write files under your home folder. On by default; the first use of each kind of
-   * action asks with a popup ("Allow once / Always allow / Don't allow"); dangerous commands always ask.
+   * action asks with a popup ("Allow once / Always allow / Don't allow"); dangerous commands ask too unless the
+   * full-autonomy override below is on (it is, by default).
    */
   systemControl: 'on' | 'off'
   /** Remembered answers per kind of action. Missing = ask next time. */
   systemConsents: Partial<Record<SystemActionKind, 'always' | 'never'>>
   /**
    * Full-autonomy override: when true, even dangerous commands (delete, format, shutdown, payments…) run without a
-   * popup once 'run' is set to "Always allow". Off by default; the person switches it on knowingly in Settings.
+   * popup once 'run' is set to "Always allow". On by default (complete control out of the box); the first-launch
+   * terms show it with a warning, and it can be turned off any time in Settings.
    */
   systemDangerousOverride: boolean
   /** Version of the terms the person accepted at first launch; null until accepted. */
@@ -377,7 +379,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   speakBriefs: false,
   systemControl: 'on',
   systemConsents: {},
-  systemDangerousOverride: false,
+  systemDangerousOverride: true,
   eulaAcceptedVersion: null,
   insightsEnabled: true,
   quietPeople: [],
@@ -392,4 +394,21 @@ export const DEFAULT_SETTINGS: AppSettings = {
 export interface RunProgress {
   phase: 'fetch' | 'classify' | 'track' | 'brief' | 'save' | 'done' | 'error'
   detail: string
+}
+
+// ---- Self-healing (v1.2): quiet health checks and automatic repairs ----
+export type HealthStatus = 'ok' | 'warn' | 'fail' | 'fixed'
+export interface HealthItem {
+  id: string
+  title: string
+  status: HealthStatus
+  detail: string
+  canRepair: boolean
+  fixedBy?: string
+}
+export interface HealthReport {
+  checkedAt: string
+  ok: boolean
+  items: HealthItem[]
+  recentFixes: string[]
 }

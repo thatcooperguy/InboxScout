@@ -55,7 +55,15 @@ interface Props {
   /** Progress line while a check runs. */
   status?: string
   onGoTo?: (tab: string) => void
+  /**
+   * Notices from the latest run (App passes r.notices from onRunFinished). Only the self-healing lines —
+   * "Fixed on its own: …" and "Reconnecting …" — are shown, as one calm line each under "last checked".
+   */
+  notices?: string[]
 }
+
+/** The notices worth a quiet line on the Today screen: things InboxScout repaired or is repairing itself. */
+export const isHealingNotice = (n: string): boolean => /^(Fixed on its own:|Reconnecting)/.test(n.trim())
 
 interface Card {
   id: string
@@ -67,9 +75,10 @@ interface Card {
  * The one screen most people need: what needs you, who is waiting on you,
  * what's coming up - and one big button. Adapts to the layout level.
  */
-export default function Today({ running, onRun, level = 'standard', status = '', onGoTo }: Props): JSX.Element {
+export default function Today({ running, onRun, level = 'standard', status = '', onGoTo, notices = [] }: Props): JSX.Element {
   const simple = level === 'simple'
   const pro = level === 'pro'
+  const healing = notices.filter(isHealingNotice)
   const [latest, setLatest] = useState<any | null | undefined>(undefined)
   const [accounts, setAccounts] = useState<any[]>([])
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set())
@@ -518,6 +527,12 @@ export default function Today({ running, onRun, level = 'standard', status = '',
               {lastChecked(when, level, pro && inboxes.length ? `${inboxes.reduce((n: number, i: any) => n + i.newCount, 0)} new · ${inboxes.length} inbox${inboxes.length === 1 ? '' : 'es'}` : undefined)}
             </p>
           )}
+          {!running &&
+            healing.map((n) => (
+              <p className="hint healing" key={n} role="status" style={{ marginTop: 4 }}>
+                🔧 {n}
+              </p>
+            ))}
           {!simple && inboxes.length > 1 && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }} role="group" aria-label="Inboxes">
               {pro && (

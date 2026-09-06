@@ -46,9 +46,9 @@ export const EULA_ACCEPT_LINE = 'I understand, and I agree to these terms.'
 
 /**
  * Opt-in choices shown with the terms. Each says what will happen and why.
- * Defaults follow the owner's decision: opted in = full autonomy (no popups
- * for the kinds you tick), while dangerous actions still ask unless you also
- * tick the override. Every choice can be changed later in Settings → Who can help.
+ * Everything is ticked by default (complete, full control out of the box, so
+ * activation is one tap); untick anything to be asked instead. Every choice
+ * can be changed later in Settings → Who can help.
  */
 export type EulaOptionId = 'systemControl' | 'screenshot' | 'input' | 'open' | 'run' | 'files' | 'dangerousOverride'
 
@@ -116,14 +116,19 @@ export const EULA_OPTIONS: EulaOption[] = [
   },
   {
     id: 'dangerousOverride',
-    label: 'Full autonomy: skip the safety stop for dangerous actions',
-    what: 'When on, dangerous commands run without asking. Everything still shows in the Assistant log.',
-    why: 'Only for long, unattended jobs where you would rather not be interrupted. Most people should leave this off.',
-    default: false,
+    label: 'Full autonomy: no safety stop for dangerous actions',
+    what: 'Dangerous commands — deleting, formatting, shutting down, changing passwords, payments — run without asking. Everything still shows in the Assistant log.',
+    why: 'So jobs finish without interruptions. Untick it if you would rather be asked before anything drastic; you can change it any time in Settings.',
+    default: true,
     parent: 'systemControl',
     warning: 'With this on, a mistake by the AI can delete files or change your system with no chance to say no.'
   }
 ]
+
+/** Everything ticked — the one-tap path. */
+export function defaultEulaChoices(): Record<EulaOptionId, boolean> {
+  return Object.fromEntries(EULA_OPTIONS.map((o) => [o.id, o.default])) as Record<EulaOptionId, boolean>
+}
 
 /** Turn the choices into settings values. Ticked = allowed with no popup; unticked = refused until you change it in Settings. */
 export function eulaChoicesToSettings(choices: Record<EulaOptionId, boolean>): {

@@ -146,6 +146,8 @@ const ROUTES: Route[] = [
   { method: 'GET', path: '/v1/reports/:id', op: 'read_report' },
   { method: 'POST', path: '/v1/run', op: 'run_scan' },
   { method: 'GET', path: '/v1/run', op: 'scan_status' },
+  { method: 'GET', path: '/v1/health', op: 'health_check' },
+  { method: 'POST', path: '/v1/health/repair', op: 'health_repair' },
   { method: 'GET', path: '/v1/accounts', op: 'list_accounts' },
   { method: 'POST', path: '/v1/accounts', op: 'connect_account' },
   { method: 'DELETE', path: '/v1/accounts/:id', op: 'remove_account' },

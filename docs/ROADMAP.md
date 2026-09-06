@@ -90,13 +90,18 @@
 
 ## ✅ v1.1 — shipped (full system control + EULA)
 
-- **Full system control** for the Assistant and connected agents, on by default: screenshots, clicks and typing on the desktop, opening apps/files/URLs, shell commands, and file access under the home folder. Per-kind native popups (Allow once / Always allow / Don't allow) with remembered answers, dangerous commands that always ask (with an off-by-default full-autonomy override), a home-folder rule with protected secret folders, and a Linux `xdotool` note. `docs/SYSTEM-CONTROL.md`.
+- **Full system control** for the Assistant and connected agents, on by default: screenshots, clicks and typing on the desktop, opening apps/files/URLs, shell commands, and file access under the home folder. Per-kind native popups (Allow once / Always allow / Don't allow) with remembered answers, dangerous commands that ask unless the full-autonomy override is on (off by default in v1.1; on by default since v1.2), a home-folder rule with protected secret folders, and a Linux `xdotool` note. `docs/SYSTEM-CONTROL.md`.
 - **Settings → Who can help**: the on/off switch, "What you've already allowed" (per-kind Always / Never / Ask each time, "Ask me again for everything"), and "Terms accepted" with "Read the terms again".
 - **Plain-language EULA** shown once at first launch (versioned; read aloud; link to the full license) and required before onboarding.
 - **Bridge tools** `desktop_*` / `files_*` for Hermes and other MCP/REST clients under Full access — the same popups appear, naming the agent.
 - Assistant screen says, in one line, that it can also use the computer and where to turn it off.
 
-## 🟠 Gaps — v1.2
+## ✅ v1.2 — shipped (self-healing + complete control by default)
+
+- **Self-healing**: a health check runs before every scan and on demand — accounts, the AI helper, the reports folder, the database, the bridge port, the schedule. Safe repairs happen on their own (reconnecting an account with a saved sign-in, falling back to the built-in engine when the AI helper fails, moving the reports folder, picking a free bridge port, re-syncing a broken account) and show up as one calm line on Today ("Fixed on its own: …"). What cannot be fixed alone is said in plain words under **Settings → Health** with one **Fix it for me** button, plus "Copy diagnostics" and "Show the log file" behind a disclosure. Bridge tools `health_check` / `health_repair` for Hermes. `docs/SELF-HEALING.md`.
+- **Complete control by default**: the first-launch terms now default every choice on — the master switch, every kind of computer use, *and* the full-autonomy override — so the Assistant and connected agents finish jobs without interruptions out of the box. Dangerous commands ask only when the override is turned off (**Settings → Who can help**); the warning stays visible wherever it is on.
+
+## 🟠 Gaps — v1.3
 
 - ~~Autonomous console agent~~ — ✅ shipped in v0.7 as the Assistant, with handoffs where a bot would be brittle.
 - **Voice commands** (talk to InboxScout) — Chromium speech recognition in Electron needs a Google key and is unreliable offline; revisit with a local model (e.g. whisper.cpp).

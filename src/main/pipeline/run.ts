@@ -35,7 +35,32 @@ import {
   skillPromptHints
 } from '../skills/engine'
 import type { SkillMatch } from '../skills/types'
+import {
+  FAIL_THRESHOLD,
+  META_AI_ERROR,
+  META_AI_FAILS,
+  isAuthError,
+  isStaleSyncError,
+  metaReauthAt,
+  metaResyncAt,
+  metaSyncError,
+  metaSyncFails,
+  withAiFallback
+} from '../health/checks'
 import type { Category, Classification, MessageRecord, RunProgress } from '../../shared/types'
+
+export { withAiFallback }
+
+export interface PipelineOptions {
+  skillsDir?: string
+  /** Self-healing: mint a fresh app password for an account whose sign-in stopped working (wired by ipc.ts). */
+  reauthAccount?: (accountId: string) => Promise<{ ok: boolean; message: string }>
+  /** Diagnostics log (wired by index.ts; silent in tests). */
+  log?: (level: 'info' | 'warn' | 'error', area: string, message: string, extra?: unknown) => void
+}
+
+/** Repairs are attempted once a day per account, so a bad night never turns into a loop. */
+const REPAIR_COOLDOWN_MS = 24 * 60 * 60 * 1000
 
 export interface PipelineResult {
   runId: string
@@ -52,13 +77,26 @@ export async function runPipeline(
   secrets: SecretStore,
   trigger: 'manual' | 'scheduled' | 'catchup' | 'cli',
   onProgress: (p: RunProgress) => void = () => {},
-  opts: { skillsDir?: string } = {}
+  opts: PipelineOptions = {}
 ): Promise<PipelineResult> {
   let settings = loadSettings(db)
   let profile = getProfile(settings.profileId)
   let profileNotice: string | null = null
   const runId = randomUUID()
   const startedAt = new Date().toISOString()
+  const log = opts.log ?? (() => {})
+  /** Plain-language notes collected during the run ("Fixed on its own: …", "AI helper unavailable…"). */
+  const runNotices: string[] = []
+  // AI resilience: the first failure of the AI helper switches the rest of this run to the built-in engine.
+  let aiDown = false
+  const aiFailed = (step: string, reason: string): void => {
+    log('warn', 'ai', `${step} failed; using the built-in engine for the rest of this run`, { reason })
+    if (aiDown) return
+    aiDown = true
+    repo.bumpCounter(db, META_AI_FAILS)
+    repo.setMeta(db, META_AI_ERROR, reason)
+    runNotices.push(`AI helper unavailable this time (${reason}) — used the built-in engine`)
+  }
   repo.insertRun(db, {
     id: runId,
     startedAt,
@@ -91,6 +129,7 @@ export async function runPipeline(
     if (accounts.length === 0) throw new Error('No email accounts connected yet.')
     const newMessages: MessageRecord[] = []
     const syncErrors: string[] = custom.errors.map((e) => `Custom skill problem: ${e}`)
+    const accountFailed: { account: (typeof accounts)[number]; message: string; count: number }[] = []
     for (const account of accounts) {
       // One broken account must never block the others.
       try {
@@ -110,6 +149,7 @@ export async function runPipeline(
           }
           if (result.historyId) repo.setMeta(db, `gmail-history:${account.id}`, result.historyId)
           repo.setSyncState(db, account.id, GMAIL_FOLDER, 1, Date.now())
+          repo.setMeta(db, metaSyncFails(account.id), '0')
           continue
         }
         if (account.provider === 'outlook') {
@@ -129,6 +169,7 @@ export async function runPipeline(
             }
             repo.setSyncState(db, account.id, folder, 1, result.lastMs)
           }
+          repo.setMeta(db, metaSyncFails(account.id), '0')
           continue
         }
         const password = secrets.get(accountSecretName(account.id))
@@ -149,8 +190,39 @@ export async function runPipeline(
           }
           repo.setSyncState(db, account.id, folder, result.uidValidity, result.lastUid)
         }
+        repo.setMeta(db, metaSyncFails(account.id), '0')
       } catch (err: any) {
-        syncErrors.push(`${account.email}: ${String(err?.message ?? err)}`)
+        const message = String(err?.message ?? err)
+        syncErrors.push(`${account.email}: ${message}`)
+        const count = repo.bumpCounter(db, metaSyncFails(account.id))
+        repo.setMeta(db, metaSyncError(account.id), message)
+        log('error', 'sync', `${account.email} failed (${count} in a row)`, { message })
+        accountFailed.push({ account, message, count })
+      }
+    }
+    // Self-healing: after a couple of failures in a row, fix what can be fixed without the person.
+    const nowMs = Date.now()
+    const coolingDown = (key: string): boolean => {
+      const last = repo.getMeta(db, key)
+      return !!last && nowMs - new Date(last).getTime() < REPAIR_COOLDOWN_MS
+    }
+    for (const f of accountFailed) {
+      if (f.count < FAIL_THRESHOLD) continue
+      if (isAuthError(f.message)) {
+        if (!opts.reauthAccount || coolingDown(metaReauthAt(f.account.id))) continue
+        repo.setMeta(db, metaReauthAt(f.account.id), new Date(nowMs).toISOString())
+        try {
+          const r = await opts.reauthAccount(f.account.id)
+          runNotices.push(r.ok ? r.message : `${f.account.email}: ${r.message}`)
+        } catch (err: any) {
+          log('warn', 'health', 'reauth failed to start', { accountId: f.account.id, error: String(err?.message ?? err) })
+        }
+      } else if (isStaleSyncError(f.message)) {
+        if (coolingDown(metaResyncAt(f.account.id))) continue
+        repo.setMeta(db, metaResyncAt(f.account.id), new Date(nowMs).toISOString())
+        repo.resetSyncState(db, f.account.id)
+        log('info', 'health', 'sync state reset after stale-bookmark errors', { accountId: f.account.id })
+        runNotices.push(`Fixed on its own: reset the sync bookmark for ${f.account.email}; the next scan starts fresh.`)
       }
     }
     const accountFailures = syncErrors.length - custom.errors.length
@@ -195,13 +267,18 @@ export async function runPipeline(
     onProgress({ phase: 'classify', detail: `Classifying ${toClassify.length} new messages…` })
     const corrections = repo.listCorrections(db, 10)
     const classifications: Classification[] = []
+    const heuristicBatch = (batch: MessageRecord[]): Map<string, MessageClassificationOutput> => {
+      const map = new Map<string, MessageClassificationOutput>()
+      for (const m of batch) map.set(m.id, classifyMessageHeuristically(m, profile))
+      return map
+    }
     const classifyChunk = async (batch: MessageRecord[]): Promise<Map<string, MessageClassificationOutput>> => {
-      if (!model) {
-        const map = new Map<string, MessageClassificationOutput>()
-        for (const m of batch) map.set(m.id, classifyMessageHeuristically(m, profile))
-        return map
-      }
-      return classifyBatch(model, profile, batch, corrections, promptHints)
+      if (!model || aiDown) return heuristicBatch(batch)
+      return withAiFallback(
+        () => classifyBatch(model, profile, batch, corrections, promptHints),
+        () => heuristicBatch(batch),
+        (reason) => aiFailed('Classifying', reason)
+      )
     }
     for (const batch of chunk(toClassify, BATCH_SIZE)) {
       const results = await classifyChunk(batch)
@@ -222,7 +299,7 @@ export async function runPipeline(
           people: r.people,
           sensitivity: r.sensitivity,
           runId,
-          model: modelName,
+          model: aiDown ? 'builtin/rules-v1' : modelName,
           corrected: false
         }
         const c = applySkillEffects(m, raw, matches, skills, skillCtx)
@@ -239,20 +316,24 @@ export async function runPipeline(
     const workPairs = classifications.filter((c) => c.category === 'work' && messageById.has(c.messageId)).map(pair)
     if (workPairs.length > 0) {
       onProgress({ phase: 'track', detail: `Updating ${profile.pulseName}…` })
-      if (!model) {
+      const trackHeuristically = (): void => {
         for (const i of deriveIssues(repo.listIssues(db, false), workPairs, new Date().toISOString())) {
           repo.upsertIssue(db, i)
         }
+      }
+      if (!model || aiDown) {
+        trackHeuristically()
       } else {
-        const decisions = await decideTracking(model, profile, repo.listProjects(db), repo.listIssues(db, true), workPairs)
-        const applied = applyTrackingDecisions(
-          repo.listProjects(db),
-          repo.listIssues(db),
-          decisions,
-          new Date().toISOString()
+        await withAiFallback(
+          async () => {
+            const decisions = await decideTracking(model, profile, repo.listProjects(db), repo.listIssues(db, true), workPairs)
+            const applied = applyTrackingDecisions(repo.listProjects(db), repo.listIssues(db), decisions, new Date().toISOString())
+            for (const p of applied.projects) repo.upsertProject(db, p)
+            for (const i of applied.issues) repo.upsertIssue(db, i)
+          },
+          trackHeuristically,
+          (reason) => aiFailed('Tracking', reason)
         )
-        for (const p of applied.projects) repo.upsertProject(db, p)
-        for (const i of applied.issues) repo.upsertIssue(db, i)
       }
     }
 
@@ -291,7 +372,16 @@ export async function runPipeline(
       promptHints,
       resolvedRecently
     }
-    const brief = model ? await generateBrief(model, briefInputs) : buildBasicBrief(briefInputs)
+    const brief =
+      model && !aiDown
+        ? await withAiFallback(
+            () => generateBrief(model, briefInputs),
+            () => buildBasicBrief(briefInputs),
+            (reason) => aiFailed('Writing the brief', reason)
+          )
+        : buildBasicBrief(briefInputs)
+    // The AI helper answered every time this run: its failure streak is over.
+    if (model && !aiDown) repo.setMeta(db, META_AI_FAILS, '0')
 
     // 4b. Quiet intelligence: circle, unified schedule, promises, per-inbox view. Computed always, shown only when useful.
     if (settings.insightsEnabled) {
@@ -356,7 +446,7 @@ export async function runPipeline(
     repo.finishRun(db, runId, 'succeeded', newMessages.length, null)
 
     // 6. Deliver (to you only) and export - never fatal.
-    const notices: string[] = profileNotice ? [profileNotice] : []
+    const notices: string[] = [...(profileNotice ? [profileNotice] : []), ...runNotices]
     const outbox = pickOutbox(accounts, null)
     const outboxPassword = outbox ? secrets.get(accountSecretName(outbox.id)) : null
     const topTitles = brief.topIssues.map((i) => i.title)
@@ -451,8 +541,9 @@ export async function runPipeline(
   } catch (err: any) {
     const message = String(err?.message ?? err)
     repo.finishRun(db, runId, 'failed', 0, message)
+    log('error', 'pipeline', 'run failed', { runId, trigger, message })
     onProgress({ phase: 'error', detail: message })
-    return { runId, reportId: null, messagesScanned: 0, issueCount: 0, error: message, notices: [] }
+    return { runId, reportId: null, messagesScanned: 0, issueCount: 0, error: message, notices: runNotices }
   }
 }
 

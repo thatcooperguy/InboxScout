@@ -1,3 +1,5 @@
+import type { HealthReport } from '../shared/types'
+
 export interface BridgeInfo {
   enabled: boolean
   running: boolean
@@ -120,6 +122,15 @@ export interface InboxScoutApi {
   systemStatus: () => Promise<{ enabled: boolean; consents: Partial<Record<string, 'always' | 'never'>>; platform: string }>
   systemSetConsent: (kind: string, value: 'always' | 'never' | null) => Promise<unknown>
   systemReset: () => Promise<unknown>
+
+  // Self-healing (v1.2). Renderer-side typing added by the UI agent as a last resort so typecheck passes;
+  // the health agent owns the real implementation — if these lines are duplicated after merge, keep one copy.
+  healthStatus: () => Promise<HealthReport>
+  healthRepair: () => Promise<HealthReport>
+  diagnosticsText: () => Promise<string>
+  diagnosticsOpen: () => Promise<boolean>
+  /** Fired after the automatic health pass at startup and after every run. */
+  onHealthReport: (cb: (r: HealthReport) => void) => () => void
 
   onRunProgress: (cb: (p: any) => void) => () => void
   onRunFinished: (cb: (r: any) => void) => () => void

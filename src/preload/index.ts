@@ -94,6 +94,17 @@ const api = {
   searchMessages: (query: string) => ipcRenderer.invoke('messages:search', query),
   correctMessage: (input: unknown) => ipcRenderer.invoke('messages:correct', input),
 
+  // Self-healing (v1.2): quiet health checks, one-button repair, copyable diagnostics.
+  healthStatus: () => ipcRenderer.invoke('health:status'),
+  healthRepair: () => ipcRenderer.invoke('health:repair'),
+  diagnosticsText: () => ipcRenderer.invoke('diagnostics:text'),
+  diagnosticsOpen: () => ipcRenderer.invoke('diagnostics:open'),
+  onHealthReport: (cb: (r: unknown) => void) => {
+    const listener = (_e: unknown, r: unknown): void => cb(r)
+    ipcRenderer.on('health:report', listener)
+    return () => ipcRenderer.removeListener('health:report', listener)
+  },
+
   onRunProgress: (cb: (p: unknown) => void) => {
     const listener = (_e: unknown, p: unknown): void => cb(p)
     ipcRenderer.on('run:progress', listener)

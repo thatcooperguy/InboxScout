@@ -74,10 +74,11 @@ Two built-in recipes use it: **Open the latest brief** (lists your reports folde
 - **The first time each kind of action happens** — looking at the screen, using the keyboard and mouse, opening something,
   running a command, touching files — a native popup tells you what it wants and asks **Allow once / Always allow /
   Don't allow**. Your answer is remembered per kind (Settings → Who can help), so a run is not a stream of questions.
-- **Dangerous commands always ask**, even under "Always allow": deleting or formatting, shutting down, changing user
-  accounts or passwords, `sudo`, turning off protection, piping downloads into a shell, and anything that looks like a payment
-  or transfer. The only way around that is the separate **Full autonomy** override in Settings, which you switch on
-  knowingly, and which we recommend leaving off.
+- **Dangerous commands ask unless the full-autonomy choice is on** (it is on by default; turn it off in Settings → Who can
+  help). Dangerous means deleting or formatting, shutting down, changing user accounts or passwords, `sudo`, turning off
+  protection, piping downloads into a shell, and anything that looks like a payment or transfer. With the choice off, those
+  always ask even under "Always allow". The **Full autonomy** override in Settings is that same choice; the first-launch
+  terms show it with a warning so you know exactly what you are agreeing to.
 - If you decline, the action fails with "not allowed" and the Assistant is told never to retry it — it looks for another
   way or asks you instead.
 

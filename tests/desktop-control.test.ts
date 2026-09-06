@@ -101,8 +101,15 @@ describe('DesktopControl consent', () => {
     expect(d.consents()).toEqual({})
   })
 
-  it('always asks for dangerous commands with a two-button popup, unless the override is on', async () => {
-    const d = make({ systemConsents: { run: 'always' } })
+  it('lets dangerous commands through under the default full-autonomy override, and asks with a two-button popup when it is off', async () => {
+    // Default (complete control out of the box): no popup even for dangerous commands.
+    expect(DEFAULT_SETTINGS.systemDangerousOverride).toBe(true)
+    const full = make({ systemConsents: { run: 'always' } })
+    expect(await full.consent('run', 'sudo reboot', 'Hermes', true)).toEqual({ allowed: true, remembered: 'always' })
+    expect(fake.shown).toHaveLength(0)
+
+    // Override off: dangerous commands ask every time, even under "Always allow", and are never remembered.
+    const d = make({ systemConsents: { run: 'always' }, systemDangerousOverride: false })
     expect(await d.consent('run', 'ls', 'Hermes', false)).toEqual({ allowed: true, remembered: 'always' })
     fake.answers.push(1)
     expect((await d.consent('run', 'rm -rf ~', 'Hermes', true)).allowed).toBe(false)
@@ -110,9 +117,6 @@ describe('DesktopControl consent', () => {
     fake.answers.push(0)
     expect(await d.consent('run', 'rm -rf ~', 'Hermes', true)).toEqual({ allowed: true })
     expect(d.consents()).toEqual({ run: 'always' })
-
-    const full = make({ systemConsents: { run: 'always' }, systemDangerousOverride: true })
-    expect(await full.consent('run', 'sudo reboot', 'Hermes', true)).toEqual({ allowed: true, remembered: 'always' })
     expect(fake.shown).toHaveLength(2)
   })
 
@@ -143,8 +147,8 @@ describe.skipIf(!posix)('DesktopControl commands and files', () => {
     expect(realpathSync((await d.run('pwd', 'Hermes', { cwd: '~/proj' })).stdout.trim())).toBe(realpathSync(join(home, 'proj')))
   })
 
-  it('dangerous commands go through the popup even when run is Always', async () => {
-    const d = make({ systemConsents: { run: 'always' } })
+  it('dangerous commands go through the popup even when run is Always, once the full-autonomy override is off', async () => {
+    const d = make({ systemConsents: { run: 'always' }, systemDangerousOverride: false })
     fake.answers.push(1)
     await expect(d.run('sudo ls', 'Hermes')).rejects.toThrow(/^consent_denied: /)
     expect(fake.shown).toHaveLength(1)

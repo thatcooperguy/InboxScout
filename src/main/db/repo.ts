@@ -439,3 +439,19 @@ function safeJson(raw: string): Record<string, string> {
 export function reopenIssue(db: DB, id: string): void {
   db.prepare(`UPDATE issues SET state = 'active', updated_at = ? WHERE id = ?`).run(new Date().toISOString(), id)
 }
+
+// ---- Self-healing (v1.2) ----
+
+/** Forget where we were in an account's mailboxes so the next scan starts from scratch (Gmail history too). Messages stay. */
+export function resetSyncState(db: DB, accountId: string): void {
+  db.prepare('DELETE FROM sync_state WHERE account_id = ?').run(accountId)
+  db.prepare('DELETE FROM meta WHERE key = ?').run(`gmail-history:${accountId}`)
+}
+
+/** Add one to a numeric meta counter and return the new value (missing or garbage counts as 0). */
+export function bumpCounter(db: DB, key: string): number {
+  const current = Number(getMeta(db, key) ?? 0)
+  const next = (Number.isFinite(current) && current > 0 ? Math.floor(current) : 0) + 1
+  setMeta(db, key, String(next))
+  return next
+}
