@@ -1,6 +1,10 @@
 import { useState } from 'react'
-import { EULA_ACCEPT_LINE, EULA_SECTIONS, EULA_VERSION } from '../../../shared/eula'
+import { EULA_ACCEPT_LINE, EULA_OPTIONS, EULA_SECTIONS, EULA_VERSION, eulaChoicesToSettings, type EulaOptionId } from '../../../shared/eula'
 import { speak } from '../useLevel'
+
+type Choices = Record<EulaOptionId, boolean>
+
+const DEFAULT_CHOICES = Object.fromEntries(EULA_OPTIONS.map((o) => [o.id, o.default])) as Choices
 
 const LICENSE_URL = 'https://github.com/thatcooperguy/InboxScout/blob/main/LICENSE.md'
 
@@ -17,13 +21,14 @@ export default function Eula({ onAccepted }: Props): JSX.Element {
   const [checked, setChecked] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [choices, setChoices] = useState<Choices>(DEFAULT_CHOICES)
 
   const accept = async (): Promise<void> => {
     setSaving(true)
     setError('')
     try {
       const current = await window.inboxScout.getSettings()
-      await window.inboxScout.setSettings({ ...current, eulaAcceptedVersion: EULA_VERSION })
+      await window.inboxScout.setSettings({ ...current, eulaAcceptedVersion: EULA_VERSION, ...eulaChoicesToSettings(choices) })
       onAccepted()
     } catch (err: any) {
       setError(String(err?.message ?? err).replace(/^Error invoking remote method[^:]*:\s*/, ''))
@@ -33,8 +38,11 @@ export default function Eula({ onAccepted }: Props): JSX.Element {
 
   const readAloud = (): void => {
     const text = EULA_SECTIONS.map((s) => `${s.title}. ${s.body}`).join(' ')
-    speak(`${text} ${EULA_ACCEPT_LINE}`)
+    const options = EULA_OPTIONS.map((o) => `${o.label}: ${o.what}`).join(' ')
+    speak(`${text} Your choices. ${options} ${EULA_ACCEPT_LINE}`)
   }
+
+  const masterOn = choices.systemControl
 
   const btn: React.CSSProperties = { minHeight: 44, fontSize: 16 }
 
@@ -66,6 +74,54 @@ export default function Eula({ onAccepted }: Props): JSX.Element {
             <p style={{ margin: 0, fontSize: 16, lineHeight: 1.55 }}>{s.body}</p>
           </div>
         ))}
+        <div className="card" style={{ padding: '18px 20px', borderRadius: 12 }}>
+          <h3 style={{ fontSize: 17, marginBottom: 4 }}>Your choices</h3>
+          <p className="hint" style={{ margin: '0 0 12px', fontSize: 14 }}>
+            Ticked means InboxScout may do it without asking each time. Unticked means it will not, until you change it.
+          </p>
+          {EULA_OPTIONS.map((o) => {
+            const sub = !!o.parent
+            const disabled = sub && !masterOn
+            return (
+              <label
+                key={o.id}
+                style={{
+                  display: 'flex',
+                  gap: 12,
+                  alignItems: 'flex-start',
+                  cursor: disabled ? 'default' : 'pointer',
+                  opacity: disabled ? 0.5 : 1,
+                  marginLeft: sub ? 28 : 0,
+                  padding: '10px 0',
+                  borderTop: sub ? '1px solid var(--line)' : 'none'
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={choices[o.id]}
+                  disabled={disabled}
+                  onChange={(e) => setChoices({ ...choices, [o.id]: e.target.checked })}
+                  style={{ width: 22, height: 22, margin: '2px 0 0', flex: '0 0 auto' }}
+                />
+                <span style={{ fontSize: 15, lineHeight: 1.45 }}>
+                  <strong style={{ display: 'block', fontSize: sub ? 15 : 16 }}>{o.label}</strong>
+                  <span style={{ display: 'block' }}>
+                    <strong>What happens:</strong> {o.what}
+                  </span>
+                  <span style={{ display: 'block' }}>
+                    <strong>Why we ask:</strong> {o.why}
+                  </span>
+                  {o.warning && (
+                    <span style={{ display: 'block', color: 'var(--red, #c0392f)', fontWeight: 600 }} role={choices[o.id] ? 'alert' : undefined}>
+                      ⚠ {o.warning}
+                    </span>
+                  )}
+                </span>
+              </label>
+            )
+          })}
+        </div>
+        <p className="hint" style={{ margin: '0 0 8px' }}>You can change any of these later in Settings → Who can help.</p>
         <p className="hint" style={{ margin: '4px 0 0' }}>
           Version {EULA_VERSION}.{' '}
           <button

@@ -1,9 +1,9 @@
 # Full system control (v1.1)
 
 Since v1.1 the Assistant — and any agent connected through the bridge, such as Hermes — can use the
-whole computer, not just its own browser window. It is **on by default**, and every kind of action is
-guarded by a popup the first time it happens. This page says exactly what that means and how to turn
-it off.
+whole computer, not just its own browser window. It is **on by default**: you choose what to allow on the
+terms screen at first launch, anything set to "Ask each time" gets a popup, and dangerous commands stop
+and ask unless you opt out. This page says exactly what that means and how to turn it off.
 
 ## What it can do
 
@@ -18,9 +18,18 @@ it off.
 The building blocks (which OS command does a click, what counts as dangerous, which paths are allowed) live
 in `src/main/desktop/scripts.ts`; the gate that asks first lives in `src/main/desktop/control.ts`.
 
+## Your choices at first launch
+
+The terms screen ends with a **Your choices** card: the master switch *Let InboxScout use my computer*, one
+checkbox per kind above, and the full-autonomy override (off by default). Every ticked kind is remembered
+as **Always** — no popup for it; every unticked kind is remembered as **Never** — refused quietly until you
+change it. All of it can be changed later under **Settings → Who can help**, including setting a kind back
+to **Ask each time**.
+
 ## The popup
 
-The **first time** InboxScout does each kind of thing, a native dialog appears with three buttons:
+For any kind set to **Ask each time** (and, by default, for dangerous commands), a native dialog appears
+with three buttons:
 
 - **Allow once** — do it this time; ask again next time.
 - **Always allow** — do it now and remember the answer for this kind of thing.

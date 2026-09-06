@@ -567,6 +567,27 @@ export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
     return canceled || !filePaths[0] ? null : filePaths[0]
   })
 
+  // ---- System control: the remembered popup answers (the control module itself is wired separately) ----
+  const SYSTEM_KINDS = ['screenshot', 'input', 'open', 'run', 'files'] as const
+  ipcMain.handle('system:status', () => {
+    const s = loadSettings(db)
+    return { enabled: s.systemControl === 'on', consents: s.systemConsents ?? {}, dangerousOverride: !!s.systemDangerousOverride, platform: process.platform }
+  })
+  ipcMain.handle('system:setConsent', (_e, kind: string, value: 'always' | 'never' | null) => {
+    if (!(SYSTEM_KINDS as readonly string[]).includes(kind)) return false
+    const s = loadSettings(db)
+    const consents = { ...(s.systemConsents ?? {}) }
+    if (value === 'always' || value === 'never') consents[kind as (typeof SYSTEM_KINDS)[number]] = value
+    else delete consents[kind as (typeof SYSTEM_KINDS)[number]]
+    saveSettings(db, { ...s, systemConsents: consents })
+    return true
+  })
+  ipcMain.handle('system:reset', () => {
+    const s = loadSettings(db)
+    saveSettings(db, { ...s, systemConsents: {} })
+    return true
+  })
+
   // ---- Evolving UI: local usage signals and the Simple / Standard / Pro level ----
   ipcMain.handle('usage:track', (_e, kind: 'tab' | 'feature', name: string) => {
     if (kind === 'tab') recordTab(db, String(name).slice(0, 40))

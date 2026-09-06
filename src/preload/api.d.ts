@@ -115,6 +115,12 @@ export interface InboxScoutApi {
   searchMessages: (query: string) => Promise<any[]>
   correctMessage: (input: unknown) => Promise<boolean>
 
+  // System control (v1.1). Renderer-side typing added by the UI agent as a last resort so typecheck passes;
+  // the preload agent owns the real implementation — if these lines are duplicated after merge, keep one copy.
+  systemStatus: () => Promise<{ enabled: boolean; consents: Partial<Record<string, 'always' | 'never'>>; platform: string }>
+  systemSetConsent: (kind: string, value: 'always' | 'never' | null) => Promise<unknown>
+  systemReset: () => Promise<unknown>
+
   onRunProgress: (cb: (p: any) => void) => () => void
   onRunFinished: (cb: (r: any) => void) => () => void
 }
