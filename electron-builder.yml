@@ -8,6 +8,8 @@ files:
 asarUnpack:
   - "**/*.node"
 win:
+  # Stable names so the README's "latest" links never go stale.
+  artifactName: InboxScout-Setup.${ext}
   target:
     - nsis
 nsis:
@@ -15,6 +17,7 @@ nsis:
   perMachine: false
   deleteAppDataOnUninstall: false
 mac:
+  artifactName: InboxScout-${arch}.${ext}
   target:
     - target: dmg
       arch:

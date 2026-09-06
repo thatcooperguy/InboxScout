@@ -1,6 +1,6 @@
 {
   "name": "inboxscout",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "AI email intelligence assistant - sorts personal from work mail and delivers daily briefs",
   "main": "out/main/index.js",
   "author": "thatcooperguy",

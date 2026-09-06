@@ -10,7 +10,19 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/thatcooperguy/InboxScout/releases/latest"><img src="https://img.shields.io/github/v/release/thatcooperguy/InboxScout?label=download&color=2456a6" alt="Latest release"/></a>
+  <a href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-Setup.exe"><img src="https://img.shields.io/badge/⬇%20Download%20for%20Windows-.exe-2456a6?style=for-the-badge" alt="Download for Windows"/></a>
+  &nbsp;
+  <a href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-arm64.dmg"><img src="https://img.shields.io/badge/⬇%20Download%20for%20Mac-Apple%20Silicon%20.dmg-1e2430?style=for-the-badge" alt="Download for Mac (Apple Silicon)"/></a>
+  &nbsp;
+  <a href="https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-x64.dmg"><img src="https://img.shields.io/badge/⬇%20Download%20for%20Mac-Intel%20.dmg-1e2430?style=for-the-badge" alt="Download for Mac (Intel)"/></a>
+</p>
+
+<p align="center">
+  <sub>Free · no account needed · updates itself · <a href="#-install">first-time install tips</a></sub>
+</p>
+
+<p align="center">
+  <a href="https://github.com/thatcooperguy/InboxScout/releases/latest"><img src="https://img.shields.io/github/v/release/thatcooperguy/InboxScout?label=latest&color=2456a6" alt="Latest release"/></a>
   <a href="https://github.com/thatcooperguy/InboxScout/actions/workflows/ci.yml"><img src="https://github.com/thatcooperguy/InboxScout/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
   <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-FSL--1.1--MIT-blue" alt="License"/></a>
   <img src="https://img.shields.io/badge/Windows%20%7C%20macOS-desktop-1e2430" alt="Platforms"/>
@@ -46,10 +58,14 @@ It works for a business owner, a real-estate agent, a lineworker at the power co
 
 ## 🚀 Install
 
-**Download** the latest installer from the [Releases page](https://github.com/thatcooperguy/InboxScout/releases/latest):
+**Download** (always the newest version):
 
-- **Windows:** `InboxScout-Setup-x.y.z.exe`
-- **macOS:** `InboxScout-x.y.z-arm64.dmg` (Apple Silicon) or `InboxScout-x.y.z-x64.dmg` (Intel)
+- **Windows:** [InboxScout-Setup.exe](https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-Setup.exe)
+- **Mac with Apple Silicon (M1–M4):** [InboxScout-arm64.dmg](https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-arm64.dmg)
+- **Mac with Intel:** [InboxScout-x64.dmg](https://github.com/thatcooperguy/InboxScout/releases/latest/download/InboxScout-x64.dmg)
+- Not sure which Mac? Apple menu → *About This Mac* → look for "Apple M…" (Apple Silicon) or "Intel".
+
+All versions are on the [Releases page](https://github.com/thatcooperguy/InboxScout/releases).
 
 > **Heads-up: the installers aren't code-signed yet** (that costs money; we're in the friends-and-family stage). You'll see a one-time warning:
 >
