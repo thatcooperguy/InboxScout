@@ -7,6 +7,9 @@ import { runPipeline } from './pipeline/run'
 import { Scheduler } from './scheduler'
 import { loadSettings, saveSettings } from './settings'
 import type { RunProgress } from '../shared/types'
+import { briefToSpeech } from '../shared/speech'
+import { speakWithOs } from './voice'
+import { latestBrief } from './db/repo'
 
 let db: DB
 let secrets: SecretStore
@@ -35,9 +38,15 @@ async function runNow(trigger: 'manual' | 'scheduled' | 'catchup' | 'cli' = 'man
           ? { title: 'InboxScout — scan failed', body: result.error.slice(0, 200) }
           : {
               title: 'InboxScout — brief ready',
-              body: `${result.messagesScanned} new messages scanned, ${result.issueCount} issue${result.issueCount === 1 ? '' : 's'} need attention.`
+              body:
+                `${result.messagesScanned} new messages scanned, ${result.issueCount} issue${result.issueCount === 1 ? '' : 's'} need attention.` +
+                (result.notices.length ? ` (${result.notices[0]})` : '')
             }
       ).show()
+    }
+    if (!result.error && loadSettings(db).speakBriefs) {
+      const latest = latestBrief(db)
+      if (latest) speakWithOs(`Your InboxScout brief is ready. ${briefToSpeech(latest.brief, { short: true })}`)
     }
     broadcast('run:finished', result)
   } finally {

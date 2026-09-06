@@ -77,6 +77,7 @@ export async function generateBrief(model: LanguageModel, inputs: BriefInputs): 
     personal: object.personal,
     sensitiveNotices: object.sensitiveNotices,
     skillSections: inputs.skillSections,
-    resolvedRecently: inputs.resolvedRecently ?? []
+    resolvedRecently: inputs.resolvedRecently ?? [],
+    waitingOnYouDetails: inputs.replies.waitingOnYou.map((t) => ({ subject: t.subject, counterpart: t.counterpart, address: t.address }))
   }
 }

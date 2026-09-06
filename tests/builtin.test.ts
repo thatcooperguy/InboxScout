@@ -146,7 +146,7 @@ describe('buildBasicBrief', () => {
       personalMessages: [],
       sensitiveMessages: [],
       deadlines: ['Friday — Safety training'],
-      replies: { waitingOnYou: [{ subject: 'Shift swap?', counterpart: 'Sam', daysWaiting: 1 }], waitingOnThem: [] },
+      replies: { waitingOnYou: [{ subject: 'Shift swap?', counterpart: 'Sam', address: 'sam@x.com', daysWaiting: 1 }], waitingOnThem: [] },
       skillSections: []
     })
     expect(brief.headline).toContain('2 open items')

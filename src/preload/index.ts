@@ -18,6 +18,19 @@ const api = {
     return () => ipcRenderer.removeListener('outlook:deviceCode', listener)
   },
   exportReportPdf: (id: string) => ipcRenderer.invoke('reports:exportPdf', id),
+  exportCsv: () => ipcRenderer.invoke('export:csv'),
+  exportIcs: () => ipcRenderer.invoke('export:ics'),
+  deliveryCarriers: () => ipcRenderer.invoke('delivery:carriers'),
+  deliveryTest: (kind: string) => ipcRenderer.invoke('delivery:test', kind),
+  setupInfo: () => ipcRenderer.invoke('setup:info'),
+  setupStart: (kind: string, step: number) => ipcRenderer.invoke('setup:start', kind, step),
+  setupGoto: (kind: string, step: number) => ipcRenderer.invoke('setup:goto', kind, step),
+  setupStop: () => ipcRenderer.invoke('setup:stop'),
+  onSetupEvent: (cb: (p: unknown) => void) => {
+    const listener = (_e: unknown, p: unknown): void => cb(p)
+    ipcRenderer.on('setup:event', listener)
+    return () => ipcRenderer.removeListener('setup:event', listener)
+  },
   resolveIssue: (id: string) => ipcRenderer.invoke('issues:resolve', id),
 
   aiProviders: () => ipcRenderer.invoke('ai:providers'),

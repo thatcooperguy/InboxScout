@@ -50,11 +50,23 @@
 - **Sign in with Google** for Gmail (OAuth PKCE loopback, `gmail.readonly`) with Gmail API delta sync via history ids; Gmail category labels, Important/Starred, read state, and real thread ids feed classification. Setup in `docs/GOOGLE.md`.
 - **Provider hints** stored per message and used by both the built-in engine and AI prompts; Outlook now contributes Focused/Other, importance, read, and flag signals.
 
-## 🟠 Gaps — v0.6
+## ✅ v0.6 — shipped (assistant channels & zero-setup)
 
-8. **Google Drive report sync** — designed (`drive.file` scope, hand-rolled REST), not implemented. OneDrive after.
+- **Baked sign-in app IDs**: release builds embed Google/Microsoft client IDs from repository secrets (`docs/RELEASING.md`) so family members never register anything.
+- **Connect helper**: companion window opens each console page and captures client IDs/secrets from the page automatically.
+- **Send me my brief**: email delivery and free carrier-gateway **text messages**, using the person's own account as the outbox; test buttons.
+- **Voice**: **Read it to me** in-app and optional spoken **voice summaries** via the OS voice when a scheduled brief is ready (works with the window closed); **Draft reply** (opens the mail app pre-filled), **CSV export**, **calendar (.ics) export**.
+- **Google Docs + Sheets export** via `drive.file` when signed in with Google.
+
+## 🟠 Gaps — v0.7
+
+- **Fully autonomous console agent** (LLM + vision driving Google/Microsoft consoles) — deliberately not shipped: brittle against UI changes and unnecessary once IDs are baked into builds. Revisit only if a real need appears.
+- **Voice commands** (talk to InboxScout) — Chromium speech recognition in Electron needs a Google key and is unreliable offline; revisit with a local model (e.g. whisper.cpp).
+- **Real phone calls / two-way SMS** — needs a paid provider (Twilio); not aligned with "free out of the box". Read-aloud and carrier texts cover the need for now.
+
+8. ~~Google Drive report sync~~ — ✅ shipped in v0.6 as Google Docs + Sheets export. OneDrive later.
 10. **Token/cost meter** — the `runs` table doesn't record token usage or cost estimates; the proposal promised per-run cost visibility.
-13. **Ship a default Microsoft app ID** in official builds (via `INBOXSCOUT_MS_CLIENT_ID` at release time) so family members never see the registration step.
+13. ~~Ship default app IDs in official builds~~ — ✅ v0.6 (`docs/RELEASING.md`).
 
 ## 🟡 Gaps — v1.x features (proposal roadmap)
 

@@ -35,7 +35,8 @@ export interface GoogleTokens {
 export async function signInWithGoogle(
   clientId: string,
   clientSecret: string,
-  openUrl: (url: string) => void
+  openUrl: (url: string) => void,
+  extraScopes: string[] = []
 ): Promise<{ email: string; tokens: GoogleTokens }> {
   if (!clientId) {
     throw new Error(
@@ -80,7 +81,7 @@ export async function signInWithGoogle(
         client_id: clientId,
         redirect_uri: redirectUri,
         response_type: 'code',
-        scope: GMAIL_SCOPE,
+        scope: [GMAIL_SCOPE, ...extraScopes].join(' '),
         access_type: 'offline',
         prompt: 'consent',
         code_challenge: challenge,

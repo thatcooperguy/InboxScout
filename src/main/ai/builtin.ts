@@ -193,6 +193,7 @@ export function buildBasicBrief(inputs: BriefInputs): Brief {
     deadlines: deadlines.slice(0, 10),
     skillSections,
     resolvedRecently: inputs.resolvedRecently ?? [],
+    waitingOnYouDetails: replies.waitingOnYou.map((t) => ({ subject: t.subject, counterpart: t.counterpart, address: t.address })),
     personal: personalMessages.slice(0, 10).map(({ message }) => `${message.subject} (${message.fromName || message.fromAddress})`),
     sensitiveNotices: sensitiveMessages
       .slice(0, 10)

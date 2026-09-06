@@ -12,6 +12,18 @@ export interface InboxScoutApi {
   openExternal: (url: string) => Promise<boolean>
   onOutlookDeviceCode: (cb: (info: { userCode: string; verificationUri: string; message: string }) => void) => () => void
   exportReportPdf: (id: string) => Promise<{ ok: boolean; filePath?: string; error?: string }>
+  exportCsv: () => Promise<{ ok: boolean; filePath?: string; error?: string }>
+  exportIcs: () => Promise<{ ok: boolean; filePath?: string; error?: string; count?: number }>
+  deliveryCarriers: () => Promise<{ id: string; name: string }[]>
+  deliveryTest: (kind: 'email' | 'sms') => Promise<{ ok: boolean; error?: string }>
+  setupInfo: () => Promise<{
+    google: { steps: any[]; configured: boolean; baked: boolean }
+    microsoft: { steps: any[]; configured: boolean; baked: boolean }
+  }>
+  setupStart: (kind: string, step: number) => Promise<boolean>
+  setupGoto: (kind: string, step: number) => Promise<boolean>
+  setupStop: () => Promise<boolean>
+  onSetupEvent: (cb: (p: any) => void) => () => void
   resolveIssue: (id: string) => Promise<boolean>
 
   aiProviders: () => Promise<any[]>

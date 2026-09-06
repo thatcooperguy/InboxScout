@@ -161,6 +161,8 @@ export interface Brief {
   skillSections: BriefSection[]
   /** Issues closed since the last brief of this period (weekly recap). */
   resolvedRecently?: string[]
+  /** Structured reply-tracker entries (for one-click reply drafts). */
+  waitingOnYouDetails?: { subject: string; counterpart: string; address: string }[]
 }
 
 export interface ScheduleSettings {
@@ -201,6 +203,15 @@ export interface AppSettings {
   /** Google OAuth desktop client used for "Sign in with Google" (Gmail API). */
   googleClientId: string
   googleClientSecret: string
+  /** Send each brief to this address ('' = off). Uses one of your own accounts as the outbox. */
+  deliverEmailTo: string
+  /** Text the headline after each run via the carrier's email gateway ('' = off). */
+  smsPhone: string
+  smsCarrier: string
+  /** Also save briefs as Google Docs and keep a Google Sheet tracker (needs Google sign-in). */
+  googleDriveExport: boolean
+  /** Speak a short summary out loud whenever a scheduled brief is ready. */
+  speakBriefs: boolean
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -218,7 +229,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   textSize: 'normal',
   microsoftClientId: '',
   googleClientId: '',
-  googleClientSecret: ''
+  googleClientSecret: '',
+  deliverEmailTo: '',
+  smsPhone: '',
+  smsCarrier: '',
+  googleDriveExport: false,
+  speakBriefs: false
 }
 
 export interface RunProgress {

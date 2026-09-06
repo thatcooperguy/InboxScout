@@ -3,6 +3,8 @@ import type { Category, MessageRecord } from '../../shared/types'
 export interface ThreadReplyState {
   subject: string
   counterpart: string
+  /** Email address of the other party (for reply drafts). */
+  address: string
   daysWaiting: number
 }
 
@@ -44,6 +46,7 @@ export function trackReplies(
           counterpart: counterpartMsg
             ? counterpartMsg.fromName || counterpartMsg.fromAddress
             : last.toAddresses.split(',')[0]?.trim() || 'recipient',
+          address: counterpartMsg?.fromAddress ?? last.toAddresses.split(',')[0]?.trim() ?? '',
           daysWaiting
         })
       }
@@ -53,6 +56,7 @@ export function trackReplies(
         waitingOnYou.push({
           subject: last.subject,
           counterpart: last.fromName || last.fromAddress,
+          address: last.fromAddress,
           daysWaiting
         })
       }

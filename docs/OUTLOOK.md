@@ -6,6 +6,10 @@ into InboxScout — they type a code on Microsoft's own page.
 
 ## One-time setup (whoever installs InboxScout for the family)
 
+> **Easiest:** open **Setup → Connect helper** in InboxScout. It opens each page below for you and captures the IDs
+> automatically. Official builds may already include the IDs (the helper says "Ready") — then skip this entirely.
+> Maintainers: see `docs/RELEASING.md` to bake IDs into releases.
+
 Microsoft requires every app to have a free "app registration". It takes about five minutes:
 
 1. Go to https://entra.microsoft.com → **App registrations** → **New registration**.

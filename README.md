@@ -38,6 +38,9 @@ It works for a business owner, a real-estate agent, a lineworker at the power co
 | 🧩 **Custom agents for companies** | Drop a JSON skill in a folder to teach InboxScout your kind of mail — and route matches to your own AI agent by webhook. [docs/SKILLS.md](docs/SKILLS.md) |
 | 💸 **Free, works out of the box** | A built-in engine runs 100% on your computer with no account. Optionally connect Gemini, Groq, OpenRouter, Mistral, DeepSeek, OpenAI, Claude, Grok, Ollama, LM Studio, or any OpenAI-compatible endpoint for smarter results. |
 | 👵 **Simple enough for anyone** | Three tabs, one big button, a three-step setup, adjustable text size. Advanced tools are there when you want them. |
+| 📨 **Comes to you** | Email yourself the brief, get the headline as a **text message** (free carrier gateways), press **Read it to me**, or let InboxScout **speak a voice summary** out loud when the morning brief is ready. It only ever sends to *you*. |
+| ✍ **Reply drafts & exports** | One click opens your own mail app with a starter reply (you send it). Export your list to CSV, add dates to any calendar (.ics), and optionally save briefs to **Google Docs** with a **Google Sheets** tracker. |
+| 🧑‍💻 **Connect helper** | The one-time Google/Microsoft app registration is done with a helper watching over your shoulder: it opens the right pages and captures the IDs for you. Official builds can skip it entirely. |
 | 🔒 **Local-first & private** | Everything lives in a local database; passwords and keys are encrypted with your OS keychain. Email content only goes to the AI you choose — or nowhere. |
 | 🔄 **Self-updating** | Installs from this page and updates itself from Releases. |
 
@@ -80,7 +83,8 @@ Microsoft accounts sign in with a short code instead of a password. A one-time f
 
 - **Setup → What to watch for** — tick the skills that matter in your life; name your *Important people*; list senders to *Never bother me about*.
 - **Setup → AI helper** — free built-in engine by default; connect any AI in one click for smarter briefs.
-- **Setup → Preferences** — schedule (daily 7:30 by default), text size, work profile, privacy.
+- **Setup → Preferences** — schedule (daily 7:30 by default), text size, work profile, privacy, and **Send me my brief** (email / text).
+- **Setup → Connect helper** — one-time Google/Microsoft app setup with the helper capturing the IDs; skip if your build already includes them.
 
 ## 🛠 Develop
 

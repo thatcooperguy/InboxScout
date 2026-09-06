@@ -6,6 +6,9 @@ import * as repo from '../db/repo'
 import { syncFolder } from '../mail/imap'
 import { getAccessToken, syncGraphFolder } from '../mail/graph'
 import { ensureAccessToken, syncGmail, GMAIL_FOLDER, type GoogleTokens } from '../mail/gmail'
+import { googleClient, microsoftClientId } from '../config'
+import { pickOutbox, sendMail, smsAddress, smsText } from '../delivery/email'
+import { appendTrackerRows, uploadBriefAsDoc } from '../mail/drive'
 import { classifyBatch, chunk, BATCH_SIZE } from '../ai/classify'
 import { decideTracking, applyTrackingDecisions } from '../ai/track'
 import { generateBrief } from '../ai/brief'
@@ -35,6 +38,8 @@ export interface PipelineResult {
   messagesScanned: number
   issueCount: number
   error: string | null
+  /** Non-fatal problems after the brief was saved (delivery, Drive export). */
+  notices: string[]
 }
 
 export async function runPipeline(
@@ -86,11 +91,8 @@ export async function runPipeline(
         if (account.provider === 'gmailapi') {
           const raw = secrets.get(accountSecretName(account.id))
           if (!raw) throw new Error('Google sign-in missing — reconnect this account.')
-          const tokens = await ensureAccessToken(
-            settings.googleClientId || process.env['INBOXSCOUT_GOOGLE_CLIENT_ID'] || '',
-            settings.googleClientSecret || process.env['INBOXSCOUT_GOOGLE_CLIENT_SECRET'] || '',
-            JSON.parse(raw) as GoogleTokens
-          )
+          const g = googleClient(settings)
+          const tokens = await ensureAccessToken(g.clientId, g.clientSecret, JSON.parse(raw) as GoogleTokens)
           if (tokens.accessToken !== (JSON.parse(raw) as GoogleTokens).accessToken) {
             secrets.set(accountSecretName(account.id), JSON.stringify(tokens))
           }
@@ -106,7 +108,7 @@ export async function runPipeline(
         }
         if (account.provider === 'outlook') {
           const homeAccountId = repo.getMeta(db, `graph-home:${account.id}`) ?? ''
-          const clientId = settings.microsoftClientId || process.env['INBOXSCOUT_MS_CLIENT_ID'] || ''
+          const clientId = microsoftClientId(settings)
           const store = {
             load: () => secrets.get(accountSecretName(account.id)),
             save: (v: string) => secrets.set(accountSecretName(account.id), v)
@@ -279,19 +281,73 @@ export async function runPipeline(
 
     saveSettings(db, { ...settings, lastRunAt: now.toISOString() })
     repo.finishRun(db, runId, 'succeeded', newMessages.length, null)
+
+    // 6. Deliver (to you only) and export - never fatal.
+    const notices: string[] = []
+    const outbox = pickOutbox(accounts, null)
+    const outboxPassword = outbox ? secrets.get(accountSecretName(outbox.id)) : null
+    const topTitles = brief.topIssues.map((i) => i.title)
+    if (settings.deliverEmailTo || (settings.smsPhone && settings.smsCarrier)) {
+      if (!outbox || !outboxPassword) {
+        notices.push('Delivery skipped: connect a Gmail, Yahoo, or iCloud account with an app password to use as the outbox.')
+      } else {
+        onProgress({ phase: 'save', detail: 'Sending your brief…' })
+        if (settings.deliverEmailTo) {
+          try {
+            await sendMail(outbox, outboxPassword, settings.deliverEmailTo, `InboxScout brief — ${now.toDateString()}`, html, markdown)
+          } catch (err: any) {
+            notices.push(`Email delivery failed: ${String(err?.message ?? err)}`)
+          }
+        }
+        const sms = settings.smsPhone && settings.smsCarrier ? smsAddress(settings.smsPhone, settings.smsCarrier) : null
+        if (settings.smsPhone && settings.smsCarrier && !sms) notices.push('Text delivery skipped: check the phone number and carrier.')
+        if (sms) {
+          try {
+            const text = smsText(brief.headline, topTitles)
+            await sendMail(outbox, outboxPassword, sms, '', `<p>${text}</p>`, text)
+          } catch (err: any) {
+            notices.push(`Text delivery failed: ${String(err?.message ?? err)}`)
+          }
+        }
+      }
+    }
+    if (settings.googleDriveExport) {
+      const gAccount = accounts.find((a) => a.provider === 'gmailapi')
+      const raw = gAccount ? secrets.get(accountSecretName(gAccount.id)) : null
+      if (!gAccount || !raw) {
+        notices.push('Google Drive export skipped: sign in with Google first (Setup → Email accounts).')
+      } else {
+        try {
+          const g = googleClient(settings)
+          const tokens = await ensureAccessToken(g.clientId, g.clientSecret, JSON.parse(raw) as GoogleTokens)
+          secrets.set(accountSecretName(gAccount.id), JSON.stringify(tokens))
+          await uploadBriefAsDoc(tokens.accessToken, `InboxScout brief ${now.toISOString().slice(0, 10)}`, html)
+          const sheetId = repo.getMeta(db, 'drive-tracker-sheet')
+          const rows = repo
+            .listIssues(db, true)
+            .map((i) => [now.toISOString().slice(0, 10), 'Issue', i.title, `${i.state}/${i.severity}`, i.ownerAction ?? '', i.deadline ?? ''])
+          const newId = await appendTrackerRows(tokens.accessToken, sheetId, rows)
+          if (newId !== sheetId) repo.setMeta(db, 'drive-tracker-sheet', newId)
+        } catch (err: any) {
+          notices.push(`Google Drive export failed: ${String(err?.message ?? err)} (you may need to sign in with Google again to allow Drive access)`)
+        }
+      }
+    }
+
     onProgress({ phase: 'done', detail: 'Brief ready.' })
     return {
       runId,
       reportId,
       messagesScanned: newMessages.length,
       issueCount: brief.topIssues.length,
-      error: null
+      error: null,
+      notices
     }
   } catch (err: any) {
     const message = String(err?.message ?? err)
     repo.finishRun(db, runId, 'failed', 0, message)
     onProgress({ phase: 'error', detail: message })
-    return { runId, reportId: null, messagesScanned: 0, issueCount: 0, error: message }
+    return { runId, reportId: null, messagesScanned: 0, issueCount: 0, error: message, notices: [] }
   }
 }
 

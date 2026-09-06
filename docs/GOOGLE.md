@@ -11,6 +11,10 @@ InboxScout can connect Gmail two ways:
 
 ## One-time setup (whoever installs InboxScout for the family)
 
+> **Easiest:** open **Setup → Connect helper** in InboxScout. It opens each page below for you and captures the IDs
+> automatically. Official builds may already include the IDs (the helper says "Ready") — then skip this entirely.
+> Maintainers: see `docs/RELEASING.md` to bake IDs into releases.
+
 1. Go to https://console.cloud.google.com → create a project (e.g. `InboxScout`).
 2. **APIs & Services → Library** → search **Gmail API** → Enable.
 3. **APIs & Services → OAuth consent screen** → External → fill in the app name and your email → Save.

@@ -10,11 +10,20 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
   const [settings, setSettings] = useState<any | null>(null)
   const [profiles, setProfiles] = useState<any[]>([])
   const [saved, setSaved] = useState(false)
+  const [carriers, setCarriers] = useState<{ id: string; name: string }[]>([])
+  const [testMsg, setTestMsg] = useState('')
 
   useEffect(() => {
     void window.inboxScout.getSettings().then(setSettings)
     void window.inboxScout.listProfiles().then(setProfiles)
+    void window.inboxScout.deliveryCarriers().then(setCarriers)
   }, [])
+
+  const testDelivery = async (kind: 'email' | 'sms'): Promise<void> => {
+    await window.inboxScout.setSettings(settings)
+    const r = await window.inboxScout.deliveryTest(kind)
+    setTestMsg(r.ok ? (kind === 'email' ? 'Test email sent ✓' : 'Test text sent ✓') : r.error ?? 'Failed')
+  }
 
   if (!settings) return <div className="empty">Loading…</div>
 
@@ -43,6 +52,13 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
               <option value="normal">Normal</option>
               <option value="large">Large</option>
               <option value="xlarge">Extra large</option>
+            </select>
+          </label>
+          <label className="field">
+            <span>🔊 Speak a short summary out loud when a scheduled brief is ready</span>
+            <select value={settings.speakBriefs ? 'yes' : 'no'} onChange={(e) => update({ speakBriefs: e.target.value === 'yes' })}>
+              <option value="no">No</option>
+              <option value="yes">Yes — use the computer's voice</option>
             </select>
           </label>
           <label className="field">
@@ -111,6 +127,50 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
               />
             </label>
           )}
+        </div>
+        <div className="card">
+          <h3>📨 Send me my brief</h3>
+          <p className="hint">
+            InboxScout only ever sends to <strong>you</strong>, using one of your own Gmail/Yahoo/iCloud accounts as the outbox.
+          </p>
+          <label className="field">
+            <span>Email each brief to</span>
+            <input value={settings.deliverEmailTo} onChange={(e) => update({ deliverEmailTo: e.target.value })} placeholder="you@example.com (blank = off)" />
+          </label>
+          <label className="field">
+            <span>Text me the headline — phone number</span>
+            <input value={settings.smsPhone} onChange={(e) => update({ smsPhone: e.target.value })} placeholder="(555) 123-4567 (blank = off)" />
+          </label>
+          <label className="field">
+            <span>Carrier (texts go through your carrier's free email gateway)</span>
+            <select value={settings.smsCarrier} onChange={(e) => update({ smsCarrier: e.target.value })}>
+              <option value="">— choose —</option>
+              {carriers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button className="ghost" onClick={() => void testDelivery('email')} disabled={!settings.deliverEmailTo}>
+              Send test email
+            </button>
+            <button className="ghost" onClick={() => void testDelivery('sms')} disabled={!settings.smsPhone || !settings.smsCarrier}>
+              Send test text
+            </button>
+            {testMsg && <span className="hint">{testMsg}</span>}
+          </div>
+          <label className="field" style={{ marginTop: 12 }}>
+            <span>Also save briefs to Google Drive (as Google Docs) and keep a Google Sheet tracker</span>
+            <select
+              value={settings.googleDriveExport ? 'yes' : 'no'}
+              onChange={(e) => update({ googleDriveExport: e.target.value === 'yes' })}
+            >
+              <option value="no">No</option>
+              <option value="yes">Yes — needs "Sign in with Google" (re-sign-in to allow Drive)</option>
+            </select>
+          </label>
         </div>
         <div className="card">
           <h3>Storage & privacy</h3>

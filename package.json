@@ -1,6 +1,6 @@
 {
   "name": "inboxscout",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "AI email intelligence assistant - sorts personal from work mail and delivers daily briefs",
   "main": "out/main/index.js",
   "author": "thatcooperguy",
@@ -34,12 +34,14 @@
     "mailparser": "^3.7.0",
     "marked": "^15.0.0",
     "node-cron": "^4.0.0",
+    "nodemailer": "^7.0.13",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
     "@types/mailparser": "^3.4.5",
     "@types/node": "^22.10.0",
+    "@types/nodemailer": "^8.0.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",

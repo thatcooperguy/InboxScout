@@ -32,5 +32,9 @@ jobs:
         run: npm run release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: bake sign-in app IDs into official builds so nobody else needs to register apps.
+          INBOXSCOUT_GOOGLE_CLIENT_ID: ${{ secrets.INBOXSCOUT_GOOGLE_CLIENT_ID }}
+          INBOXSCOUT_GOOGLE_CLIENT_SECRET: ${{ secrets.INBOXSCOUT_GOOGLE_CLIENT_SECRET }}
+          INBOXSCOUT_MS_CLIENT_ID: ${{ secrets.INBOXSCOUT_MS_CLIENT_ID }}
           # Unsigned builds until signing certs are configured:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'

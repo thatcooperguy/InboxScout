@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { replyMailto } from '../../../shared/mailto'
+import { briefToSpeech } from '../../../shared/speech'
 
 interface Props {
   running: boolean
@@ -21,6 +23,33 @@ export default function Today({ running, onRun }: Props): JSX.Element {
       .listIssues()
       .then((issues) => setDoneIds(new Set(issues.filter((i) => i.state === 'resolved').map((i) => i.id))))
   }, [])
+
+  const [speaking, setSpeaking] = useState(false)
+  const [exportMsg, setExportMsg] = useState('')
+
+  const readAloud = (): void => {
+    if (!('speechSynthesis' in window) || !brief) return
+    if (speaking) {
+      window.speechSynthesis.cancel()
+      setSpeaking(false)
+      return
+    }
+    const utter = new SpeechSynthesisUtterance(briefToSpeech(brief))
+    utter.rate = 0.95
+    utter.onend = () => setSpeaking(false)
+    window.speechSynthesis.cancel()
+    window.speechSynthesis.speak(utter)
+    setSpeaking(true)
+  }
+
+  const exportCsv = async (): Promise<void> => {
+    const r = await window.inboxScout.exportCsv()
+    setExportMsg(r.ok ? `Saved ${r.filePath}` : r.error ?? '')
+  }
+  const exportIcs = async (): Promise<void> => {
+    const r = await window.inboxScout.exportIcs()
+    setExportMsg(r.ok ? `Saved ${r.count} date${r.count === 1 ? '' : 's'} to ${r.filePath} — open it to add them to your calendar.` : r.error ?? '')
+  }
 
   const markDone = async (id: string): Promise<void> => {
     await window.inboxScout.resolveIssue(id)
@@ -59,10 +88,26 @@ export default function Today({ running, onRun }: Props): JSX.Element {
             </p>
           )}
         </div>
-        <button className="big-btn" onClick={onRun} disabled={running}>
-          {running ? 'Checking…' : '✉ Check my email now'}
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
+          <button className="big-btn" onClick={onRun} disabled={running}>
+            {running ? 'Checking…' : '✉ Check my email now'}
+          </button>
+          {brief && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+              <button className="ghost" onClick={readAloud}>
+                {speaking ? '⏹ Stop reading' : '🔊 Read it to me'}
+              </button>
+              <button className="ghost" onClick={() => void exportIcs()}>
+                📅 Add dates to calendar
+              </button>
+              <button className="ghost" onClick={() => void exportCsv()}>
+                📄 Export list (CSV)
+              </button>
+            </div>
+          )}
+        </div>
       </div>
+      {exportMsg && <div className="success">{exportMsg}</div>}
 
       {brief && !hasAnything && (
         <div className="today-card">
@@ -99,10 +144,27 @@ export default function Today({ running, onRun }: Props): JSX.Element {
             <div className="today-card">
               <h3>✉ Waiting for your reply</h3>
               <ul>
-                {brief.waitingOnYou.map((t: string, idx: number) => (
-                  <li key={idx}>{t}</li>
-                ))}
+                {(brief.waitingOnYouDetails?.length ? brief.waitingOnYouDetails : brief.waitingOnYou.map((t: string) => ({ subject: t, counterpart: '', address: '' }))).map(
+                  (t: any, idx: number) => (
+                    <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+                      <span>
+                        <strong>{t.subject}</strong>
+                        {t.counterpart && <div className="next">{t.counterpart}</div>}
+                      </span>
+                      {t.address && (
+                        <button
+                          className="ghost"
+                          style={{ alignSelf: 'center', whiteSpace: 'nowrap' }}
+                          onClick={() => void window.inboxScout.openExternal(replyMailto(t.address, t.subject, t.counterpart))}
+                        >
+                          ✍ Draft reply
+                        </button>
+                      )}
+                    </li>
+                  )
+                )}
               </ul>
+              <p className="hint">Draft reply opens your own mail app with a starter message — you review and send.</p>
             </div>
           )}
           {brief.deadlines.length > 0 && (

@@ -3,8 +3,9 @@ import Accounts from './Accounts'
 import AiSettings from './AiSettings'
 import Skills from './Skills'
 import SettingsView from './Settings'
+import SetupAssistant from './SetupAssistant'
 
-type Sub = 'hub' | 'accounts' | 'ai' | 'skills' | 'prefs'
+type Sub = 'hub' | 'accounts' | 'ai' | 'skills' | 'prefs' | 'helper'
 
 interface Props {
   onSettingsChanged: () => void
@@ -24,6 +25,7 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
         {sub === 'ai' && <AiSettings />}
         {sub === 'skills' && <Skills />}
         {sub === 'prefs' && <SettingsView onSaved={onSettingsChanged} />}
+        {sub === 'helper' && <SetupAssistant />}
       </div>
     )
   }
@@ -47,6 +49,11 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
           <span className="icon">🧠</span>
           <strong>AI helper</strong>
           <span className="sub">Works free out of the box. Optionally connect a smarter AI.</span>
+        </button>
+        <button className="hub-btn" onClick={() => setSub('helper')}>
+          <span className="icon">🧑‍💻</span>
+          <strong>Connect helper</strong>
+          <span className="sub">One-time Google / Microsoft app setup — the helper watches and fills it in for you.</span>
         </button>
         <button className="hub-btn" onClick={() => setSub('prefs')}>
           <span className="icon">⚙️</span>

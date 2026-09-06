@@ -3,6 +3,11 @@ import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { signInWithDeviceCode } from './mail/graph'
 import { signInWithGoogle, GMAIL_FOLDER } from './mail/gmail'
+import { DRIVE_SCOPE } from './mail/drive'
+import { googleClient, microsoftClientId, hasBakedClients } from './config'
+import { GOOGLE_STEPS, MICROSOFT_STEPS, SetupAssistant, type SetupKind } from './setup/assistant'
+import { eventsFromBrief, toCsv, toIcs, trackerRows } from './reports/exports'
+import { SMS_GATEWAYS, pickOutbox, sendMail, smsAddress } from './delivery/email'
 import { randomUUID } from 'node:crypto'
 import type { DB } from './db/index'
 import * as repo from './db/repo'
@@ -61,7 +66,7 @@ export function registerIpc(ctx: IpcContext): void {
   )
   ipcMain.handle('accounts:outlookSignIn', async () => {
     const settings = loadSettings(db)
-    const clientId = settings.microsoftClientId || process.env['INBOXSCOUT_MS_CLIENT_ID'] || ''
+    const clientId = microsoftClientId(settings)
     const id = randomUUID()
     let cache: string | null = null
     const store = { load: () => cache, save: (v: string) => void (cache = v) }
@@ -85,9 +90,13 @@ export function registerIpc(ctx: IpcContext): void {
   })
   ipcMain.handle('accounts:googleSignIn', async () => {
     const settings = loadSettings(db)
-    const clientId = settings.googleClientId || process.env['INBOXSCOUT_GOOGLE_CLIENT_ID'] || ''
-    const clientSecret = settings.googleClientSecret || process.env['INBOXSCOUT_GOOGLE_CLIENT_SECRET'] || ''
-    const { email, tokens } = await signInWithGoogle(clientId, clientSecret, (url) => void shell.openExternal(url))
+    const { clientId, clientSecret } = googleClient(settings)
+    const { email, tokens } = await signInWithGoogle(
+      clientId,
+      clientSecret,
+      (url) => void shell.openExternal(url),
+      settings.googleDriveExport ? [DRIVE_SCOPE] : []
+    )
     const account: AccountConfig = {
       id: randomUUID(),
       label: email,
@@ -103,8 +112,85 @@ export function registerIpc(ctx: IpcContext): void {
     return account
   })
   ipcMain.handle('shell:openExternal', (_e, url: string) => {
-    if (/^https?:\/\//.test(url)) void shell.openExternal(url)
+    if (/^(https?:\/\/|mailto:)/.test(url)) void shell.openExternal(url)
     return true
+  })
+
+  // ---- Setup Assistant (one-time app registration, watched and captured) ----
+  const assistant = new SetupAssistant(
+    (kind, captured) => {
+      const settings = loadSettings(db)
+      saveSettings(db, {
+        ...settings,
+        ...(kind === 'google'
+          ? { googleClientId: captured.googleClientId ?? settings.googleClientId, googleClientSecret: captured.googleClientSecret ?? settings.googleClientSecret }
+          : { microsoftClientId: captured.microsoftClientId ?? settings.microsoftClientId })
+      })
+    },
+    (payload) => ctx.broadcast('setup:event', payload)
+  )
+  ipcMain.handle('setup:info', () => {
+    const settings = loadSettings(db)
+    const baked = hasBakedClients()
+    return {
+      google: { steps: GOOGLE_STEPS, configured: !!googleClient(settings).clientId, baked: baked.google },
+      microsoft: { steps: MICROSOFT_STEPS, configured: !!microsoftClientId(settings), baked: baked.microsoft }
+    }
+  })
+  ipcMain.handle('setup:start', (_e, kind: SetupKind, step: number) => {
+    assistant.start(kind, step ?? 0)
+    return true
+  })
+  ipcMain.handle('setup:goto', (_e, kind: SetupKind, step: number) => {
+    assistant.goto(kind, step)
+    return true
+  })
+  ipcMain.handle('setup:stop', () => {
+    assistant.stop()
+    return true
+  })
+
+  // ---- Exports & delivery ----
+  ipcMain.handle('export:csv', async () => {
+    const latest = repo.latestBrief(db)
+    const rows = trackerRows(repo.listIssues(db, false), latest?.brief ?? null)
+    const { filePath, canceled } = await dialog.showSaveDialog({
+      title: 'Export tracker as CSV',
+      defaultPath: join(loadSettings(db).reportsDir || '', 'InboxScout-tracker.csv'),
+      filters: [{ name: 'CSV', extensions: ['csv'] }]
+    })
+    if (canceled || !filePath) return { ok: false }
+    writeFileSync(filePath, toCsv(rows), 'utf8')
+    return { ok: true, filePath }
+  })
+  ipcMain.handle('export:ics', async () => {
+    const latest = repo.latestBrief(db)
+    const events = latest ? eventsFromBrief(latest.brief, new Date()) : []
+    if (events.length === 0) return { ok: false, error: 'No dates with a recognisable day were found in the latest brief.' }
+    const { filePath, canceled } = await dialog.showSaveDialog({
+      title: 'Export dates to your calendar',
+      defaultPath: join(loadSettings(db).reportsDir || '', 'InboxScout-dates.ics'),
+      filters: [{ name: 'Calendar', extensions: ['ics'] }]
+    })
+    if (canceled || !filePath) return { ok: false }
+    writeFileSync(filePath, toIcs(events), 'utf8')
+    return { ok: true, filePath, count: events.length }
+  })
+  ipcMain.handle('delivery:carriers', () => Object.entries(SMS_GATEWAYS).map(([id, g]) => ({ id, name: g.name })))
+  ipcMain.handle('delivery:test', async (_e, kind: 'email' | 'sms') => {
+    const settings = loadSettings(db)
+    const outbox = pickOutbox(repo.listAccounts(db), null)
+    const password = outbox ? secrets.get(accountSecretName(outbox.id)) : null
+    if (!outbox || !password) return { ok: false, error: 'Connect a Gmail, Yahoo, or iCloud account with an app password first — it becomes the outbox.' }
+    const to = kind === 'email' ? settings.deliverEmailTo : smsAddress(settings.smsPhone, settings.smsCarrier)
+    if (!to) return { ok: false, error: kind === 'email' ? 'Enter an email address first.' : 'Enter a valid 10-digit phone number and pick a carrier.' }
+    try {
+      const text = 'InboxScout test: your briefs will arrive here.'
+      await sendMail(outbox, password, to, kind === 'email' ? 'InboxScout test' : '', `<p>${text}</p>`, text)
+      return { ok: true }
+    } catch (err: any) {
+      return { ok: false, error: String(err?.message ?? err) }
+    }
   })
   ipcMain.handle('accounts:remove', (_e, id: string) => {
     repo.deleteAccount(db, id)
