@@ -244,6 +244,33 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
     ]
   },
   {
+    key: 'systemControl',
+    group: 'helpers',
+    label: 'Let InboxScout use my computer',
+    what: 'Opens apps and files, types and clicks on your desktop, runs commands, and reads and writes files under your home folder — for the Assistant and any connected agent.',
+    why: 'On because chores should just finish. The first time it does each kind of thing, a popup asks you; dangerous things always ask.',
+    who: 'Turn it off if you would rather the helper stayed inside its own browser window.',
+    caution: 'When on, a connected agent with Full bridge access can do these things too — it will still see the popups.',
+    kind: 'select',
+    options: [
+      { value: 'on', label: 'On — ask the first time for each kind of thing (recommended)' },
+      { value: 'off', label: 'Off' }
+    ]
+  },
+  {
+    key: 'systemDangerousOverride',
+    group: 'helpers',
+    label: 'Full autonomy: skip the safety popup for dangerous actions',
+    what: "When on, and 'Run commands' is set to Always allow, InboxScout no longer stops to ask before dangerous commands — deleting files, formatting, shutting down, changing passwords, payments. Everything still shows in the Assistant log.",
+    why: 'Off, because those popups are the last safety net. Turn it on only if you want the Assistant or a connected agent to run completely unattended.',
+    who: 'Power users who run long unattended jobs.',
+    caution: 'With this on, a mistake by the AI can delete files or change your system with no chance to say no.',
+    kind: 'toggle',
+    options: yesNo('On — never ask, even for dangerous commands', 'Off — always ask before dangerous commands (recommended)'),
+    showWhen: (s) => s.systemControl === 'on',
+    minLevel: 'standard'
+  },
+  {
     key: 'bridgeEnabled',
     group: 'helpers',
     label: 'Let other AI tools on this computer use InboxScout',

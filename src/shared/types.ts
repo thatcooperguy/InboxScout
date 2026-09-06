@@ -307,6 +307,21 @@ export interface AppSettings {
   googleDriveExport: boolean
   /** Speak a short summary out loud whenever a scheduled brief is ready. */
   speakBriefs: boolean
+  /**
+   * Full system control for the Assistant and connected agents (Hermes): open apps and files, type and click on the
+   * desktop, run commands, read and write files under your home folder. On by default; the first use of each kind of
+   * action asks with a popup ("Allow once / Always allow / Don't allow"); dangerous commands always ask.
+   */
+  systemControl: 'on' | 'off'
+  /** Remembered answers per kind of action. Missing = ask next time. */
+  systemConsents: Partial<Record<SystemActionKind, 'always' | 'never'>>
+  /**
+   * Full-autonomy override: when true, even dangerous commands (delete, format, shutdown, payments…) run without a
+   * popup once 'run' is set to "Always allow". Off by default; the person switches it on knowingly in Settings.
+   */
+  systemDangerousOverride: boolean
+  /** Version of the terms the person accepted at first launch; null until accepted. */
+  eulaAcceptedVersion: string | null
   /** Circle, schedule, promises, and per-inbox insights. On by default; they only appear when there is something to say. */
   insightsEnabled: boolean
   /** People the owner marked "not important" in the People view (addresses). */
@@ -334,6 +349,9 @@ export type BridgeAccess = 'read' | 'full'
  */
 export type AssistantAutonomy = 'careful' | 'signin' | 'full'
 
+/** Kinds of system action a popup can remember an answer for. */
+export type SystemActionKind = 'screenshot' | 'input' | 'open' | 'run' | 'files'
+
 export const DEFAULT_SETTINGS: AppSettings = {
   profileId: 'general',
   profileAuto: true,
@@ -357,6 +375,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   smsCarrier: '',
   googleDriveExport: false,
   speakBriefs: false,
+  systemControl: 'on',
+  systemConsents: {},
+  systemDangerousOverride: false,
+  eulaAcceptedVersion: null,
   insightsEnabled: true,
   quietPeople: [],
   bridgeEnabled: false,

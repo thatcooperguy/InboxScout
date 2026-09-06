@@ -6,6 +6,8 @@ import Reports from './views/Reports'
 import People from './views/People'
 import Setup from './views/Setup'
 import Onboarding from './views/Onboarding'
+import Eula from './views/Eula'
+import { EULA_VERSION } from '../../shared/eula'
 import { LEVEL_BLURB, LEVEL_LABEL } from '../../shared/adapt'
 import { t } from './copy'
 
@@ -113,6 +115,10 @@ export default function App(): JSX.Element {
         📬 InboxScout — opening…
       </div>
     )
+  }
+  // The plain-language terms come first, once per version, before anything else can happen.
+  if (settings.eulaAcceptedVersion !== EULA_VERSION) {
+    return <Eula onAccepted={loadSettings} />
   }
   if (onboarding) {
     return (

@@ -2,8 +2,116 @@ import { useEffect, useMemo, useState } from 'react'
 import ProfilePicker from './ProfilePicker'
 import { SETTING_GROUPS, defaultOf, getSetting, isDefault, searchSettings, setSetting, visibleAt, type SettingDesc } from '../../../shared/settingsRegistry'
 import { LEVEL_LABEL } from '../../../shared/adapt'
+import { EULA_VERSION } from '../../../shared/eula'
+import Eula from './Eula'
 
 type Level = 'simple' | 'standard' | 'pro'
+
+type ConsentKind = 'screenshot' | 'input' | 'open' | 'run' | 'files'
+type ConsentValue = 'always' | 'never' | 'ask'
+
+/** Plain names for each kind of thing the computer-control popup can remember. */
+const CONSENT_KINDS: { kind: ConsentKind; label: string }[] = [
+  { kind: 'screenshot', label: 'Look at my screen' },
+  { kind: 'input', label: 'Use my keyboard and mouse' },
+  { kind: 'open', label: 'Open apps and files' },
+  { kind: 'run', label: 'Run commands' },
+  { kind: 'files', label: 'Read and change my files' }
+]
+
+/** "What you've already allowed": the remembered popup answers, editable, with a reset. */
+function SystemConsents({ dangerousOverride }: { dangerousOverride: boolean }): JSX.Element {
+  const [consents, setConsents] = useState<Partial<Record<string, 'always' | 'never'>> | null>(null)
+  const [confirmReset, setConfirmReset] = useState(false)
+  const [note, setNote] = useState('')
+  useEffect(() => {
+    void window.inboxScout.systemStatus().then((s) => setConsents(s.consents))
+  }, [])
+  if (!consents) return <></>
+  const set = async (kind: ConsentKind, value: ConsentValue): Promise<void> => {
+    await window.inboxScout.systemSetConsent(kind, value === 'ask' ? null : value)
+    const next = { ...consents }
+    if (value === 'ask') delete next[kind]
+    else next[kind] = value
+    setConsents(next)
+    setNote('Saved ✓')
+    window.setTimeout(() => setNote(''), 2500)
+  }
+  const reset = async (): Promise<void> => {
+    await window.inboxScout.systemReset()
+    setConsents({})
+    setConfirmReset(false)
+    setNote('Forgotten — InboxScout will ask again for everything.')
+    window.setTimeout(() => setNote(''), 4000)
+  }
+  return (
+    <div className="setting-row">
+      <div className="setting-main">
+        <strong>What you've already allowed</strong>
+        <div className="hint">
+          The answers you gave the popups. "Always" means no popup for that kind of thing (dangerous commands still ask). "Never"
+          means it is refused quietly. "Ask each time" brings the popup back.
+        </div>
+        {dangerousOverride && (
+          <div className="hint" style={{ color: 'var(--red, #c0392f)' }}>
+            ⚠ Full autonomy is on: with "Run commands" on Always, even dangerous commands run without asking.
+          </div>
+        )}
+        {note && (
+          <div className="hint" role="status" aria-live="polite" style={{ color: 'var(--good)' }}>
+            {note}
+          </div>
+        )}
+      </div>
+      <div className="setting-control" style={{ display: 'grid', gap: 8 }}>
+        {CONSENT_KINDS.map((c) => (
+          <label key={c.kind} style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 8, alignItems: 'center', fontSize: 13 }}>
+            <span>{c.label}</span>
+            <select value={consents[c.kind] ?? 'ask'} onChange={(e) => void set(c.kind, e.target.value as ConsentValue)} aria-label={`${c.label}: remembered answer`}>
+              <option value="always">Always</option>
+              <option value="never">Never</option>
+              <option value="ask">Ask each time</option>
+            </select>
+          </label>
+        ))}
+        {confirmReset ? (
+          <span style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span className="hint">Forget all of these answers?</span>
+            <button className="primary" onClick={() => void reset()}>
+              Yes, ask me again
+            </button>
+            <button className="ghost" onClick={() => setConfirmReset(false)}>
+              Keep them
+            </button>
+          </span>
+        ) : (
+          <button className="ghost" onClick={() => setConfirmReset(true)} disabled={Object.keys(consents).length === 0}>
+            Ask me again for everything
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** "Terms accepted: <version>" with a way to read them again. */
+function TermsRow({ accepted, onReadAgain }: { accepted: string | null; onReadAgain: () => void }): JSX.Element {
+  return (
+    <div className="setting-row">
+      <div className="setting-main">
+        <strong>Terms accepted: {accepted ?? 'not yet'}</strong>
+        <div className="hint">
+          The plain-language terms you agreed to when InboxScout first opened{accepted && accepted !== EULA_VERSION ? ` (the current version is ${EULA_VERSION})` : ''}.
+        </div>
+      </div>
+      <div className="setting-control">
+        <button className="ghost" onClick={onReadAgain}>
+          Read the terms again
+        </button>
+      </div>
+    </div>
+  )
+}
 
 /** Connection details for Hermes and friends; the on/off and access switches live in the registry. */
 function BridgeDetails(): JSX.Element {
@@ -71,6 +179,7 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
   const [query, setQuery] = useState('')
   const [showAll, setShowAll] = useState(false)
   const [openHelp, setOpenHelp] = useState<string | null>(null)
+  const [readingTerms, setReadingTerms] = useState(false)
 
   useEffect(() => {
     void window.inboxScout.getSettings().then(setSettings)
@@ -107,6 +216,22 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
   }
 
   if (!settings) return <div className="empty">Loading…</div>
+  if (readingTerms) {
+    return (
+      <div>
+        <button className="ghost" style={{ marginBottom: 8 }} onClick={() => setReadingTerms(false)}>
+          ← Back to Settings
+        </button>
+        <Eula
+          onAccepted={() => {
+            setReadingTerms(false)
+            void window.inboxScout.getSettings().then(setSettings)
+            onSaved?.()
+          }}
+        />
+      </div>
+    )
+  }
 
   // Apply on change (no Save button to forget): each change is stored at once and confirmed quietly.
   const change = (key: string, value: unknown): void => {
@@ -171,6 +296,8 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
     const v = getSetting(settings, d.key)
     if (d.key === 'storeFullBodies') return v === false
     if (d.key === 'assistantAutonomy' || d.key === 'bridgeAccess') return v === 'full'
+    if (d.key === 'systemControl') return v === 'on'
+    if (d.key === 'systemDangerousOverride') return v === true
     return true
   }
   const scheduleSummary = (): string => {
@@ -300,6 +427,8 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
                 {testMsg && <span className="hint">{testMsg}</span>}
               </div>
             )}
+            {g.id === 'helpers' && settings.systemControl === 'on' && <SystemConsents dangerousOverride={!!settings.systemDangerousOverride} />}
+            {g.id === 'helpers' && <TermsRow accepted={settings.eulaAcceptedVersion ?? null} onReadAgain={() => setReadingTerms(true)} />}
             {g.id === 'helpers' && settings.bridgeEnabled && <BridgeDetails />}
           </div>
         )

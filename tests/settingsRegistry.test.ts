@@ -18,7 +18,7 @@ describe('settings registry', () => {
   })
 
   it('covers every plain setting except the ones handled by richer cards', () => {
-    const handledElsewhere = new Set(['profileId', 'ai.provider', 'ai.customBaseUrl', 'lastRunAt', 'enabledSkillIds', 'vipSenders', 'mutedSenders', 'quietPeople', 'schedule.hour', 'schedule.minute'])
+    const handledElsewhere = new Set(['profileId', 'ai.provider', 'ai.customBaseUrl', 'lastRunAt', 'enabledSkillIds', 'vipSenders', 'mutedSenders', 'quietPeople', 'schedule.hour', 'schedule.minute', 'systemConsents', 'eulaAcceptedVersion'])
     const flat = (obj: any, prefix = ''): string[] =>
       Object.entries(obj).flatMap(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v) ? flat(v, `${prefix}${k}.`) : [`${prefix}${k}`]))
     const registered = new Set(SETTINGS_REGISTRY.map((d) => d.key))

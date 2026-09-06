@@ -57,6 +57,7 @@ export default function Assistant({ preset }: Props): JSX.Element {
   const [signinAs, setSigninAs] = useState('')
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [confirmForget, setConfirmForget] = useState<string | null>(null)
+  const [systemEnabled, setSystemEnabled] = useState(false)
   const logBox = useRef<HTMLDivElement>(null)
   /** True while the person is reading the newest lines; false once they scroll up to read older ones. */
   const followLog = useRef(true)
@@ -73,6 +74,10 @@ export default function Assistant({ preset }: Props): JSX.Element {
       setLog(s.log)
       setCaptured(s.captured)
     })
+    void window.inboxScout
+      .systemStatus()
+      .then((s) => setSystemEnabled(s.enabled))
+      .catch(() => setSystemEnabled(false))
     return window.inboxScout.onAgentEvent((e) => {
       if (e.status) setStatus(e.status)
       if (e.message) setLog((l) => [...l.slice(-80), e.message])
@@ -199,6 +204,13 @@ export default function Assistant({ preset }: Props): JSX.Element {
             Dial it back any time. Always on, whatever you pick: every step is shown below, there is a Stop button, the window is
             visible, and the AI never sees a password — it types a placeholder that InboxScout swaps in at the keyboard.
           </p>
+          {systemEnabled && (
+            <p className="hint" style={{ margin: '8px 0 0' }}>
+              {level === 'simple'
+                ? 'It can also use your computer. It will ask you first.'
+                : 'It can also use your computer — open apps, type, run commands — and will ask the first time for each kind of thing. Turn this off in Settings → Helpers.'}
+            </p>
+          )}
         </div>
       )}
 

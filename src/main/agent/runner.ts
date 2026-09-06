@@ -17,6 +17,7 @@ import {
   type SavedSignin
 } from './policy'
 import { extractAppPassword, extractCredentials } from '../setup/capture'
+import type { DesktopControl } from '../desktop/control'
 
 export type AgentStatus = 'idle' | 'running' | 'waiting_user' | 'waiting_answer' | 'done' | 'failed' | 'stopped'
 
@@ -32,6 +33,8 @@ export interface AgentEvent {
 export interface AgentDeps {
   getModel: () => Promise<{ model: LanguageModel; vision: boolean } | null>
   onEvent: (e: AgentEvent) => void
+  /** Full system control (desktop input, apps, commands, files). Null when unavailable. */
+  desktop?: DesktopControl | null
 }
 
 export interface AgentTask {

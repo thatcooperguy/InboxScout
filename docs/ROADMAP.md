@@ -88,7 +88,15 @@
 - **Accessibility pass** from the human-factors research: AA contrast for hint text, visible focus rings, 36–44 px targets, reduced motion, confirm-with-verb on destructive actions, plain-language enums, real labels and live regions, onboarding with Sign in with Google/Microsoft and "let the assistant get the app password".
 - Research: `docs/design/HUMAN-FACTORS.md`, `docs/design/UX-AUDIT.md`, `docs/design/ADAPTIVE-UI.md`.
 
-## 🟠 Gaps — v1.1
+## ✅ v1.1 — shipped (full system control + EULA)
+
+- **Full system control** for the Assistant and connected agents, on by default: screenshots, clicks and typing on the desktop, opening apps/files/URLs, shell commands, and file access under the home folder. Per-kind native popups (Allow once / Always allow / Don't allow) with remembered answers, dangerous commands that always ask (with an off-by-default full-autonomy override), a home-folder rule with protected secret folders, and a Linux `xdotool` note. `docs/SYSTEM-CONTROL.md`.
+- **Settings → Who can help**: the on/off switch, "What you've already allowed" (per-kind Always / Never / Ask each time, "Ask me again for everything"), and "Terms accepted" with "Read the terms again".
+- **Plain-language EULA** shown once at first launch (versioned; read aloud; link to the full license) and required before onboarding.
+- **Bridge tools** `desktop_*` / `files_*` for Hermes and other MCP/REST clients under Full access — the same popups appear, naming the agent.
+- Assistant screen says, in one line, that it can also use the computer and where to turn it off.
+
+## 🟠 Gaps — v1.2
 
 - ~~Autonomous console agent~~ — ✅ shipped in v0.7 as the Assistant, with handoffs where a bot would be brittle.
 - **Voice commands** (talk to InboxScout) — Chromium speech recognition in Electron needs a Google key and is unreliable offline; revisit with a local model (e.g. whisper.cpp).
