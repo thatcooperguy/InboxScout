@@ -169,7 +169,17 @@ const ROUTES: Route[] = [
   { method: 'GET', path: '/v1/skills', op: 'list_skills' },
   { method: 'POST', path: '/v1/skills', op: 'set_skills' },
   { method: 'GET', path: '/v1/settings', op: 'get_settings' },
-  { method: 'PATCH', path: '/v1/settings', op: 'update_settings', args: ({ body }) => ({ patch: body?.patch ?? body }) }
+  { method: 'PATCH', path: '/v1/settings', op: 'update_settings', args: ({ body }) => ({ patch: body?.patch ?? body }) },
+  // System control (Full access only; each may pop up a question on the person's screen)
+  { method: 'POST', path: '/v1/desktop/screenshot', op: 'desktop_screenshot' },
+  { method: 'POST', path: '/v1/desktop/click', op: 'desktop_click' },
+  { method: 'POST', path: '/v1/desktop/type', op: 'desktop_type' },
+  { method: 'POST', path: '/v1/desktop/key', op: 'desktop_key' },
+  { method: 'POST', path: '/v1/desktop/open', op: 'desktop_open' },
+  { method: 'POST', path: '/v1/desktop/run', op: 'desktop_run' },
+  { method: 'POST', path: '/v1/files/read', op: 'files_read' },
+  { method: 'POST', path: '/v1/files/write', op: 'files_write' },
+  { method: 'POST', path: '/v1/files/list', op: 'files_list' }
 ]
 
 function matchRoute(method: string, pathname: string): { route: Route; params: Record<string, string> } | null {

@@ -43,6 +43,16 @@ export const actionSchema = z.object({
     z.object({ kind: z.literal('read') }),
     z.object({ kind: z.literal('ask_user'), question: z.string() }),
     z.object({ kind: z.literal('handoff'), reason: z.string() }),
+    // Whole-computer actions (only when system control is on; each kind may pop up a permission question).
+    z.object({ kind: z.literal('desktop_screenshot') }),
+    z.object({ kind: z.literal('desktop_click'), x: z.number(), y: z.number(), double: z.boolean().optional() }),
+    z.object({ kind: z.literal('desktop_type'), text: z.string() }),
+    z.object({ kind: z.literal('desktop_key'), combo: z.string() }),
+    z.object({ kind: z.literal('open'), target: z.string() }),
+    z.object({ kind: z.literal('run'), command: z.string() }),
+    z.object({ kind: z.literal('file_read'), path: z.string() }),
+    z.object({ kind: z.literal('file_write'), path: z.string(), text: z.string() }),
+    z.object({ kind: z.literal('file_list'), path: z.string() }),
     z.object({
       kind: z.literal('done'),
       summary: z.string(),
@@ -219,6 +229,30 @@ export const RECIPES: Recipe[] = [
       'msftauth.net'
     ],
     captures: 'microsoftClientId'
+  },
+  {
+    id: 'open-latest-brief',
+    name: 'Open the latest brief',
+    icon: '📰',
+    description: 'Finds the newest saved brief in your reports folder and opens it on your computer.',
+    params: [{ key: 'reportsDir', label: 'Reports folder', placeholder: '/Users/you/Documents/InboxScout' }],
+    goal: (p) =>
+      `Use file_list on the reports folder "${p.reportsDir}" to find the newest .html brief (the file names contain the date; pick the latest), ` +
+      `then open it with the open action. Finish with done saying which file you opened.`,
+    startUrl: () => 'about:blank',
+    allowedDomains: [],
+    captures: 'none'
+  },
+  {
+    id: 'open-exports-folder',
+    name: 'Open the exports folder',
+    icon: '📂',
+    description: 'Opens the folder where InboxScout saves briefs and exports.',
+    params: [{ key: 'reportsDir', label: 'Reports folder', placeholder: '/Users/you/Documents/InboxScout' }],
+    goal: (p) => `Open the folder "${p.reportsDir}" with the open action, then finish with done.`,
+    startUrl: () => 'about:blank',
+    allowedDomains: [],
+    captures: 'none'
   }
 ]
 
@@ -253,6 +287,8 @@ export interface PromptOptions {
   autonomy?: Autonomy
   /** Email of the saved sign-in available to this run (never the password). */
   signinEmail?: string | null
+  /** Full system control is on: the model may use the whole computer, not just its browser window. */
+  systemControl?: boolean
 }
 
 export function buildSystemPrompt(rules: string[], opts: PromptOptions = {}): string {
@@ -265,6 +301,15 @@ export function buildSystemPrompt(rules: string[], opts: PromptOptions = {}): st
     'Rules:',
     '- Use element ids from the list. Prefer clicking the most specific matching element. Type into inputs by id.'
   ]
+  if (opts.systemControl) {
+    lines.push(
+      '- You may use the whole computer, not just your browser window: open apps, files, folders, and URLs with open; click and type on the desktop with desktop_click, desktop_type, and desktop_key after a desktop_screenshot shows you where things are (coordinates are in the screenshot\'s pixel space — the app scales them to the real screen); run commands with run; read, write, and list files under the home folder with file_read, file_write, and file_list.',
+      '- Prefer the browser actions (navigate, click, type) for web tasks; use the desktop only when a web page cannot do it.',
+      '- Take a desktop_screenshot before clicking on the desktop, and after each desktop action, to verify what happened.',
+      '- A popup may ask the person for permission and they may decline. If an action result says "not allowed", never retry that action — find another way or use ask_user.',
+      '- Never run destructive commands (deleting, formatting, shutting down, changing accounts) unless the goal clearly asks for exactly that.'
+    )
+  }
   if (canSignIn) {
     lines.push(
       `- A saved sign-in for ${opts.signinEmail} is available. On a sign-in page, type ${EMAIL_PLACEHOLDER} into the email/username field and ${PASSWORD_PLACEHOLDER} into the password field (exactly those placeholders — the app swaps in the real values; you never see the password). Press Enter or click Next/Sign in afterwards.`,

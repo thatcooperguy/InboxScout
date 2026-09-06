@@ -6,6 +6,7 @@ import { DEFAULT_SETTINGS } from '../src/shared/types'
 import { buildOps, runOp, SETTINGS_ALLOWLIST, type OpsDeps } from '../src/main/api/ops'
 import { handleMcp } from '../src/main/api/mcp'
 import { deleteSignin, getSignin, listSignins, pickSigninForHost, saveSignin } from '../src/main/signins'
+import type { DesktopControl } from '../src/main/desktop/control'
 
 class FakeSecrets {
   map = new Map<string, string>()
@@ -24,9 +25,32 @@ function makeDeps(): { deps: OpsDeps; calls: string[] } {
   const db = openDatabase(':memory:')
   const secrets = new FakeSecrets()
   const calls: string[] = []
+  /** Minimal stand-in for DesktopControl: records calls; the person "says no" to anything mentioning "secret". */
+  const denied = (detail: string): void => {
+    if (/secret/i.test(detail)) throw new Error('consent_denied: You chose "Don\'t allow"')
+  }
+  const desktop = {
+    screenshot: async () => ({ dataUrl: 'data:image/png;base64,AA==', width: 16, height: 10, screenWidth: 1600, screenHeight: 1000 }),
+    click: async (x: number, y: number) => `clicked ${x},${y}`,
+    type: async (text: string) => `typed ${text}`,
+    key: async (combo: string) => `pressed ${combo}`,
+    open: async (target: string) => `opened ${target}`,
+    run: async (command: string) => {
+      denied(command)
+      calls.push(`run:${command}`)
+      return { code: 0, stdout: 'ok\n', stderr: '', timedOut: false }
+    },
+    readFile: async (path: string) => {
+      denied(path)
+      return `contents of ${path}`
+    },
+    writeFile: async (path: string) => `wrote ${path}`,
+    listDir: async () => [{ name: 'Documents', dir: true, size: 0 }]
+  } as unknown as DesktopControl
   const deps: OpsDeps = {
     db,
     secrets,
+    desktop,
     agent: {
       getStatus: () => ({ status: 'idle', log: [], captured: {}, task: null }),
       answer: (t) => calls.push(`answer:${t}`),
@@ -151,6 +175,29 @@ describe('bridge operations', () => {
     expect((await runOp(ops, 'list_issues', {}, true)) as any[]).toHaveLength(0)
     expect((await runOp(ops, 'list_issues', { includeResolved: true }, true)) as any[]).toHaveLength(1)
     saveSettings(deps.db, { ...DEFAULT_SETTINGS })
+  })
+
+  it('exposes system control as write ops and surfaces a refused popup as consent_denied', async () => {
+    const { deps, calls } = makeDeps()
+    const ops = buildOps(deps)
+    // Every system op needs Full access.
+    for (const name of ['desktop_screenshot', 'desktop_click', 'desktop_type', 'desktop_key', 'desktop_open', 'desktop_run', 'files_read', 'files_write', 'files_list']) {
+      await expect(runOp(ops, name, { x: 1, y: 2, text: 't', combo: 'enter', target: 'x', command: 'ls', path: '~' }, true)).rejects.toThrow(/read-only/)
+    }
+    const shot: any = await runOp(ops, 'desktop_screenshot', {}, false)
+    expect(shot).toMatchObject({ width: 16, height: 10, screenWidth: 1600, screenHeight: 1000 })
+    expect(shot.dataUrl).toMatch(/^data:image\/png/)
+    expect(await runOp(ops, 'desktop_click', { x: 0, y: 5 }, false)).toBe('clicked 0,5')
+    expect(await runOp(ops, 'desktop_run', { command: 'ls' }, false)).toEqual({ code: 0, stdout: 'ok\n', stderr: '', timedOut: false })
+    expect(await runOp(ops, 'files_read', { path: '~/notes.txt' }, false)).toEqual({ text: 'contents of ~/notes.txt' })
+    expect(await runOp(ops, 'files_write', { path: '~/empty.txt' }, false)).toEqual({ ok: true })
+    expect(calls).toContain('run:ls')
+    // The person clicks "Don't allow": the error keeps the consent_denied prefix so agents know not to retry.
+    await expect(runOp(ops, 'desktop_run', { command: 'cat secret' }, false)).rejects.toThrow(/consent_denied/)
+    await expect(runOp(ops, 'files_read', { path: '~/secret.txt' }, false)).rejects.toThrow(/^consent_denied: /)
+    const mcp = await handleMcp({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'desktop_run', arguments: { command: 'cat secret' } } }, ops, { readOnly: false, version: '1.1.0' })
+    expect((mcp.body as any).result.isError).toBe(true)
+    expect((mcp.body as any).result.content[0].text).toContain('consent_denied')
   })
 })
 

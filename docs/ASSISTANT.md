@@ -51,6 +51,49 @@ recipes use the one for the account being connected, or the one matching the sit
 - **Isolated.** Its own cookie jar, separate from the app and from your normal browser.
 - **Scoped changes.** It is told never to change settings the goal did not ask for.
 
+## Your whole computer
+
+Since v1.1 the Assistant is not limited to its browser window. With **system control on** (the default) it can:
+
+- **look at your screen** — take a screenshot to see where things are;
+- **click and type on the desktop** — click a spot it saw in the screenshot, type text, press key combos like `ctrl+s`;
+- **open things** — apps, files, folders, and links, with whatever your computer normally uses;
+- **run commands** — a shell command with a timeout, in your home folder;
+- **read, write, and list files** — inside your home folder only, never in secret folders such as `.ssh`, `.gnupg`, cloud
+  credentials, or the OS keychain.
+
+The model is told to prefer plain browser actions for web tasks, to take a screenshot before clicking on the desktop and
+after each desktop action to check the result, and never to run destructive commands unless the goal clearly asks for them.
+Two built-in recipes use it: **Open the latest brief** (lists your reports folder, picks the newest `.html`, opens it) and
+**Open the exports folder**. Other agents on the computer (Hermes, through the bridge) go through exactly the same gate.
+
+### The first-launch opt-in and the popups
+
+- **Once, at first launch,** InboxScout shows its plain-language terms and asks you to accept them. Nothing below happens
+  until you have.
+- **The first time each kind of action happens** — looking at the screen, using the keyboard and mouse, opening something,
+  running a command, touching files — a native popup tells you what it wants and asks **Allow once / Always allow /
+  Don't allow**. Your answer is remembered per kind (Settings → Who can help), so a run is not a stream of questions.
+- **Dangerous commands always ask**, even under "Always allow": deleting or formatting, shutting down, changing user
+  accounts or passwords, `sudo`, turning off protection, piping downloads into a shell, and anything that looks like a payment
+  or transfer. The only way around that is the separate **Full autonomy** override in Settings, which you switch on
+  knowingly, and which we recommend leaving off.
+- If you decline, the action fails with "not allowed" and the Assistant is told never to retry it — it looks for another
+  way or asks you instead.
+
+### The off switch
+
+Settings → Who can help → **System control: off** turns the whole thing off. The Assistant then keeps working as a
+browser-only helper, and any whole-computer action simply reports "system control is off". You can also clear or change the
+remembered answers there at any time.
+
+### Platform notes
+
+- **Windows** and **macOS** work out of the box (macOS asks once for Accessibility and Screen Recording permission for
+  InboxScout in System Settings → Privacy & Security).
+- **Linux** needs `xdotool` installed for clicking and typing (`sudo apt install xdotool` or your distro's equivalent);
+  screenshots, opening, commands, and files work without it.
+
 ## Driving it from another agent (Hermes)
 
 Everything above is available to other agents on the computer through the **Agent bridge** — as an MCP server, a
@@ -72,6 +115,8 @@ image support (Gemini, OpenAI, Claude, Grok, OpenRouter vision models) see scree
 | Register the Google sign-in app (owner) | Project, Gmail API, consent screen, Desktop OAuth client | client ID + secret |
 | Add a family member to the Google sign-in (owner) | Adds a test user on the consent screen | — |
 | Register the Microsoft sign-in app (owner) | Entra app, public client flows, Mail.Read | app ID |
+| Open the latest brief | Finds the newest saved brief in your reports folder and opens it (needs system control) | — |
+| Open the exports folder | Opens the folder where briefs and exports are saved (needs system control) | — |
 | Something else | Any task you describe, on a site you name | — |
 
 ## Honest limits

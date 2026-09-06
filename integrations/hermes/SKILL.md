@@ -1,6 +1,6 @@
 ---
 name: inboxscout
-description: Use InboxScout (the desktop email assistant on this computer) as a tool — read today's brief, list open issues, search and read mail, trigger a scan, connect mailboxes, save sign-ins, notify or speak to the person, and drive its Assistant browser to do web chores like creating app passwords.
+description: Use InboxScout (the desktop email assistant on this computer) as a tool — read today's brief, list open issues, search and read mail, trigger a scan, connect mailboxes, save sign-ins, notify or speak to the person, drive its Assistant browser to do web chores like creating app passwords, and (with the person's OK via a popup) look at their screen, click and type, open apps and files, run commands, and read or write files in their home folder.
 ---
 
 # InboxScout skill for Hermes (and any HTTP- or MCP-capable agent)
@@ -60,7 +60,44 @@ J="content-type: application/json"
 | Preferences (safe subset) | `get_settings`, `update_settings {patch}` | `GET /settings`, `PATCH /settings` |
 | Live events (scan progress, Assistant steps) | — | `GET /events` (Server-Sent Events) |
 
+### System control (Full access only — a popup may appear on the person's screen)
+
+| Goal | MCP tool | REST |
+|---|---|---|
+| See the person's screen | `desktop_screenshot` → `{dataUrl, width, height, screenWidth, screenHeight}` | `POST /desktop/screenshot` |
+| Click on the desktop (screen coordinates) | `desktop_click {x, y, button?, double?}` | `POST /desktop/click` |
+| Type where the cursor is | `desktop_type {text}` | `POST /desktop/type` |
+| Press a key or combo | `desktop_key {combo}` e.g. `"enter"`, `"ctrl+s"` | `POST /desktop/key` |
+| Open an app, a file/folder under home, or a URL | `desktop_open {target}` | `POST /desktop/open` |
+| Run a shell command (home folder, 60 s) | `desktop_run {command, cwd?, timeoutMs?}` → `{code, stdout, stderr, timedOut}` | `POST /desktop/run` |
+| Read a text file under home (≤ 200 KB) | `files_read {path}` → `{text}` | `POST /files/read` |
+| Write a text file under home | `files_write {path, text}` → `{ok}` | `POST /files/write` |
+| List a folder under home | `files_list {path}` → `[{name, dir, size}]` | `POST /files/list` |
+
 Machine-readable spec: `GET /v1/openapi.json` (no token needed).
+
+## System control: popups and `consent_denied`
+
+The person decides how much control connected agents get, in **Settings → Who can help** (it is on by default, and they
+accepted terms describing it at first launch). The rules:
+
+- **Full bridge access is required.** Every system tool is a write tool; with the bridge set to *Read only* they fail with
+  "read-only" — ask the person to switch the bridge to **Full**.
+- **A popup may appear on the person's screen** the first time each *kind* of action happens (screenshot, mouse/keyboard,
+  open, run, files). It says who is asking ("Another agent (bridge)") and what for, with **Allow once / Always allow /
+  Don't allow**. Their answer is remembered per kind; the person can change it in Settings at any time. Expect the call to
+  block until they answer — tell them to look at their computer if you are waiting.
+- **Dangerous commands always ask** (deleting recursively, formatting, shutting down, `sudo`, changing accounts or
+  firewalls, piping downloads into a shell, force-pushing, payments…) even under "Always allow", with a plain
+  **Allow this once / Don't allow** popup that is never remembered.
+- **`consent_denied`** — if any of these tools fails with an error starting with `consent_denied:`, the person said no
+  (or set that kind to *Never*, or turned system control off). Tell them what you wanted to do and why, then **do not
+  retry** the same action; find another way or wait for them.
+- Files and `cwd` must be under the home folder; secret folders (`~/.ssh`, `~/.gnupg`, `~/.aws`, credential stores) are
+  never readable or writable. `~` is expanded. `desktop_run` returns a non-zero exit code rather than an error.
+- A screenshot is scaled to fit 1600 × 1000; multiply picture coordinates by `screenWidth / width` (and the same for
+  height) before you `desktop_click`.
+- On Linux, mouse and keyboard control needs `xdotool` (`sudo apt install xdotool`).
 
 ## How to behave
 
@@ -77,6 +114,7 @@ Machine-readable spec: `GET /v1/openapi.json` (no token needed).
 - Poll `assistant_status` every few seconds, or subscribe to `/v1/events`. Runs are capped at 45 steps.
 - Briefs and mail are personal data: summarize for the person, don't forward them elsewhere.
 - If a call fails with "read-only", ask the person to switch the bridge to **Full** in Preferences.
+- If a system-control call fails with `consent_denied`, the person said no: explain, don't retry (see above).
 
 ## Getting briefs pushed to you
 

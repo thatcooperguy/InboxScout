@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   EMAIL_PLACEHOLDER,
   PASSWORD_PLACEHOLDER,
@@ -13,6 +13,10 @@ import {
   redactSecret
 } from '../src/main/agent/policy'
 import { extractAppPassword } from '../src/main/setup/capture'
+
+// runner.ts pulls in the Assistant's Electron browser window; only describeAction is under test here.
+vi.mock('electron', () => ({ BrowserWindow: class {} }))
+import { describeAction } from '../src/main/agent/runner'
 
 describe('agent policy', () => {
   it('formats elements compactly with ids the model can reference', () => {
@@ -48,6 +52,54 @@ describe('agent policy', () => {
     expect(actionSchema.safeParse({ thought: 'ok', action: { kind: 'done', summary: 'finished', captured: { appPassword: 'abcd' } } }).success).toBe(true)
     expect(actionSchema.safeParse({ thought: 'ok', action: { kind: 'explode' } }).success).toBe(false)
     expect(actionSchema.safeParse({ thought: 'ok', action: { kind: 'wait', seconds: 99 } }).success).toBe(false)
+  })
+
+  it('accepts every whole-computer action', () => {
+    const ok = (action: unknown): boolean => actionSchema.safeParse({ thought: 'ok', action }).success
+    expect(ok({ kind: 'desktop_screenshot' })).toBe(true)
+    expect(ok({ kind: 'desktop_click', x: 120, y: 340 })).toBe(true)
+    expect(ok({ kind: 'desktop_click', x: 120, y: 340, double: true })).toBe(true)
+    expect(ok({ kind: 'desktop_type', text: 'hello' })).toBe(true)
+    expect(ok({ kind: 'desktop_key', combo: 'ctrl+s' })).toBe(true)
+    expect(ok({ kind: 'open', target: '/Users/me/Documents/brief.html' })).toBe(true)
+    expect(ok({ kind: 'run', command: 'ls -la' })).toBe(true)
+    expect(ok({ kind: 'file_read', path: '/Users/me/notes.txt' })).toBe(true)
+    expect(ok({ kind: 'file_write', path: '/Users/me/notes.txt', text: 'remember milk' })).toBe(true)
+    expect(ok({ kind: 'file_list', path: '/Users/me/Documents' })).toBe(true)
+    // Missing required fields are rejected.
+    expect(ok({ kind: 'desktop_click', x: 1 })).toBe(false)
+    expect(ok({ kind: 'run' })).toBe(false)
+    expect(ok({ kind: 'file_write', path: '/Users/me/notes.txt' })).toBe(false)
+  })
+
+  it('mentions the desktop only when system control is on', () => {
+    const off = buildSystemPrompt([])
+    expect(off).not.toContain('desktop_screenshot')
+    expect(off).not.toContain('whole computer')
+    expect(buildSystemPrompt([], { systemControl: false })).not.toContain('desktop_screenshot')
+    const on = buildSystemPrompt([], { systemControl: true })
+    expect(on).toContain('whole computer')
+    expect(on).toContain('desktop_screenshot')
+    expect(on).toContain('Prefer the browser actions')
+    expect(on).toContain('not allowed')
+    expect(on).toContain('never retry')
+    expect(on).toContain('destructive')
+  })
+
+  it('describes every whole-computer action for the log', () => {
+    expect(describeAction({ kind: 'desktop_screenshot' })).toBe('look at the screen')
+    expect(describeAction({ kind: 'desktop_click', x: 10, y: 20 })).toBe('click the desktop at 10,20')
+    expect(describeAction({ kind: 'desktop_click', x: 10, y: 20, double: true })).toBe('double-click the desktop at 10,20')
+    expect(describeAction({ kind: 'desktop_type', text: 'hello' })).toContain('type "hello" on the desktop')
+    expect(describeAction({ kind: 'desktop_key', combo: 'enter' })).toBe('press enter')
+    expect(describeAction({ kind: 'open', target: 'Notes' })).toBe('open on this computer: Notes')
+    expect(describeAction({ kind: 'run', command: 'ls' })).toBe('run: ls')
+    expect(describeAction({ kind: 'file_read', path: '/a/b.txt' })).toBe('read file /a/b.txt')
+    expect(describeAction({ kind: 'file_write', path: '/a/b.txt', text: 'x' })).toBe('write file /a/b.txt')
+    expect(describeAction({ kind: 'file_list', path: '/a' })).toBe('list folder /a')
+    // The browser actions still describe as before.
+    expect(describeAction({ kind: 'click', id: 3 })).toBe('click [3]')
+    expect(describeAction({ kind: 'navigate', url: 'https://x.test' })).toBe('open https://x.test')
   })
 
   it('builds prompts that carry the goal, elements, history, and rules', () => {
@@ -100,11 +152,19 @@ describe('agent policy', () => {
 
   it('ships recipes with goals, start pages, and allowed domains that match', () => {
     for (const r of RECIPES) {
-      const p = { email: 'me@example.com' }
+      const p = { email: 'me@example.com', reportsDir: '/Users/me/Documents/InboxScout' }
       expect(r.goal(p).length).toBeGreaterThan(20)
-      expect(hostAllowed(r.startUrl(p), r.allowedDomains)).toBe(true)
+      const start = r.startUrl(p)
+      // Desktop-only recipes start on a blank page and need no web domains.
+      if (start !== 'about:blank') expect(hostAllowed(start, r.allowedDomains)).toBe(true)
     }
     expect(RECIPES.find((r) => r.id === 'gmail-app-password')?.captures).toBe('appPassword')
+    const latest = RECIPES.find((r) => r.id === 'open-latest-brief')
+    expect(latest?.captures).toBe('none')
+    expect(latest?.params.map((x) => x.key)).toEqual(['reportsDir'])
+    expect(latest?.goal({ reportsDir: '/tmp/reports' })).toContain('file_list')
+    expect(latest?.goal({ reportsDir: '/tmp/reports' })).toContain('/tmp/reports')
+    expect(RECIPES.find((r) => r.id === 'open-exports-folder')?.goal({ reportsDir: '/tmp/reports' })).toContain('/tmp/reports')
   })
 })
 

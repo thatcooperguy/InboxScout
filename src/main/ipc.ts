@@ -10,6 +10,7 @@ import { eventsFromBrief, toCsv, toIcs, trackerRows } from './reports/exports'
 import { SMS_GATEWAYS, pickOutbox, sendMail, smsAddress } from './delivery/email'
 import { AgentRunner } from './agent/runner'
 import { RECIPES } from './agent/policy'
+import { DesktopControl } from './desktop/control'
 import { resolveModel } from './ai/provider'
 import { bridgeInfo, regenerateBridgeToken, syncBridge, type BridgeDeps } from './api/local'
 import { deleteSignin, getSignin, listSignins, pickSigninForHost, saveSignin } from './signins'
@@ -40,9 +41,13 @@ export interface IpcContext {
 export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
   const { db, secrets } = ctx
 
+  // ---- Full system control (screen, mouse/keyboard, apps, commands, home-folder files), gated by popups ----
+  const desktop = new DesktopControl({ db, getWindow: () => BrowserWindow.getAllWindows()[0] ?? null, homeDir: app.getPath('home') })
+
   // ---- Assistant browser (AI-operated browser with guardrails) ----
   const VISION_PROVIDERS = new Set(['gemini', 'openai', 'anthropic', 'xai', 'openrouter', 'custom'])
   const agent = new AgentRunner({
+    desktop,
     getModel: async () => {
       const settings = loadSettings(db)
       if (settings.ai.provider === 'builtin') return null
@@ -122,7 +127,7 @@ export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
       settings.assistantAutonomy === 'careful'
         ? null
         : (wanted ? getSignin(db, secrets, wanted) : null) ?? pickSigninForHost(db, secrets, hostOf(base.startUrl))
-    const task = { ...base, autonomy: settings.assistantAutonomy, signin }
+    const task = { ...base, autonomy: settings.assistantAutonomy, signin, systemControl: settings.systemControl === 'on' }
     if (!task.goal) return { ok: false, summary: 'Tell the assistant what to do.' }
     if (agent.isBusy()) return { ok: false, summary: 'The assistant is already working on something.' }
     // Runs in the background; the app follows along via agent:event.
@@ -183,6 +188,7 @@ export function registerIpc(ctx: IpcContext): { agent: AgentRunner } {
     secrets,
     version: app.getVersion(),
     agent,
+    desktop,
     startAgent,
     runNow: () => ctx.runNow(),
     isRunning: () => ctx.isRunning(),

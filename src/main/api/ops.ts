@@ -6,6 +6,7 @@ import { deleteSignin, listSignins, saveSignin, type SecretsLike } from '../sign
 import { PROFILES, PROFILE_GROUPS, PROFILE_LIST, getProfile } from '../profiles/profiles'
 import { detectProfile } from '../profiles/detect'
 import { recentDetectInput } from '../profiles/auto'
+import type { DesktopControl } from '../desktop/control'
 import type { AccountConfig, AppSettings } from '../../shared/types'
 
 /**
@@ -50,7 +51,13 @@ export interface OpsDeps {
   speak: (text: string) => void
   listSkills: () => { id: string; name: string; description: string; enabled: boolean; builtin: boolean }[]
   setEnabledSkills: (ids: string[]) => void
+  /** Full system control (screen, mouse/keyboard, apps, commands, home-folder files). Each kind may pop up a question for the person. */
+  desktop: DesktopControl
 }
+
+/** Shown in the consent popup so the person knows who is asking. */
+const BRIDGE_REQUESTER = 'Another agent (bridge)'
+const POPUP_NOTE = "A popup may appear on the person's screen asking them to allow it. A 'consent_denied' error means the person said no — tell them and do not retry."
 
 /** Preference keys an agent may read and change. Secrets and app IDs are never exposed. */
 export const SETTINGS_ALLOWLIST: (keyof AppSettings)[] = [
@@ -422,6 +429,87 @@ export function buildOps(deps: OpsDeps): Op[] {
         saveSettings(db, next)
         return { ok: true, changed, settings: publicSettings() }
       }
+    },
+    {
+      name: 'desktop_screenshot',
+      description: `Take a picture of the person's primary screen. Returns {dataUrl (PNG), width, height, screenWidth, screenHeight}; scale picture coordinates by screenWidth/width before clicking. ${POPUP_NOTE}`,
+      write: true,
+      input: obj({}),
+      run: () => deps.desktop.screenshot(BRIDGE_REQUESTER)
+    },
+    {
+      name: 'desktop_click',
+      description: `Click on the person's desktop at screen coordinates (top-left origin). ${POPUP_NOTE}`,
+      write: true,
+      input: obj(
+        {
+          x: { type: 'number' },
+          y: { type: 'number' },
+          button: { type: 'string', enum: ['left', 'right'] },
+          double: { type: 'boolean', description: 'Double-click (default false)' }
+        },
+        ['x', 'y']
+      ),
+      run: (a) => deps.desktop.click(Number(a.x), Number(a.y), BRIDGE_REQUESTER, { button: a.button === 'right' ? 'right' : 'left', double: !!a.double })
+    },
+    {
+      name: 'desktop_type',
+      description: `Type text at whatever has keyboard focus on the person's desktop. ${POPUP_NOTE}`,
+      write: true,
+      input: obj({ text: { type: 'string' } }, ['text']),
+      run: (a) => deps.desktop.type(String(a.text ?? ''), BRIDGE_REQUESTER)
+    },
+    {
+      name: 'desktop_key',
+      description: `Press a key or combo on the person's desktop, e.g. "enter", "ctrl+s", "cmd+shift+4". ${POPUP_NOTE}`,
+      write: true,
+      input: obj({ combo: { type: 'string' } }, ['combo']),
+      run: (a) => deps.desktop.key(String(a.combo ?? ''), BRIDGE_REQUESTER)
+    },
+    {
+      name: 'desktop_open',
+      description: `Open an app by name, a file or folder under the home folder, or a web URL with the OS default. ${POPUP_NOTE}`,
+      write: true,
+      input: obj({ target: { type: 'string', description: 'App name, path (~ allowed), or http(s) URL' } }, ['target']),
+      run: (a) => deps.desktop.open(String(a.target ?? ''), BRIDGE_REQUESTER)
+    },
+    {
+      name: 'desktop_run',
+      description: `Run a shell command on the person's computer (PowerShell on Windows, /bin/sh elsewhere) in the home folder unless cwd is given. Returns {code, stdout, stderr, timedOut}; a non-zero code is returned, not thrown. Dangerous commands (delete, format, shutdown, sudo, payments…) always ask the person. ${POPUP_NOTE}`,
+      write: true,
+      input: obj(
+        {
+          command: { type: 'string' },
+          cwd: { type: 'string', description: 'Folder to run in (must be under the home folder)' },
+          timeoutMs: { type: 'number', description: 'Default 60000' }
+        },
+        ['command']
+      ),
+      run: (a) => deps.desktop.run(String(a.command ?? ''), BRIDGE_REQUESTER, { cwd: a.cwd ? String(a.cwd) : undefined, timeoutMs: Number(a.timeoutMs) || undefined })
+    },
+    {
+      name: 'files_read',
+      description: `Read a text file under the person's home folder (first 200 KB). Secret folders like ~/.ssh are never readable. ${POPUP_NOTE}`,
+      write: true,
+      input: obj({ path: { type: 'string', description: 'Path, ~ allowed' } }, ['path']),
+      run: async (a) => ({ text: await deps.desktop.readFile(String(a.path ?? ''), BRIDGE_REQUESTER) })
+    },
+    {
+      name: 'files_write',
+      description: `Write (replace) a text file under the person's home folder, creating parent folders. ${POPUP_NOTE}`,
+      write: true,
+      input: obj({ path: { type: 'string', description: 'Path, ~ allowed' }, text: { type: 'string', description: 'File contents (empty allowed)' } }, ['path']),
+      run: async (a) => {
+        await deps.desktop.writeFile(String(a.path ?? ''), String(a.text ?? ''), BRIDGE_REQUESTER)
+        return { ok: true }
+      }
+    },
+    {
+      name: 'files_list',
+      description: `List a folder under the person's home folder: [{name, dir, size}], folders first. ${POPUP_NOTE}`,
+      write: true,
+      input: obj({ path: { type: 'string', description: 'Folder path, ~ allowed' } }, ['path']),
+      run: (a) => deps.desktop.listDir(String(a.path ?? ''), BRIDGE_REQUESTER)
     }
   ]
 }
