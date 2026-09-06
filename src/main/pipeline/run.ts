@@ -5,6 +5,7 @@ import type { DB } from '../db/index'
 import * as repo from '../db/repo'
 import { syncFolder } from '../mail/imap'
 import { getAccessToken, syncGraphFolder } from '../mail/graph'
+import { ensureAccessToken, syncGmail, GMAIL_FOLDER, type GoogleTokens } from '../mail/gmail'
 import { classifyBatch, chunk, BATCH_SIZE } from '../ai/classify'
 import { decideTracking, applyTrackingDecisions } from '../ai/track'
 import { generateBrief } from '../ai/brief'
@@ -82,6 +83,27 @@ export async function runPipeline(
     for (const account of accounts) {
       // One broken account must never block the others.
       try {
+        if (account.provider === 'gmailapi') {
+          const raw = secrets.get(accountSecretName(account.id))
+          if (!raw) throw new Error('Google sign-in missing — reconnect this account.')
+          const tokens = await ensureAccessToken(
+            settings.googleClientId || process.env['INBOXSCOUT_GOOGLE_CLIENT_ID'] || '',
+            settings.googleClientSecret || process.env['INBOXSCOUT_GOOGLE_CLIENT_SECRET'] || '',
+            JSON.parse(raw) as GoogleTokens
+          )
+          if (tokens.accessToken !== (JSON.parse(raw) as GoogleTokens).accessToken) {
+            secrets.set(accountSecretName(account.id), JSON.stringify(tokens))
+          }
+          onProgress({ phase: 'fetch', detail: `${account.email} — Gmail` })
+          const historyId = repo.getMeta(db, `gmail-history:${account.id}`)
+          const result = await syncGmail(tokens.accessToken, account, historyId || null, settings.storeFullBodies)
+          for (const m of result.messages) {
+            if (repo.insertMessage(db, m)) newMessages.push(m)
+          }
+          if (result.historyId) repo.setMeta(db, `gmail-history:${account.id}`, result.historyId)
+          repo.setSyncState(db, account.id, GMAIL_FOLDER, 1, Date.now())
+          continue
+        }
         if (account.provider === 'outlook') {
           const homeAccountId = repo.getMeta(db, `graph-home:${account.id}`) ?? ''
           const clientId = settings.microsoftClientId || process.env['INBOXSCOUT_MS_CLIENT_ID'] || ''

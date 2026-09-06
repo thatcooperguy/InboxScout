@@ -57,8 +57,14 @@ export function classifyMessageHeuristically(m: MessageRecord, profile: WorkProf
   )
   const looksPersonal = PERSONAL_TEXT.test(text) || (PERSONAL_DOMAINS.has(domain) && !workHints.test(text))
 
+  // Provider signals (Gmail categories, Outlook Focused/Other) are strong evidence.
+  const hints = m.providerHints ?? null
+  const hintNoise = hints?.category === 'promotions' || hints?.category === 'social' || hints?.category === 'forums'
+  const hintUpdates = hints?.category === 'updates'
+  const hintImportant = !!hints && (hints.important || hints.starred)
+
   let category: MessageClassificationOutput['category']
-  if (isNoise) category = 'promotions_noise'
+  if ((isNoise || hintNoise) && !hintImportant) category = 'promotions_noise'
   else if (looksPersonal && !isTransactional) category = 'personal'
   else category = 'work'
 
@@ -71,15 +77,18 @@ export function classifyMessageHeuristically(m: MessageRecord, profile: WorkProf
   const asksQuestion = /\?/.test(m.subject) || /can you|could you|please (reply|confirm|let me know|advise)|what do you think|are you available/i.test(text)
 
   let screening: Screening
-  if (isNoise) screening = 'newsletter'
-  else if (isTransactional) screening = 'transactional'
-  else if (asksQuestion && category !== 'promotions_noise') screening = 'needs_reply'
+  if (category === 'promotions_noise') screening = 'newsletter'
+  else if (isTransactional || hintUpdates) screening = 'transactional'
+  else if (asksQuestion) screening = 'needs_reply'
   else screening = 'fyi'
 
   let importance = 0
   if (category === 'work') importance = 1
+  if (hints?.focused === true) importance = Math.max(importance, 1)
   if (important) importance = 2
+  if (hintImportant) importance = Math.max(importance, 2)
   if (urgent) importance = 3
+  if (hints?.focused === false && !hintImportant && !urgent) importance = Math.min(importance, 1)
   if (category === 'promotions_noise') importance = 0
 
   const deadlineMatch = category === 'promotions_noise' ? null : text.match(DATE_PATTERN)

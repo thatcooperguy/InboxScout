@@ -16,6 +16,22 @@ export default function Accounts(): JSX.Element {
 
   useEffect(() => window.inboxScout.onOutlookDeviceCode((info: any) => setDeviceCode(info)), [])
 
+  const signInGoogle = async (): Promise<void> => {
+    setBusy(true)
+    setError('')
+    setOk('')
+    try {
+      const account = await window.inboxScout.googleSignIn()
+      setOk(`Connected ${account.email} ✓ (Gmail signals on)`)
+      setAdding(false)
+      load()
+    } catch (err: any) {
+      setError(String(err?.message ?? err).replace(/^Error invoking remote method[^:]*:\s*/, ''))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   const signInOutlook = async (): Promise<void> => {
     setBusy(true)
     setError('')
@@ -121,6 +137,20 @@ export default function Accounts(): JSX.Element {
               <option value="imap">Other (IMAP)</option>
             </select>
           </label>
+          {provider === 'gmail' && (
+            <div className="card" style={{ background: 'var(--blue-soft)', borderColor: 'var(--blue)' }}>
+              <strong>Best for Gmail: Sign in with Google</strong>
+              <p className="hint" style={{ margin: '4px 0 10px' }}>
+                Uses Google's own sign-in page (no app password) and gives InboxScout Gmail's Promotions/Social/Updates
+                labels and Important markers for much better sorting. Needs a one-time Google app setup by whoever
+                installed InboxScout (docs/GOOGLE.md). Otherwise use an app password below.
+              </p>
+              {error && <div className="error">{error}</div>}
+              <button className="primary" onClick={() => void signInGoogle()} disabled={busy}>
+                {busy ? 'Waiting for Google…' : 'Sign in with Google'}
+              </button>
+            </div>
+          )}
           {provider === 'outlook' ? (
             <div>
               <p className="hint">

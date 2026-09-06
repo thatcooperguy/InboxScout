@@ -10,6 +10,7 @@ const api = {
   addAccount: (input: unknown) => ipcRenderer.invoke('accounts:add', input),
   removeAccount: (id: string) => ipcRenderer.invoke('accounts:remove', id),
   outlookSignIn: () => ipcRenderer.invoke('accounts:outlookSignIn'),
+  googleSignIn: () => ipcRenderer.invoke('accounts:googleSignIn'),
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   onOutlookDeviceCode: (cb: (info: unknown) => void) => {
     const listener = (_e: unknown, info: unknown): void => cb(info)

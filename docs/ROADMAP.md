@@ -45,7 +45,12 @@
 - **Intel Mac build** (`x64` dmg) alongside Apple Silicon; README install steps for unsigned builds.
 - README makeover with logo and badges.
 
-## 🟠 Gaps — v0.5
+## ✅ v0.5 — shipped (better sign-in, better extraction)
+
+- **Sign in with Google** for Gmail (OAuth PKCE loopback, `gmail.readonly`) with Gmail API delta sync via history ids; Gmail category labels, Important/Starred, read state, and real thread ids feed classification. Setup in `docs/GOOGLE.md`.
+- **Provider hints** stored per message and used by both the built-in engine and AI prompts; Outlook now contributes Focused/Other, importance, read, and flag signals.
+
+## 🟠 Gaps — v0.6
 
 8. **Google Drive report sync** — designed (`drive.file` scope, hand-rolled REST), not implemented. OneDrive after.
 10. **Token/cost meter** — the `runs` table doesn't record token usage or cost estimates; the proposal promised per-run cost visibility.
@@ -62,7 +67,7 @@
 
 17. **Code signing** — Windows SmartScreen warning (Azure Trusted Signing ~$10/mo) and macOS notarization (Apple Developer ID $99/yr; Sequoia blocks unsigned apps hard). Required before handing installers to non-technical users.
 18. **Intel Mac build** — the `.dmg` is Apple Silicon only; add `x64`/universal target.
-19. **Gmail API BYO-client mode** — optional advanced path for power users.
+19. ~~Gmail API BYO-client mode~~ — ✅ shipped as "Sign in with Google" in v0.5.
 
 ## Deliberately out of scope (unchanged)
 

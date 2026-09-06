@@ -162,6 +162,22 @@ export default function SettingsView({ onSaved }: Props): JSX.Element {
             />
           </label>
           <label className="field">
+            <span>Google OAuth client ID (for "Sign in with Google" — see docs/GOOGLE.md)</span>
+            <input
+              value={settings.googleClientId}
+              onChange={(e) => update({ googleClientId: e.target.value })}
+              placeholder="xxxx.apps.googleusercontent.com"
+            />
+          </label>
+          <label className="field">
+            <span>Google OAuth client secret</span>
+            <input
+              type="password"
+              value={settings.googleClientSecret}
+              onChange={(e) => update({ googleClientSecret: e.target.value })}
+            />
+          </label>
+          <label className="field">
             <span>Ollama URL (local AI)</span>
             <input
               value={settings.ai.ollamaBaseUrl}

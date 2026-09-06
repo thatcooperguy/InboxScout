@@ -53,11 +53,16 @@ export function insertMessage(db: DB, m: MessageRecord): boolean {
     .prepare(
       `INSERT OR IGNORE INTO messages
        (id, account_id, folder, uid, message_id, thread_key, from_address, from_name, to_addresses,
-        subject, date, snippet, body_text, from_me, list_unsubscribe, has_attachments)
+        subject, date, snippet, body_text, from_me, list_unsubscribe, has_attachments, provider_hints)
        VALUES (@id, @accountId, @folder, @uid, @messageId, @threadKey, @fromAddress, @fromName, @toAddresses,
-        @subject, @date, @snippet, @bodyText, @fromMe, @listUnsubscribe, @hasAttachments)`
+        @subject, @date, @snippet, @bodyText, @fromMe, @listUnsubscribe, @hasAttachments, @providerHints)`
     )
-    .run({ ...m, fromMe: m.fromMe ? 1 : 0, hasAttachments: m.hasAttachments ? 1 : 0 })
+    .run({
+      ...m,
+      fromMe: m.fromMe ? 1 : 0,
+      hasAttachments: m.hasAttachments ? 1 : 0,
+      providerHints: m.providerHints ? JSON.stringify(m.providerHints) : null
+    })
   return res.changes > 0
 }
 
@@ -78,7 +83,8 @@ function rowToMessage(r: any): MessageRecord {
     bodyText: r.body_text,
     fromMe: !!r.from_me,
     listUnsubscribe: r.list_unsubscribe ?? null,
-    hasAttachments: !!r.has_attachments
+    hasAttachments: !!r.has_attachments,
+    providerHints: r.provider_hints ? JSON.parse(r.provider_hints) : null
   }
 }
 

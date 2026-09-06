@@ -40,7 +40,10 @@ describe('mapGraphMessage', () => {
         body: { contentType: 'html', content: '<p>Please sign by <b>Friday</b>.</p>' },
         conversationId: 'conv-1',
         internetMessageId: '<abc@escrow.com>',
-        hasAttachments: true
+        hasAttachments: true,
+        inferenceClassification: 'focused',
+        importance: 'high',
+        isRead: false
       },
       account,
       'inbox',
@@ -53,6 +56,7 @@ describe('mapGraphMessage', () => {
     expect(m.fromMe).toBe(false)
     expect(m.messageId).toBe('<abc@escrow.com>')
     expect(m.folder).toBe('inbox')
+    expect(m.providerHints).toEqual({ source: 'outlook', category: null, important: true, starred: false, unread: true, focused: true })
 
     const sent = mapGraphMessage(
       { id: 'AAMk2', from: { emailAddress: { address: 'ME@outlook.com' } }, sentDateTime: '2026-09-05T15:00:00Z', bodyPreview: 'hi' },

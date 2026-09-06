@@ -8,6 +8,7 @@ export interface InboxScoutApi {
   addAccount: (input: unknown) => Promise<any>
   removeAccount: (id: string) => Promise<boolean>
   outlookSignIn: () => Promise<any>
+  googleSignIn: () => Promise<any>
   openExternal: (url: string) => Promise<boolean>
   onOutlookDeviceCode: (cb: (info: { userCode: string; verificationUri: string; message: string }) => void) => () => void
   exportReportPdf: (id: string) => Promise<{ ok: boolean; filePath?: string; error?: string }>

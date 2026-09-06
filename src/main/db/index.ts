@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS messages (
   body_text TEXT NOT NULL,
   from_me INTEGER NOT NULL DEFAULT 0,
   list_unsubscribe TEXT,
-  has_attachments INTEGER NOT NULL DEFAULT 0
+  has_attachments INTEGER NOT NULL DEFAULT 0,
+  provider_hints TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_messages_thread ON messages(thread_key, date);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_dedupe ON messages(account_id, folder, uid);
@@ -149,6 +150,7 @@ function migrate(db: DB): void {
   ensureColumn(db, 'messages', 'list_unsubscribe', 'TEXT')
   ensureColumn(db, 'messages', 'has_attachments', 'INTEGER NOT NULL DEFAULT 0')
   ensureColumn(db, 'reports', 'brief_json', 'TEXT')
+  ensureColumn(db, 'messages', 'provider_hints', 'TEXT')
 }
 
 function ensureColumn(db: DB, table: string, column: string, type: string): void {

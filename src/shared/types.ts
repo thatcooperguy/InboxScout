@@ -25,12 +25,24 @@ export interface AccountConfig {
   id: string
   label: string
   email: string
-  provider: 'gmail' | 'yahoo' | 'outlook' | 'imap'
+  provider: 'gmail' | 'gmailapi' | 'yahoo' | 'icloud' | 'outlook' | 'imap'
   host: string
   port: number
   /** IMAP folders to scan. INBOX plus the sent folder for reply tracking. */
   folders: string[]
   createdAt: string
+}
+
+/** Signals the mail provider itself gives us (Gmail categories, Outlook Focused inbox). */
+export interface ProviderHints {
+  source: 'gmail' | 'outlook'
+  /** Gmail: promotions | social | updates | forums | personal; Outlook: null */
+  category: string | null
+  important: boolean
+  starred: boolean
+  unread: boolean
+  /** Outlook Focused inbox verdict: true = Focused, false = Other, null = unknown */
+  focused: boolean | null
 }
 
 export interface MessageRecord {
@@ -51,6 +63,7 @@ export interface MessageRecord {
   /** Raw List-Unsubscribe header when present (fuel for the future unsubscribe report). */
   listUnsubscribe: string | null
   hasAttachments: boolean
+  providerHints?: ProviderHints | null
 }
 
 export interface Classification {
@@ -185,6 +198,9 @@ export interface AppSettings {
   textSize: 'normal' | 'large' | 'xlarge'
   /** Microsoft Entra app (client) ID used for Outlook.com sign-in. */
   microsoftClientId: string
+  /** Google OAuth desktop client used for "Sign in with Google" (Gmail API). */
+  googleClientId: string
+  googleClientSecret: string
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -200,7 +216,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   vipSenders: [],
   mutedSenders: [],
   textSize: 'normal',
-  microsoftClientId: ''
+  microsoftClientId: '',
+  googleClientId: '',
+  googleClientSecret: ''
 }
 
 export interface RunProgress {

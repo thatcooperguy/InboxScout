@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { PublicClientApplication, type ICachePlugin, type TokenCacheContext } from '@azure/msal-node'
-import type { AccountConfig, MessageRecord } from '../../shared/types'
+import type { AccountConfig, MessageRecord, ProviderHints } from '../../shared/types'
 import { makeSnippet, threadKeyFor } from './imap'
 
 /**
@@ -113,6 +113,10 @@ export interface GraphMessage {
   conversationId?: string | null
   internetMessageId?: string | null
   hasAttachments?: boolean
+  inferenceClassification?: 'focused' | 'other' | string | null
+  importance?: 'low' | 'normal' | 'high' | string | null
+  isRead?: boolean
+  flag?: { flagStatus?: string } | null
 }
 
 /** Pure mapping from a Graph message to our record. */
@@ -131,6 +135,14 @@ export function mapGraphMessage(
   const bodyText = (raw.body?.contentType === 'html' ? htmlToText(bodyRaw) : bodyRaw).slice(0, 20000)
   const snippet = makeSnippet(bodyText || raw.bodyPreview || '')
   const date = raw.receivedDateTime ?? raw.sentDateTime ?? new Date().toISOString()
+  const hints: ProviderHints = {
+    source: 'outlook',
+    category: null,
+    important: raw.importance === 'high',
+    starred: raw.flag?.flagStatus === 'flagged',
+    unread: raw.isRead === false,
+    focused: raw.inferenceClassification === 'focused' ? true : raw.inferenceClassification === 'other' ? false : null
+  }
   return {
     id: randomUUID(),
     accountId: account.id,
@@ -149,12 +161,14 @@ export function mapGraphMessage(
     bodyText: storeFullBodies ? bodyText : snippet,
     fromMe: fromAddr === account.email.toLowerCase(),
     listUnsubscribe: null,
-    hasAttachments: !!raw.hasAttachments
+    hasAttachments: !!raw.hasAttachments,
+    providerHints: hints
   }
 }
 
 const SELECT =
-  'id,subject,from,toRecipients,receivedDateTime,sentDateTime,bodyPreview,body,conversationId,internetMessageId,hasAttachments'
+  'id,subject,from,toRecipients,receivedDateTime,sentDateTime,bodyPreview,body,conversationId,internetMessageId,hasAttachments,' +
+  'inferenceClassification,importance,isRead,flag'
 
 /**
  * Fetch messages newer than `sinceMs` (epoch ms) from a well-known folder

@@ -2,6 +2,7 @@ import { BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { signInWithDeviceCode } from './mail/graph'
+import { signInWithGoogle, GMAIL_FOLDER } from './mail/gmail'
 import { randomUUID } from 'node:crypto'
 import type { DB } from './db/index'
 import * as repo from './db/repo'
@@ -80,6 +81,25 @@ export function registerIpc(ctx: IpcContext): void {
     repo.upsertAccount(db, account)
     if (cache) secrets.set(accountSecretName(id), cache)
     repo.setMeta(db, `graph-home:${id}`, homeAccountId)
+    return account
+  })
+  ipcMain.handle('accounts:googleSignIn', async () => {
+    const settings = loadSettings(db)
+    const clientId = settings.googleClientId || process.env['INBOXSCOUT_GOOGLE_CLIENT_ID'] || ''
+    const clientSecret = settings.googleClientSecret || process.env['INBOXSCOUT_GOOGLE_CLIENT_SECRET'] || ''
+    const { email, tokens } = await signInWithGoogle(clientId, clientSecret, (url) => void shell.openExternal(url))
+    const account: AccountConfig = {
+      id: randomUUID(),
+      label: email,
+      email,
+      provider: 'gmailapi',
+      host: 'gmail.googleapis.com',
+      port: 443,
+      folders: [GMAIL_FOLDER],
+      createdAt: new Date().toISOString()
+    }
+    repo.upsertAccount(db, account)
+    secrets.set(accountSecretName(account.id), JSON.stringify(tokens))
     return account
   })
   ipcMain.handle('shell:openExternal', (_e, url: string) => {

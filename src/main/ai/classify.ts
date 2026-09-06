@@ -52,11 +52,23 @@ export function buildClassificationPrompt(
       `From: ${m.fromName} <${m.fromAddress}>`,
       `Subject: ${m.subject}`,
       `Date: ${m.date}`,
+      ...(m.providerHints ? [`Provider signals: ${describeHints(m.providerHints)}`] : []),
       `Body (truncated): ${m.bodyText.slice(0, 1200)}`,
       ''
     )
   })
   return lines.join('\n')
+}
+
+function describeHints(h: NonNullable<MessageRecord['providerHints']>): string {
+  const parts: string[] = []
+  if (h.category) parts.push(`${h.source === 'gmail' ? 'Gmail category' : 'category'} = ${h.category}`)
+  if (h.focused === true) parts.push('Outlook Focused inbox')
+  if (h.focused === false) parts.push('Outlook "Other" (not focused)')
+  if (h.important) parts.push('marked important')
+  if (h.starred) parts.push('starred/flagged')
+  parts.push(h.unread ? 'unread' : 'already read')
+  return parts.join(', ')
 }
 
 export async function classifyBatch(

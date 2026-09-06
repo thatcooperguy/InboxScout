@@ -31,7 +31,7 @@ It works for a business owner, a real-estate agent, a lineworker at the power co
 
 | | |
 |---|---|
-| 📬 **Reads all your mail, read-only** | Gmail, Yahoo, iCloud, Outlook.com/Hotmail, any IMAP. It can never send, delete, or change anything. |
+| 📬 **Reads all your mail, read-only** | Gmail (Sign in with Google or app password), Yahoo, iCloud, Outlook.com/Hotmail (Sign in with Microsoft), any IMAP. It can never send, delete, or change anything. |
 | 🧠 **Sorts personal from work** | Plus importance, needs-reply, newsletters, receipts, and a heads-up when something contains sensitive info (never redacted). |
 | 📰 **Daily or weekly brief** | Top emerging issues with a concrete next step each, a rolling pulse on your projects/deals/jobs, a reply tracker, and upcoming dates. Saved as HTML, Markdown, and PDF. |
 | 🔎 **Skills — you pick what to watch for** | Bills & invoices, appointments, real-estate deals, work orders & compliance, deliveries, travel, school & family, health, job search, customer requests, important people. |
@@ -60,7 +60,9 @@ Then the three-step setup: **connect your email → say what kind of work you do
 <details>
 <summary><strong>Connecting Gmail, Yahoo, iCloud</strong></summary>
 
-These use an **app password** (a special 16-character password just for InboxScout):
+**Gmail's best option is "Sign in with Google"** — a normal Google sign-in page, no app password, and InboxScout gets Gmail's own Promotions/Social/Updates labels and Important markers for much better sorting. It needs a one-time free Google setup by whoever installs InboxScout ([docs/GOOGLE.md](docs/GOOGLE.md)).
+
+Otherwise these use an **app password** (a special 16-character password just for InboxScout):
 - Gmail: turn on 2-Step Verification, then create one at [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
 - Yahoo: Account Security → *Generate and manage app passwords*
 - iCloud: [appleid.apple.com](https://appleid.apple.com) → Sign-In and Security → App-Specific Passwords
@@ -93,7 +95,7 @@ npm run package      # build local installers (no publish)
 
 Headless scan: `inboxscout --sync`. Stack: Electron · TypeScript · React · better-sqlite3 (FTS5) · imapflow + mailparser · Microsoft Graph (MSAL) · Vercel AI SDK · node-cron · electron-updater.
 
-Design docs: [Proposal](docs/PROPOSAL.md) · [Roadmap](docs/ROADMAP.md) · [Skills](docs/SKILLS.md) · [Outlook setup](docs/OUTLOOK.md) · [Contributing](CONTRIBUTING.md)
+Design docs: [Proposal](docs/PROPOSAL.md) · [Roadmap](docs/ROADMAP.md) · [Skills](docs/SKILLS.md) · [Google setup](docs/GOOGLE.md) · [Outlook setup](docs/OUTLOOK.md) · [Contributing](CONTRIBUTING.md)
 
 ## 📜 License
 
