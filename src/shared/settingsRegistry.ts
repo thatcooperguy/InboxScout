@@ -220,6 +220,32 @@ export const SETTINGS_REGISTRY: SettingDesc[] = [
     options: yesNo('Yes — Docs and a Sheet tracker', 'No'),
     minLevel: 'standard'
   },
+  // ---- Trusted helpers (v1.4, Part A). The helper list itself is a richer card under Setup → Trusted helpers. ----
+  {
+    key: 'helpersPaused',
+    group: 'get',
+    label: 'Pause my helpers',
+    what: 'When on, nothing is sent to any helper — no digests, no heads-ups, and Ask for help is greyed out.',
+    why: 'Off, because you added helpers to hear from you.',
+    who: 'Turn it on when you are travelling with them or just want a quiet week.',
+    kind: 'toggle',
+    options: yesNo('On — send nothing to my helpers for now', 'Off — my helpers hear from InboxScout')
+  },
+  {
+    key: 'setupBy',
+    group: 'get',
+    label: 'Who set this up',
+    what: 'Me, or someone helping me. When someone else set it up, they are usually your first helper.',
+    why: 'Set once during setup.',
+    who: 'Change it if the helper who set it up should no longer get anything.',
+    kind: 'select',
+    options: [
+      { value: '', label: 'Not answered yet' },
+      { value: 'me', label: 'Me' },
+      { value: 'someone_else', label: 'Someone helping me' }
+    ],
+    minLevel: 'standard'
+  },
   {
     key: 'storeFullBodies',
     group: 'advanced',

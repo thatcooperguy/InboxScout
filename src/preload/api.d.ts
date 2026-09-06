@@ -1,4 +1,4 @@
-import type { HealthReport } from '../shared/types'
+import type { Answer, HealthReport, Helper, HelperCadence, HelperLevel, HelperSend } from '../shared/types'
 
 export interface BridgeInfo {
   enabled: boolean
@@ -150,8 +150,26 @@ export interface InboxScoutApi {
   /** Fired after the automatic health pass at startup and after every run. */
   onHealthReport: (cb: (r: HealthReport) => void) => () => void
 
+  // Trusted helpers (v1.4, Part A). The person's own screen sees full contact details; the bridge and phone see them masked.
+  helpersList: () => Promise<{ helpers: Helper[]; paused: boolean; setupBy: 'me' | 'someone_else' | null; helperNoticeUntil: string | null }>
+  helpersAdd: (input: { name: string; relationship?: string; email?: string; phone?: string; carrier?: string; level?: HelperLevel; cadence?: HelperCadence; weekday?: number; addedBy?: 'person' | 'helper_setup' }) => Promise<Helper>
+  helpersUpdate: (id: string, patch: Partial<Pick<Helper, 'name' | 'relationship' | 'email' | 'phone' | 'carrier' | 'level' | 'cadence' | 'weekday' | 'paused'>>) => Promise<Helper>
+  helpersRemove: (id: string) => Promise<{ ok: boolean }>
+  /** Queues the message; it goes after 10 seconds unless helpersCancel(sendId) is called first. */
+  helpersAsk: (input: { helperId: string; title: string; nextStep?: string; whyNow?: string; note?: string }) => Promise<{ sendId: string; sendsAt: string; helperName: string; outboxMissing: boolean; mailto: string | null }>
+  helpersCancel: (sendId: string) => Promise<{ cancelled: boolean }>
+  helpersLog: (limit?: number, helperId?: string) => Promise<HelperSend[]>
+  helpersPauseAll: (paused: boolean) => Promise<{ paused: boolean }>
+  helpersSetSetupBy: (setupBy: 'me' | 'someone_else' | null) => Promise<boolean>
+  helpersDismissNotice: () => Promise<boolean>
+
   onRunProgress: (cb: (p: any) => void) => () => void
   onRunFinished: (cb: (r: any) => void) => () => void
+
+  // Conversation (v1.4, Part B): "Ask about your mail…".
+  /** The local answer, at once. `aiPending` = an AI answer will follow on onAskAnswer with the same id. */
+  ask: (q: string, id?: string) => Promise<{ id: string; answer: Answer; aiPending: boolean }>
+  onAskAnswer: (cb: (r: { id: string; answer: Answer }) => void) => () => void
 }
 
 declare global {

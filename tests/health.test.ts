@@ -96,7 +96,7 @@ describe('health checks', () => {
   it('all green on a healthy app', () => {
     const report = runHealth(fakeCtx().ctx)
     expect(report.ok).toBe(true)
-    expect(report.items.map((i) => i.id)).toEqual(['db', 'reportsDir', 'accounts', 'ai', 'schedule', 'bridge', 'desktop-linux', 'keyring-linux', 'disk'])
+    expect(report.items.map((i) => i.id)).toEqual(['db', 'reportsDir', 'accounts', 'ai', 'schedule', 'bridge', 'desktop-linux', 'keyring-linux', 'disk', 'helpers'])
     expect(report.items.every((i) => i.status === 'ok')).toBe(true)
     expect(report.checkedAt).toBe(NOW.toISOString())
   })
@@ -223,6 +223,33 @@ describe('health checks', () => {
     expect(detect('disk', fakeCtx({ freeBytes: () => LOW_DISK_BYTES - 1 })).status).toBe('warn')
     expect(detect('disk', fakeCtx({ freeBytes: () => LOW_DISK_BYTES })).status).toBe('ok')
     expect(detect('disk', fakeCtx({ freeBytes: () => null })).status).toBe('ok')
+  })
+
+  it('helpers: quiet without helpers, warns without an outbox or after a failed send, never fails, never auto-repairs', () => {
+    const sarah = { id: 'h1', name: 'Sarah', relationship: 'daughter', email: 'sarah@example.com', phone: '', carrier: '', level: 'needs' as const, cadence: 'each_brief' as const, weekday: 1, paused: false, addedBy: 'person' as const, createdAt: NOW.toISOString() }
+    expect(detect('helpers', fakeCtx()).status).toBe('ok')
+    // Helpers but nothing that can send mail (an Outlook account cannot be the outbox).
+    const noOutbox = detect('helpers', fakeCtx({ accounts: () => [account('o1', 'outlook')] }, { helpers: [sarah] }))
+    expect(noOutbox).toMatchObject({ status: 'warn', canRepair: false, title: 'Trusted helpers' })
+    expect(noOutbox.detail).toContain('no account that can send mail')
+    expect(noOutbox.detail).toContain('app password')
+    // With a Gmail app-password account, all is well.
+    expect(detect('helpers', fakeCtx({ accounts: () => [account('g1', 'gmail')] }, { helpers: [sarah] })).status).toBe('ok')
+    // The last message to a helper failed: say so in plain words.
+    const failed = detect(
+      'helpers',
+      fakeCtx(
+        { accounts: () => [account('g1', 'gmail')], lastHelperSend: () => ({ id: 's1', helperId: 'h1', kind: 'digest', channel: 'email', sentAt: NOW.toISOString(), subject: 'x', text: 'y', triggerKey: null, status: 'failed', error: 'SMTP 535 auth failed' }) },
+        { helpers: [sarah] }
+      )
+    )
+    expect(failed.status).toBe('warn')
+    expect(failed.detail).toContain('Sarah')
+    expect(failed.detail).toContain('535')
+    // Paused helpers are never a problem.
+    expect(detect('helpers', fakeCtx({ accounts: () => [] }, { helpers: [sarah], helpersPaused: true })).status).toBe('ok')
+    expect(detect('helpers', fakeCtx({ accounts: () => [] }, { helpers: [{ ...sarah, paused: true }] })).status).toBe('ok')
+    expect(check('helpers').repair).toBeUndefined()
   })
 
   it('a check that throws becomes a fail item instead of breaking the report', () => {

@@ -124,6 +124,34 @@ main { padding: 14px 14px 32px; max-width: 640px; margin: 0 auto; }
 .spin { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.5); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; margin-right: 8px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 [hidden] { display: none !important; }
+/* Conversation (v1.4, Part B): "Ask about your mail…" at the top of the page */
+.chat { margin: 0 0 12px; }
+.chat form { display: flex; gap: 8px; }
+.chat input { flex: 1; min-width: 0; font: inherit; font-size: 17px; min-height: 52px; border: 1px solid var(--line); border-radius: 12px; padding: 8px 14px; background: var(--card); color: var(--ink); }
+.chat input:focus { outline: 3px solid var(--blue); outline-offset: 1px; border-color: var(--blue); }
+.chat button.go { background: var(--blue); color: #fff; border: none; border-radius: 12px; min-height: 52px; padding: 0 18px; font-weight: 700; cursor: pointer; }
+.chat button.go[disabled] { opacity: .65; }
+.chat-log { margin-top: 10px; }
+.chat-x { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin-top: 8px; }
+.chat-q { color: var(--ink-faint); font-size: 14px; margin-bottom: 4px; }
+.chat-a { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 16px; }
+.chat-a.wait { color: var(--ink-faint); }
+.chat-src { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chat-src button, .chat-acts button, .chat-acts a { font: inherit; font-size: 13.5px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--ink-soft); padding: 6px 12px; min-height: 36px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+.chat-acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chat-acts a, .chat-acts button.primary { border-color: var(--blue); color: var(--blue); font-weight: 600; }
+.chat-src .full { width: 100%; font-size: 13.5px; color: var(--ink-soft); padding: 4px 2px; }
+.chat-meta { font-size: 12px; color: var(--ink-faint); margin-top: 6px; }
+/* Trusted helpers (v1.4): Ask for help per Needs-you row, and the 10-second cancel bar */
+.row .acts { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.ask-form { margin-top: 10px; padding: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); display: grid; gap: 8px; }
+.ask-form select, .ask-form input { font: inherit; min-height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--card); color: var(--ink); width: 100%; }
+.ask-form .btns { display: flex; gap: 8px; }
+.ask-form .btns .primary { flex: 1; background: var(--blue); color: #fff; border: none; border-radius: 10px; min-height: 44px; font-weight: 700; cursor: pointer; }
+.ask-form .hint { font-size: 13px; color: var(--ink-faint); }
+.ask-bar { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 6; background: var(--ink); color: var(--paper); border-radius: 14px; padding: 12px 14px; display: flex; gap: 10px; align-items: center; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+.ask-bar span { flex: 1; min-width: 0; font-weight: 600; }
+.ask-bar button { background: var(--red); color: #fff; border: none; border-radius: 10px; min-height: 40px; padding: 8px 14px; font-weight: 700; cursor: pointer; }
 `
 
 /* The page script. Plain ES2017; no backticks or template placeholders so it can live in this template literal. */
@@ -214,13 +242,17 @@ const JS = `
     var deadlines = (b.deadlines || []);
     if (!issues.length && !waiting.length && !deadlines.length) out += '<div class="all-clear">✅ You\\'re all caught up.</div>';
 
+    lastIssues = issues;
     if (issues.length) {
       out += card('Needs you', issues.length, '<ul>' + issues.map(function (i, idx) {
         return '<li class="row" data-idx="' + idx + '"><div class="txt"><div class="title">' + esc(i.title) +
           (i.severity ? '<span class="pill ' + esc(i.severity) + '">' + esc(i.severity) + '</span>' : '') + '</div>' +
           (i.nextStep ? '<div class="next">→ ' + esc(i.nextStep) + '</div>' : '') +
-          (i.whyNow ? '<div class="why">' + esc(i.whyNow) + '</div>' : '') + '</div>' +
-          (i.issueId ? '<button class="ghost done" data-done="' + esc(i.issueId) + '">Done</button>' : '') + '</li>';
+          (i.whyNow ? '<div class="why">' + esc(i.whyNow) + '</div>' : '') + '<div class="ask-slot"></div></div>' +
+          '<div class="acts">' +
+          (i.issueId ? '<button class="ghost done" data-done="' + esc(i.issueId) + '">Done</button>' : '') +
+          (helpers.length && !helpersPaused ? '<button class="ghost" data-ask="' + idx + '">Ask for help</button>' : '') +
+          '</div></li>';
       }).join('') + '</ul>');
     }
     if (waiting.length) out += card("They're waiting on you", waiting.length, lines(waiting));
@@ -274,7 +306,76 @@ const JS = `
   }
 
   function load() {
-    return api('get_brief').then(function (latest) { banner('', ''); renderBrief(latest); }).catch(fail);
+    return loadHelpers().then(function () { return api('get_brief'); }).then(function (latest) { banner('', ''); renderBrief(latest); }).catch(fail);
+  }
+
+  // ---- Trusted helpers (v1.4): "Ask for help" on each Needs-you row, with a 10-second Don't send ----
+  var helpers = [];
+  var helpersPaused = false;
+  var lastIssues = [];
+  var askTimer = null;
+  function loadHelpers() {
+    return api('helper_list').then(function (r) {
+      helpers = (r && r.helpers) ? r.helpers.filter(function (h) { return !h.paused; }) : [];
+      helpersPaused = !!(r && r.paused);
+    }).catch(function () { helpers = []; });
+  }
+  function openAsk(idx, li) {
+    var slot = li.querySelector('.ask-slot');
+    if (!slot || slot.firstChild) return;
+    var first = helpers[0];
+    slot.innerHTML = '<div class="ask-form">' +
+      '<div class="hint">They get the title, the next step, and your note. Not the email itself.</div>' +
+      (helpers.length > 1
+        ? '<select aria-label="Which helper">' + helpers.map(function (h) { return '<option value="' + esc(h.id) + '">' + esc(h.name) + (h.relationship ? ' (' + esc(h.relationship) + ')' : '') + '</option>'; }).join('') + '</select>'
+        : '<div><strong>Send to ' + esc(first.name) + '</strong>' + (first.relationship ? ' <span class="muted">(' + esc(first.relationship) + ')</span>' : '') + '</div>') +
+      '<input type="text" maxlength="200" placeholder="Add a note (optional)" aria-label="A note for them">' +
+      '<div class="btns"><button type="button" class="primary" data-ask-send="' + idx + '">Send</button><button type="button" class="ghost" data-ask-close="1">Cancel</button></div>' +
+      '</div>';
+    var input = slot.querySelector('input');
+    if (input) input.focus();
+  }
+  function closeAsk(li) {
+    var slot = li.querySelector('.ask-slot');
+    if (slot) slot.innerHTML = '';
+  }
+  function askBar(text, sendId) {
+    var bar = $('askbar');
+    bar.hidden = false;
+    bar.innerHTML = '<span>' + esc(text) + '</span>' + (sendId ? '<button type="button" data-ask-cancel="' + esc(sendId) + '">Don\\u2019t send</button>' : '');
+  }
+  function hideAskBar(after) {
+    if (askTimer) { clearInterval(askTimer); askTimer = null; }
+    setTimeout(function () { $('askbar').hidden = true; $('askbar').innerHTML = ''; }, after || 0);
+  }
+  function sendAsk(idx, li) {
+    var issue = lastIssues[idx];
+    if (!issue) return;
+    var select = li.querySelector('.ask-form select');
+    var input = li.querySelector('.ask-form input');
+    var helperId = select ? select.value : (helpers[0] && helpers[0].id);
+    if (!helperId) { banner('err', 'No helper yet. Add one on your computer under Setup → Trusted helpers.'); return; }
+    var helper = helpers.filter(function (h) { return h.id === helperId; })[0] || helpers[0];
+    var args = { helperId: helperId, title: issue.title, nextStep: issue.nextStep || undefined, whyNow: issue.whyNow || undefined, note: input && input.value ? input.value : undefined };
+    closeAsk(li);
+    api('helper_ask', args).then(function (r) {
+      var until = new Date(r.sendsAt).getTime();
+      var tick = function () {
+        var left = Math.max(0, Math.ceil((until - Date.now()) / 1000));
+        if (left > 0) { askBar('Sending to ' + helper.name + ' in ' + left + ' seconds.', r.sendId); return; }
+        askBar(r.outboxMissing ? 'Could not send: no account on your computer can send mail (see Setup → Health).' : 'Sent to ' + helper.name + '.', null);
+        hideAskBar(5000);
+      };
+      if (askTimer) clearInterval(askTimer);
+      askTimer = setInterval(tick, 500);
+      tick();
+    }).catch(fail);
+  }
+  function cancelAsk(sendId) {
+    api('helper_cancel', { sendId: sendId }).then(function (r) {
+      askBar(r && r.cancelled ? 'Not sent.' : 'Too late to stop it — it already went.', null);
+      hideAskBar(3000);
+    }).catch(fail);
   }
 
   function loadReports() {
@@ -369,11 +470,86 @@ const JS = `
   }
 
   document.addEventListener('click', function (e) {
-    var t = e.target.closest ? e.target.closest('[data-done],[data-report]') : null;
+    var t = e.target.closest ? e.target.closest('[data-done],[data-report],[data-ask],[data-ask-send],[data-ask-close],[data-ask-cancel]') : null;
     if (!t) return;
     if (t.getAttribute('data-done')) markDone(t.getAttribute('data-done'), t.closest('li'));
+    else if (t.hasAttribute('data-ask')) openAsk(Number(t.getAttribute('data-ask')), t.closest('li'));
+    else if (t.hasAttribute('data-ask-send')) sendAsk(Number(t.getAttribute('data-ask-send')), t.closest('li'));
+    else if (t.hasAttribute('data-ask-close')) closeAsk(t.closest('li'));
+    else if (t.hasAttribute('data-ask-cancel')) cancelAsk(t.getAttribute('data-ask-cancel'));
     else openReport(t.getAttribute('data-report'));
   });
+  // ---- Conversation (v1.4, Part B): "Ask about your mail…" — the last 5 exchanges, never stored ----
+  var chatLog = [];
+  var chatBusy = false;
+  function renderChat() {
+    var el = $('chat-log');
+    if (!el) return;
+    el.innerHTML = chatLog.map(function (x, i) {
+      var a = x.answer;
+      var out = '<div class="chat-x"><div class="chat-q">You: ' + esc(x.q) + '</div>';
+      if (!a) return out + '<div class="chat-a wait">Thinking…</div></div>';
+      out += '<div class="chat-a">' + esc(a.text) + '</div>';
+      if (a.sources && a.sources.length) {
+        out += '<div class="chat-src">' + a.sources.map(function (s, j) {
+          return '<button type="button" data-chat-src="' + i + ':' + j + '" aria-expanded="false">' + esc(s.label.length > 34 ? s.label.slice(0, 33) + '…' : s.label) + '</button>';
+        }).join('') + '<div class="full" data-chat-full="' + i + '" hidden></div></div>';
+      }
+      var acts = (a.actions || []).filter(function (ac) { return ac.kind === 'open_draft' || ac.kind === 'ask'; });
+      if (acts.length) {
+        out += '<div class="chat-acts">' + acts.map(function (ac, j) {
+          if (ac.kind === 'open_draft') return '<a href="' + esc(ac.mailto) + '">' + esc(ac.label || 'Open the draft') + '</a>';
+          return '<button type="button" class="primary" data-chat-ask="' + i + ':' + j + '">' + esc(ac.label || ac.question) + '</button>';
+        }).join('') + '</div>';
+      }
+      if (a.error) out += '<div class="chat-meta">' + esc(a.error) + '</div>';
+      return out + '</div>';
+    }).join('');
+  }
+  function askQuestion(q) {
+    q = String(q || '').trim();
+    if (!q || chatBusy) return;
+    chatBusy = true;
+    var btn = $('chat-go');
+    btn.disabled = true;
+    var row = { q: q, answer: null };
+    chatLog.unshift(row);
+    chatLog = chatLog.slice(0, 5);
+    renderChat();
+    api('ask', { q: q }).then(function (a) {
+      row.answer = a || { text: 'No answer.', sources: [], actions: [] };
+      renderChat();
+      var auto = (row.answer.actions || []).filter(function (ac) { return ac.auto && ac.kind === 'open_draft' && ac.mailto; })[0];
+      if (auto) { try { location.href = auto.mailto; } catch (e) { /* the button stays */ } }
+    }).catch(function (err) {
+      row.answer = { text: "I couldn't answer that just now.", sources: [], actions: [], error: (err && err.message) || OFFLINE };
+      renderChat();
+    }).then(function () { chatBusy = false; btn.disabled = false; });
+  }
+  $('chat-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var input = $('chat-q');
+    askQuestion(input.value);
+    input.value = '';
+  });
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target.closest('[data-chat-src],[data-chat-ask]') : null;
+    if (!t) return;
+    var parts = (t.getAttribute('data-chat-src') || t.getAttribute('data-chat-ask') || '').split(':');
+    var x = chatLog[Number(parts[0])];
+    if (!x || !x.answer) return;
+    if (t.hasAttribute('data-chat-src')) {
+      var full = document.querySelector('[data-chat-full="' + parts[0] + '"]');
+      var src = x.answer.sources[Number(parts[1])];
+      var open = t.getAttribute('aria-expanded') === 'true';
+      t.setAttribute('aria-expanded', open ? 'false' : 'true');
+      if (full) { full.hidden = open; full.textContent = open ? '' : src.label; }
+    } else {
+      var ac = (x.answer.actions || []).filter(function (a) { return a.kind === 'open_draft' || a.kind === 'ask'; })[Number(parts[1])];
+      if (ac && ac.kind === 'ask' && ac.question) askQuestion(ac.question);
+    }
+  });
+
   $('check').addEventListener('click', check);
   $('refresh').addEventListener('click', function () { load().then(loadReports); });
   $('close').addEventListener('click', function () { $('panel').hidden = true; $('panel-body').innerHTML = ''; });
@@ -414,6 +590,13 @@ export const PHONE_APP_HTML = `<!doctype html>
 </header>
 <main>
   <div id="banner" class="banner" role="alert" hidden></div>
+  <section class="chat" aria-label="Ask about your mail">
+    <form id="chat-form" autocomplete="off">
+      <input id="chat-q" type="text" placeholder="Ask about your mail…" aria-label="Ask about your mail" enterkeyhint="send" maxlength="500">
+      <button id="chat-go" class="go" type="submit">Ask</button>
+    </form>
+    <div id="chat-log" class="chat-log" role="log" aria-live="polite"></div>
+  </section>
   <button id="check" class="big" type="button">✉ Check my email</button>
   <div id="content"></div>
   <section class="card reports">
@@ -426,6 +609,7 @@ export const PHONE_APP_HTML = `<!doctype html>
   <div class="panel-bar"><button id="close" class="ghost" type="button">← Back</button><span id="panel-title"></span></div>
   <div id="panel-body" class="panel-body"></div>
 </div>
+<div id="askbar" class="ask-bar" role="status" aria-live="polite" hidden></div>
 <noscript>InboxScout needs JavaScript turned on.</noscript>
 <script>${JS}</script>
 </body>

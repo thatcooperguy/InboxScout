@@ -254,6 +254,8 @@ export interface Brief {
   schedule?: BriefSchedule
   promises?: PromiseLine[]
   inboxes?: InboxSummary[]
+  /** Trusted helpers (v1.4): replies from helpers found in the inbox ("Notes from your helpers"). */
+  helperNotes?: HelperNote[]
 }
 
 export interface ScheduleSettings {
@@ -345,6 +347,15 @@ export interface AppSettings {
    */
   phoneAccess: 'on' | 'off'
   phonePort: number
+  // ---- Trusted helpers (v1.4, Part A) ----
+  /** People the person named to get a narrow, plain-words slice of the brief. Changed only through the helper ops/IPC (every path logs and sends the hello). */
+  helpers: Helper[]
+  /** One press stops every digest, heads-up, and Ask for help. */
+  helpersPaused: boolean
+  /** Who ran first-run setup: the person, or someone helping them (usually the first helper). */
+  setupBy: 'me' | 'someone_else' | null
+  /** Today shows the "X gets a copy of what needs you" line until this date (ISO); null = nothing to show. */
+  helperNoticeUntil: string | null
 }
 
 /** read: look but don't touch; full: also scan, connect accounts, change preferences, and drive the Assistant. */
@@ -396,7 +407,43 @@ export const DEFAULT_SETTINGS: AppSettings = {
   agentWebhookUrl: '',
   agentWebhookToken: '',
   phoneAccess: 'off',
-  phonePort: 47321
+  phonePort: 47321,
+  // Trusted helpers (v1.4)
+  helpers: [],
+  helpersPaused: false,
+  setupBy: null,
+  helperNoticeUntil: null
+}
+
+// ---- Conversation (v1.4, Part B): "Ask about your mail…" ----
+/** Where an answer came from: "Dentist · Dr. Patel · Tue". `messageId` lets the UI open the message. */
+export interface AskSource {
+  messageId?: string
+  label: string
+}
+/**
+ * Something the person can press under an answer. `open_draft` carries a mailto: the renderer opens with
+ * openExternal (InboxScout never sends); `go_to` switches tab; `speak` reads `text` aloud; `ask` re-asks
+ * `question` (the "Which Jane — Jane Park or Jane Ruiz?" chips). `auto` = run it as soon as the answer
+ * arrives (the local "Tell Jane…" intent and the AI's draft_reply).
+ */
+export interface AskAction {
+  kind: 'open_draft' | 'open_message' | 'go_to' | 'speak' | 'ask'
+  mailto?: string
+  messageId?: string
+  tab?: string
+  label?: string
+  question?: string
+  text?: string
+  auto?: boolean
+}
+export interface Answer {
+  text: string
+  sources: AskSource[]
+  actions: AskAction[]
+  engine: 'local' | 'ai'
+  /** True when the local engine only found keyword hits and is not sure. Pro shows "unsure"; Simple never shows it. */
+  unsure: boolean
 }
 
 export interface RunProgress {
@@ -419,4 +466,48 @@ export interface HealthReport {
   ok: boolean
   items: HealthItem[]
   recentFixes: string[]
+}
+
+// ---- Trusted helpers (v1.4, Part A): a second recipient the person names ----
+/**
+ * ask: only when the person presses Ask for help. schedule: appointments and dates only (friends).
+ * needs: what needs the person, plus heads-ups. all: the full brief, same as "Email me my brief".
+ */
+export type HelperLevel = 'ask' | 'schedule' | 'needs' | 'all'
+export type HelperCadence = 'each_brief' | 'weekly' | 'off'
+export interface Helper {
+  id: string
+  name: string
+  /** Free text: "daughter", "neighbour", "friend". Shown in copy, never parsed. */
+  relationship: string
+  email: string // '' when SMS only
+  phone: string // '' when email only
+  carrier: string // key of SMS_GATEWAYS, '' when email only
+  level: HelperLevel
+  cadence: HelperCadence
+  /** 0–6, used when cadence is weekly. */
+  weekday: number
+  paused: boolean
+  addedBy: 'person' | 'helper_setup' | 'bridge'
+  createdAt: string
+}
+/** One message that went (or tried to go) to a helper — the sent log, verbatim. */
+export interface HelperSend {
+  id: string
+  helperId: string
+  kind: 'hello' | 'ask' | 'digest' | 'headsup'
+  channel: 'email' | 'sms'
+  sentAt: string
+  subject: string
+  text: string // exactly what went out (plain text)
+  triggerKey: string | null
+  status: 'sent' | 'failed' | 'cancelled'
+  error: string | null
+}
+/** A reply from a helper, surfaced on Today as "Notes from your helpers". */
+export interface HelperNote {
+  from: string
+  text: string
+  receivedAt: string
+  messageId: string
 }

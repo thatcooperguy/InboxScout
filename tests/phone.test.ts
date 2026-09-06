@@ -193,6 +193,41 @@ describe('phone server', () => {
     expect((await jsonOf(await call('/api/health_check'))).ok).toBe(true)
   })
 
+  // ---- Conversation (v1.4, Part B): the box at the top of the phone page ----
+  it('answers questions from the phone through the read-only ask op', async () => {
+    expect(PHONE_OPS).toContain('ask')
+    expect(PHONE_APP_HTML).toContain('id="chat-form"')
+    expect(PHONE_APP_HTML).toContain('Ask about your mail…')
+    expect(PHONE_APP_HTML.indexOf('id="chat-form"')).toBeLessThan(PHONE_APP_HTML.indexOf('id="check"'))
+    const r = await post('ask', { q: 'Who is waiting on me?' })
+    expect(r.status).toBe(200)
+    const a = await jsonOf(r)
+    expect(a.engine).toBe('local')
+    expect(typeof a.text).toBe('string')
+    expect(Array.isArray(a.sources)).toBe(true)
+    expect(Array.isArray(a.actions)).toBe(true)
+    expect((await post('ask', {})).status).toBe(400)
+    expect(calls).not.toContain('run:ls')
+  })
+
+  it('trusted helpers (v1.4): the phone may list and ask, never add, change, or read the log', async () => {
+    for (const op of ['helper_add', 'helper_update', 'helper_remove', 'helper_pause_all', 'helper_log']) {
+      expect((await post(op, { name: 'Mallory', level: 'all', id: 'x', patch: {}, paused: true })).status, op).toBe(404)
+    }
+    expect(await jsonOf(await call('/api/helper_list'))).toEqual({ paused: false, helpers: [] })
+    // Allowed, but there is no helper yet: a plain 400, not "not available".
+    const none = await post('helper_ask', { helperId: 'nope', title: 'Sign the form' })
+    expect(none.status).toBe(400)
+    expect((await jsonOf(none)).error).toMatch(/No helper yet/)
+    expect((await post('helper_ask', {})).status).toBe(400)
+    expect(await jsonOf(await post('helper_cancel', { sendId: 'nope' }))).toEqual({ cancelled: false })
+    expect(PHONE_OPS).toContain('helper_ask')
+    expect(PHONE_OPS).not.toContain('helper_add')
+    expect(PHONE_APP_HTML).toContain('Ask for help')
+    expect(PHONE_APP_HTML).toContain('helper_ask')
+    expect(PHONE_APP_HTML).toContain('helper_cancel')
+  })
+
   it('cuts old links off with a new code', async () => {
     const old = token()
     regeneratePhoneToken(deps)

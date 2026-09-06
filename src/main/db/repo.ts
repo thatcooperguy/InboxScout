@@ -1,7 +1,9 @@
 import type { DB } from './index'
 import type {
   AccountConfig,
+  Category,
   Classification,
+  HelperSend,
   IssueRecord,
   MessageRecord,
   ProjectRecord,
@@ -105,14 +107,96 @@ export function recentMessagesWithClassification(db: DB, limit: number): any[] {
     .all(limit)
 }
 
+// ---- Conversation (v1.4, Part B): safe full-text queries and per-sender lookups ----
+
+/** Words that carry no search meaning; dropped before a query reaches FTS5. */
+const FTS_STOP_WORDS = new Set([
+  'a', 'an', 'and', 'are', 'as', 'at', 'be', 'by', 'did', 'do', 'does', 'for', 'from', 'has', 'have', 'he', 'her', 'his', 'i',
+  'in', 'is', 'it', 'its', 'me', 'my', 'of', 'on', 'or', 'our', 'she', 'that', 'the', 'their', 'them', 'they', 'this', 'to',
+  'was', 'we', 'were', 'what', 'when', 'where', 'which', 'who', 'will', 'with', 'you', 'your', 's', 't', 'll', 're', 've', 'm', 'd'
+])
+
+/**
+ * Turn free text into a query FTS5 will never choke on: keep `[\p{L}\p{N}]+` tokens, drop stop-words, quote each
+ * token, join with a space (implicit AND) or with OR. Returns '' when nothing searchable is left. Idempotent on
+ * its own output ("jane's write back?" → `"jane" "write" "back"`). Punctuation, quotes, apostrophes, and emoji
+ * cannot reach MATCH, so `Jane's` and `write back?` no longer raise syntax errors.
+ */
+export function toFtsQuery(text: string, mode: 'and' | 'or' = 'and'): string {
+  const tokens = (String(text ?? '').toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter((t) => !FTS_STOP_WORDS.has(t))
+  const unique = [...new Set(tokens)].slice(0, 12)
+  if (unique.length === 0) return ''
+  return unique.map((t) => `"${t}"`).join(mode === 'or' ? ' OR ' : ' ')
+}
+
+/** Full-text search, safe for any text: all words first, then any word when that finds nothing. */
 export function searchMessages(db: DB, query: string, limit: number): any[] {
-  return db
+  const run = (q: string): any[] =>
+    db
+      .prepare(
+        `SELECT m.id, m.subject, m.from_address, m.from_name, m.date, m.snippet
+         FROM messages_fts f JOIN messages m ON m.rowid = f.rowid
+         WHERE messages_fts MATCH ? ORDER BY rank LIMIT ?`
+      )
+      .all(q, limit)
+  const all = toFtsQuery(query, 'and')
+  if (!all) return []
+  const hits = run(all)
+  if (hits.length > 0) return hits
+  const any = toFtsQuery(query, 'or')
+  return any === all ? [] : run(any)
+}
+
+/**
+ * Mail from one sender, newest first. `who` is an address (exact, case-insensitive) or a word matched
+ * against the sender's name and address ("bank" → alerts@bank.com, "Chase Bank"). Never the person's own mail.
+ */
+export function searchMessagesFrom(db: DB, who: string, limit = 3): MessageRecord[] {
+  const w = String(who ?? '').trim().toLowerCase()
+  if (!w) return []
+  const rows = w.includes('@')
+    ? db.prepare('SELECT * FROM messages WHERE from_me = 0 AND lower(from_address) = ? ORDER BY date DESC LIMIT ?').all(w, limit)
+    : db
+        .prepare(
+          `SELECT * FROM messages WHERE from_me = 0 AND (lower(from_name) LIKE ? OR lower(from_address) LIKE ?)
+           ORDER BY date DESC LIMIT ?`
+        )
+        .all(`%${w}%`, `%${w}%`, limit)
+  return (rows as any[]).map(rowToMessage)
+}
+
+/** The newest message this address sent to the person (null when they never wrote). */
+export function latestInboundFrom(db: DB, address: string): MessageRecord | null {
+  const r = db
+    .prepare('SELECT * FROM messages WHERE from_me = 0 AND lower(from_address) = ? ORDER BY date DESC LIMIT 1')
+    .get(String(address ?? '').trim().toLowerCase()) as any
+  return r ? rowToMessage(r) : null
+}
+
+/** The newest message the person sent to this address (null when they never wrote to them). */
+export function latestSentTo(db: DB, address: string): MessageRecord | null {
+  const a = String(address ?? '').trim().toLowerCase()
+  if (!a) return null
+  const r = db.prepare('SELECT * FROM messages WHERE from_me = 1 AND lower(to_addresses) LIKE ? ORDER BY date DESC LIMIT 1').get(`%${a}%`) as any
+  return r ? rowToMessage(r) : null
+}
+
+/**
+ * Senders whose name starts with `prefix` (any word of it), one row per address, newest first — the
+ * fallback when the People list does not know a name yet. Also matches names the classifier recorded.
+ */
+export function findSendersByName(db: DB, prefix: string, limit = 5): { name: string; address: string; lastSeen: string }[] {
+  const p = String(prefix ?? '').trim().toLowerCase()
+  if (!p) return []
+  const rows = db
     .prepare(
-      `SELECT m.id, m.subject, m.from_address, m.date, m.snippet
-       FROM messages_fts f JOIN messages m ON m.rowid = f.rowid
-       WHERE messages_fts MATCH ? ORDER BY rank LIMIT ?`
+      `SELECT m.from_name AS name, lower(m.from_address) AS address, MAX(m.date) AS lastSeen
+       FROM messages m LEFT JOIN classifications c ON c.message_id = m.id
+       WHERE m.from_me = 0 AND (lower(m.from_name) LIKE ? OR lower(m.from_name) LIKE ? OR lower(c.people) LIKE ?)
+       GROUP BY lower(m.from_address) ORDER BY lastSeen DESC LIMIT ?`
     )
-    .all(query, limit)
+    .all(`${p}%`, `% ${p}%`, `%"${p}%`, limit) as any[]
+  return rows.map((r) => ({ name: r.name || r.address, address: r.address, lastSeen: r.lastSeen }))
 }
 
 export function upsertClassification(db: DB, c: Classification): void {
@@ -454,4 +538,91 @@ export function bumpCounter(db: DB, key: string): number {
   const next = (Number.isFinite(current) && current > 0 ? Math.floor(current) : 0) + 1
   setMeta(db, key, String(next))
   return next
+}
+
+// ---- v1.4 quality sweep (items 6, 7): lighter per-run reads ----
+
+const LITE_COLUMNS =
+  'id, account_id, folder, uid, message_id, thread_key, from_address, from_name, to_addresses, subject, date, snippet, from_me, list_unsubscribe, has_attachments, provider_hints'
+
+/**
+ * `messagesSince` without the 20 KB bodies: `bodyChars` > 0 keeps only that many leading characters
+ * (the people engine reads at most 2000), 0 leaves `bodyText` empty (the reply tracker reads none).
+ * Same window, order, and cap as `messagesSince`.
+ */
+export function messagesSinceLite(db: DB, days: number, limit = 4000, bodyChars = 0): MessageRecord[] {
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString()
+  const body = bodyChars > 0 ? `substr(body_text, 1, ${Math.floor(bodyChars)})` : `''`
+  return (
+    db.prepare(`SELECT ${LITE_COLUMNS}, ${body} AS body_text FROM messages WHERE date >= ? ORDER BY date DESC LIMIT ?`).all(cutoff, limit) as any[]
+  ).map(rowToMessage)
+}
+
+const CATEGORY_CHUNK = 500
+
+/** Stored category per message id, in one `IN (…)` query per 500 ids (instead of one query per message). */
+export function categoryMap(db: DB, ids: string[]): Map<string, Category> {
+  const out = new Map<string, Category>()
+  const unique = [...new Set(ids)]
+  for (let i = 0; i < unique.length; i += CATEGORY_CHUNK) {
+    const slice = unique.slice(i, i + CATEGORY_CHUNK)
+    const placeholders = slice.map(() => '?').join(',')
+    const rows = db.prepare(`SELECT message_id, category FROM classifications WHERE message_id IN (${placeholders})`).all(...slice) as any[]
+    for (const r of rows) out.set(r.message_id, r.category)
+  }
+  return out
+}
+
+// ---- Trusted helpers (v1.4): the sent log, verbatim ----
+
+function rowToHelperSend(r: any): HelperSend {
+  return {
+    id: r.id,
+    helperId: r.helper_id,
+    kind: r.kind,
+    channel: r.channel,
+    sentAt: r.sent_at,
+    subject: r.subject,
+    text: r.text,
+    triggerKey: r.trigger_key ?? null,
+    status: r.status,
+    error: r.error ?? null
+  }
+}
+
+export function insertHelperSend(db: DB, s: HelperSend): void {
+  db.prepare(
+    `INSERT OR REPLACE INTO helper_sends (id, helper_id, kind, channel, sent_at, subject, text, trigger_key, status, error)
+     VALUES (@id, @helperId, @kind, @channel, @sentAt, @subject, @text, @triggerKey, @status, @error)`
+  ).run({ ...s, triggerKey: s.triggerKey ?? null, error: s.error ?? null })
+}
+
+/** Newest first. `helperId` narrows to one helper; `limit` defaults to 100. */
+export function listHelperSends(db: DB, opts: { helperId?: string; limit?: number } = {}): HelperSend[] {
+  const limit = Math.max(1, Math.min(1000, Math.floor(opts.limit ?? 100)))
+  const rows = opts.helperId
+    ? db.prepare('SELECT * FROM helper_sends WHERE helper_id = ? ORDER BY sent_at DESC LIMIT ?').all(opts.helperId, limit)
+    : db.prepare('SELECT * FROM helper_sends ORDER BY sent_at DESC LIMIT ?').all(limit)
+  return (rows as any[]).map(rowToHelperSend)
+}
+
+export function updateHelperSend(db: DB, id: string, patch: Partial<Pick<HelperSend, 'status' | 'error' | 'sentAt' | 'channel' | 'text' | 'subject'>>): void {
+  const current = db.prepare('SELECT * FROM helper_sends WHERE id = ?').get(id) as any
+  if (!current) return
+  const next = { ...rowToHelperSend(current), ...patch }
+  db.prepare('UPDATE helper_sends SET status = ?, error = ?, sent_at = ?, channel = ?, text = ?, subject = ? WHERE id = ?').run(
+    next.status,
+    next.error ?? null,
+    next.sentAt,
+    next.channel,
+    next.text,
+    next.subject,
+    id
+  )
+}
+
+/** The most recent log row for one helper (the health check looks at whether it failed). */
+export function lastHelperSend(db: DB, helperId: string): HelperSend | null {
+  const r = db.prepare('SELECT * FROM helper_sends WHERE helper_id = ? ORDER BY sent_at DESC LIMIT 1').get(helperId) as any
+  return r ? rowToHelperSend(r) : null
 }

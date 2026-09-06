@@ -108,6 +108,27 @@ const api = {
     return () => ipcRenderer.removeListener('health:report', listener)
   },
 
+  // Trusted helpers (v1.4, Part A).
+  helpersList: () => ipcRenderer.invoke('helpers:list'),
+  helpersAdd: (input: unknown) => ipcRenderer.invoke('helpers:add', input),
+  helpersUpdate: (id: string, patch: unknown) => ipcRenderer.invoke('helpers:update', id, patch),
+  helpersRemove: (id: string) => ipcRenderer.invoke('helpers:remove', id),
+  helpersAsk: (input: unknown) => ipcRenderer.invoke('helpers:ask', input),
+  helpersCancel: (sendId: string) => ipcRenderer.invoke('helpers:cancel', sendId),
+  helpersLog: (limit?: number, helperId?: string) => ipcRenderer.invoke('helpers:log', limit, helperId),
+  helpersPauseAll: (paused: boolean) => ipcRenderer.invoke('helpers:pauseAll', paused),
+  helpersSetSetupBy: (setupBy: string | null) => ipcRenderer.invoke('helpers:setSetupBy', setupBy),
+  helpersDismissNotice: () => ipcRenderer.invoke('helpers:dismissNotice'),
+
+  // Conversation (v1.4): "Ask about your mail…". The local answer comes back at once; an AI answer, when
+  // there is one, arrives on onAskAnswer with the same id.
+  ask: (q: string, id?: string) => ipcRenderer.invoke('ask:question', { q, id }),
+  onAskAnswer: (cb: (r: unknown) => void) => {
+    const listener = (_e: unknown, r: unknown): void => cb(r)
+    ipcRenderer.on('ask:answer', listener)
+    return () => ipcRenderer.removeListener('ask:answer', listener)
+  },
+
   onRunProgress: (cb: (p: unknown) => void) => {
     const listener = (_e: unknown, p: unknown): void => cb(p)
     ipcRenderer.on('run:progress', listener)

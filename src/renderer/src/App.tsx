@@ -9,6 +9,8 @@ import Onboarding from './views/Onboarding'
 import Eula from './views/Eula'
 import { EULA_VERSION } from '../../shared/eula'
 import { LEVEL_BLURB, LEVEL_LABEL } from '../../shared/adapt'
+import { nextSlotLabel, plainError } from '../../shared/errors'
+import type { RunProgress } from '../../shared/types'
 import { t } from './copy'
 
 type UiLevelInfo = Awaited<ReturnType<typeof window.inboxScout.uiLevel>>
@@ -37,6 +39,9 @@ export default function App(): JSX.Element {
   const [settings, setSettings] = useState<any | null>(null)
   const [ui, setUi] = useState<UiLevelInfo | null>(null)
   const [lastNotices, setLastNotices] = useState<string[]>([])
+  const [progress, setProgress] = useState<RunProgress | null>(null)
+  /** Raw error from the last run; shown in plain words (item 12), raw text behind "Show details". */
+  const [lastError, setLastError] = useState<string | null>(null)
 
   const loadSettings = useCallback(() => {
     void window.inboxScout.getSettings().then((s) => {
@@ -85,13 +90,17 @@ export default function App(): JSX.Element {
   }, [loadSettings])
 
   useEffect(() => {
-    const offProgress = window.inboxScout.onRunProgress((p) => {
-      setRunning(p.phase !== 'done' && p.phase !== 'error')
-      setStatus(p.detail)
+    const offProgress = window.inboxScout.onRunProgress((p: RunProgress) => {
+      const live = p.phase !== 'done' && p.phase !== 'error'
+      setRunning(live)
+      setProgress(live ? p : null)
+      setStatus(p.phase === 'error' ? '' : p.detail)
     })
     const offFinished = window.inboxScout.onRunFinished((r) => {
       setRunning(false)
-      setStatus(r.error ? `Problem: ${r.error}` : r.notices?.length ? `Brief ready. ${r.notices[0]}` : 'Brief ready.')
+      setProgress(null)
+      setLastError(r.error ? String(r.error) : null)
+      setStatus(r.error ? '' : r.notices?.length ? `Brief ready. ${r.notices[0]}` : 'Brief ready.')
       setLastNotices(Array.isArray(r.notices) ? r.notices : [])
       setRefreshKey((k) => k + 1)
     })
@@ -103,6 +112,7 @@ export default function App(): JSX.Element {
 
   const runNow = async (): Promise<void> => {
     setRunning(true)
+    setLastError(null)
     setStatus('Starting…')
     const res = await window.inboxScout.runNow()
     if (!res.started) {
@@ -143,8 +153,14 @@ export default function App(): JSX.Element {
         ? [...SIMPLE_TABS, ...ADVANCED_TABS]
         : SIMPLE_TABS
 
+  const nextSlot = nextSlotLabel(settings.schedule)
+  const statusText = lastError && !running ? plainError(lastError, level, { nextSlot }).text : status
+
   return (
     <div className={`layout level-${level}`}>
+      <a className="skip-link" href="#main">
+        Skip to content
+      </a>
       <nav className="sidebar">
         <div className="brand">📬 InboxScout</div>
         {tabs.map((tb, i) => (
@@ -155,7 +171,7 @@ export default function App(): JSX.Element {
         <div className="spacer" />
         {level !== 'simple' && (
           <div className="status" role="status" aria-live="polite">
-            {status}
+            {statusText}
           </div>
         )}
         {level !== 'simple' && (
@@ -164,7 +180,7 @@ export default function App(): JSX.Element {
           </button>
         )}
       </nav>
-      <main className="content">
+      <main className="content" id="main" tabIndex={-1}>
         {ui?.announce && (
           <div className="success" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
             <span>
@@ -178,7 +194,21 @@ export default function App(): JSX.Element {
             </button>
           </div>
         )}
-        {tab === 'today' && <Today key={`t${refreshKey}`} running={running} onRun={() => void runNow()} level={level} status={status} notices={lastNotices} onGoTo={(id) => goTo(id as TabId)} />}
+        {/* No key: Today keeps the previous brief on screen and refetches when refreshKey changes (item 9). */}
+        {tab === 'today' && (
+          <Today
+            running={running}
+            onRun={() => void runNow()}
+            level={level}
+            status={status}
+            progress={progress}
+            refreshKey={refreshKey}
+            lastError={lastError}
+            nextSlot={nextSlot}
+            notices={lastNotices}
+            onGoTo={(id) => goTo(id as TabId)}
+          />
+        )}
         {tab === 'reports' && <Reports key={`r${refreshKey}`} />}
         {tab === 'people' && <People key={`p${refreshKey}`} />}
         {tab === 'setup' && (

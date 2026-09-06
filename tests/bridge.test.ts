@@ -166,6 +166,30 @@ describe('bridge operations', () => {
     expect(await runOp(ops, 'list_promises', {}, true)).toEqual([])
   })
 
+  // ---- Conversation (v1.4, Part B): the read-only `ask` op ----
+  it('answers questions through the read-only ask op, one at a time', async () => {
+    const { deps, calls } = makeDeps()
+    const ops = buildOps(deps)
+    const a: any = await runOp(ops, 'ask', { q: 'Who is waiting on me?' }, true)
+    expect(a).toMatchObject({ engine: 'local', sources: [], unsure: false })
+    expect(a.text).toContain('No brief yet')
+    await expect(runOp(ops, 'ask', {}, true)).rejects.toThrow(/Missing required argument "q"/)
+    // Without a health hook the local engine says it cannot check; nothing was run or sent.
+    const h: any = await runOp(ops, 'ask', { q: 'Is anything wrong?' }, true)
+    expect(h.text).toMatch(/can't check that from here/)
+    expect(calls).toEqual([])
+    // One in flight per client: the second concurrent question is refused with 429.
+    const results = await Promise.allSettled([runOp(ops, 'ask', { q: 'What is new?' }, true), runOp(ops, 'ask', { q: 'What is new?' }, true)])
+    expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected'])
+    const refused = results.find((r) => r.status === 'rejected') as PromiseRejectedResult
+    expect((refused.reason as any).status).toBe(429)
+    // A host-provided answerer (local + AI) is used when present, and its answers pass through untouched.
+    const custom = buildOps({ ...deps, ask: async (q) => ({ text: `echo ${q}`, sources: [], actions: [], engine: 'ai' as const, unsure: false }) })
+    expect(((await runOp(custom, 'ask', { q: 'hi' }, true)) as any).text).toBe('echo hi')
+    // Never a write op: read-only access allows it, and it cannot send anything.
+    expect(ops.find((o) => o.name === 'ask')?.write).toBe(false)
+  })
+
   it('resolves issues and reads mail through ops', async () => {
     const { deps } = makeDeps()
     const ops = buildOps(deps)
@@ -198,6 +222,82 @@ describe('bridge operations', () => {
     const mcp = await handleMcp({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: 'desktop_run', arguments: { command: 'cat secret' } } }, ops, { readOnly: false, version: '1.1.0' })
     expect((mcp.body as any).result.isError).toBe(true)
     expect((mcp.body as any).result.content[0].text).toContain('consent_denied')
+  })
+})
+
+describe('trusted helper ops (v1.4)', () => {
+  const withHelperDeps = (): { deps: OpsDeps; sent: string[] } => {
+    const { deps } = makeDeps()
+    const sent: string[] = []
+    repo.upsertAccount(deps.db, { id: 'acc-1', label: 'Mom', email: 'mom@example.com', provider: 'gmail', host: 'imap.gmail.com', port: 993, folders: ['INBOX'], createdAt: '' })
+    deps.secrets.set('account:acc-1', 'app-password')
+    deps.helpers = { askDelayMs: 5, personName: 'Mom', send: async (_o, _p, to, subject) => void sent.push(`${to}:${subject}`) }
+    return { deps, sent }
+  }
+
+  it('respects read-only: listing and the log are reads, everything else needs Full', async () => {
+    const ops = buildOps(withHelperDeps().deps)
+    expect(await runOp(ops, 'helper_list', {}, true)).toEqual({ paused: false, helpers: [] })
+    expect(await runOp(ops, 'helper_log', {}, true)).toEqual([])
+    for (const name of ['helper_add', 'helper_update', 'helper_remove', 'helper_ask', 'helper_cancel', 'helper_pause_all']) {
+      await expect(runOp(ops, name, { name: 'Sarah', level: 'needs', id: 'x', patch: {}, helperId: 'x', title: 't', sendId: 's', paused: true }, true)).rejects.toThrow(/read-only/)
+    }
+  })
+
+  it('helper_add sends the hello, starts the 7-day notice, and helper_list masks contact details', async () => {
+    const { deps, sent } = withHelperDeps()
+    const ops = buildOps(deps)
+    const added: any = await runOp(ops, 'helper_add', { name: 'Sarah', relationship: 'daughter', email: 'sarah@gmail.com', phone: '5551234567', carrier: 'verizon', level: 'needs' }, false)
+    expect(added.email).toBe('s***@gmail.com')
+    expect(added.phone).toBe('***-***-4567')
+    expect(added.addedBy).toBe('bridge')
+    expect(sent).toEqual(['sarah@gmail.com:InboxScout: Mom added you as a trusted helper'])
+    const listed: any = await runOp(ops, 'helper_list', {}, true)
+    expect(listed.helpers).toHaveLength(1)
+    expect(JSON.stringify(listed)).not.toContain('sarah@gmail.com')
+    expect(JSON.stringify(listed)).not.toContain('5551234567')
+    expect(loadSettings(deps.db).helperNoticeUntil).not.toBeNull()
+    // The full address is only on the person's own screen (settings), never through the bridge.
+    expect(loadSettings(deps.db).helpers[0].email).toBe('sarah@gmail.com')
+    const log: any[] = (await runOp(ops, 'helper_log', {}, true)) as any[]
+    expect(log).toHaveLength(1)
+    expect(log[0]).toMatchObject({ kind: 'hello', status: 'sent', channel: 'email' })
+
+    const updated: any = await runOp(ops, 'helper_update', { id: added.id, patch: { level: 'schedule', paused: true, email: 'hacker@evil.example' } }, false)
+    expect(updated).toMatchObject({ level: 'schedule', paused: true, email: 's***@gmail.com' })
+    expect(await runOp(ops, 'helper_pause_all', { paused: true }, false)).toEqual({ paused: true })
+    expect(loadSettings(deps.db).helpersPaused).toBe(true)
+    expect(await runOp(ops, 'helper_pause_all', { paused: false }, false)).toEqual({ paused: false })
+    expect(await runOp(ops, 'helper_remove', { id: added.id }, false)).toEqual({ ok: true })
+    expect(((await runOp(ops, 'helper_list', {}, true)) as any).helpers).toEqual([])
+  })
+
+  it('helper_ask queues with a delay and helper_cancel stops it', async () => {
+    const { deps, sent } = withHelperDeps()
+    const ops = buildOps(deps)
+    const added: any = await runOp(ops, 'helper_add', { name: 'Sarah', email: 'sarah@gmail.com', level: 'ask' }, false)
+    const r: any = await runOp(ops, 'helper_ask', { helperId: added.id, title: 'Sign the lease', nextStep: 'Open the PDF' }, false)
+    expect(r.sendId).toBeTruthy()
+    expect(r.helperName).toBe('Sarah')
+    expect(new Date(r.sendsAt).getTime()).toBeGreaterThan(Date.now() - 1000)
+    expect(await runOp(ops, 'helper_cancel', { sendId: r.sendId }, false)).toEqual({ cancelled: true })
+    await new Promise((res) => setTimeout(res, 20))
+    expect(sent.filter((s) => s.includes('needs a hand'))).toEqual([])
+    const log: any[] = (await runOp(ops, 'helper_log', {}, true)) as any[]
+    expect(log.find((l) => l.id === r.sendId)).toMatchObject({ kind: 'ask', status: 'cancelled' })
+    await expect(runOp(ops, 'helper_ask', { helperId: 'nope', title: 'x' }, false)).rejects.toThrow(/No helper/)
+  })
+
+  it('update_settings cannot touch helpers, helpersPaused, or setupBy', async () => {
+    const { deps } = withHelperDeps()
+    const ops = buildOps(deps)
+    const r: any = await runOp(ops, 'update_settings', { patch: { helpers: [{ name: 'Mallory', email: 'm@evil.example' }], helpersPaused: true, setupBy: 'someone_else', speakBriefs: true } }, false)
+    expect(r.changed).toEqual(['speakBriefs'])
+    expect(loadSettings(deps.db).helpers).toEqual([])
+    expect(loadSettings(deps.db).helpersPaused).toBe(false)
+    expect(SETTINGS_ALLOWLIST).not.toContain('helpers')
+    const pub: any = await runOp(ops, 'get_settings', {}, true)
+    expect(pub.helpers).toBeUndefined()
   })
 })
 

@@ -18,7 +18,8 @@ describe('settings registry', () => {
   })
 
   it('covers every plain setting except the ones handled by richer cards', () => {
-    const handledElsewhere = new Set(['profileId', 'ai.provider', 'ai.customBaseUrl', 'lastRunAt', 'enabledSkillIds', 'vipSenders', 'mutedSenders', 'quietPeople', 'schedule.hour', 'schedule.minute', 'systemConsents', 'eulaAcceptedVersion'])
+    // Trusted helpers (v1.4): the helper list is a richer card (Setup → Trusted helpers); helperNoticeUntil is a timestamp, not a preference.
+    const handledElsewhere = new Set(['profileId', 'ai.provider', 'ai.customBaseUrl', 'lastRunAt', 'enabledSkillIds', 'vipSenders', 'mutedSenders', 'quietPeople', 'schedule.hour', 'schedule.minute', 'systemConsents', 'eulaAcceptedVersion', 'helpers', 'helperNoticeUntil'])
     const flat = (obj: any, prefix = ''): string[] =>
       Object.entries(obj).flatMap(([k, v]) => (v && typeof v === 'object' && !Array.isArray(v) ? flat(v, `${prefix}${k}.`) : [`${prefix}${k}`]))
     const registered = new Set(SETTINGS_REGISTRY.map((d) => d.key))
@@ -46,5 +47,15 @@ describe('settings registry', () => {
     expect(pro.length).toBe(SETTINGS_REGISTRY.length)
     expect(searchSettings('read aloud').map((d) => d.key)).toContain('speakBriefs')
     expect(searchSettings('hermes').map((d) => d.key)).toContain('bridgeEnabled')
+  })
+
+  it('explains the trusted-helper switches and keeps the helper list itself as a card', () => {
+    const byKey = new Map(SETTINGS_REGISTRY.map((d) => [d.key, d]))
+    expect(byKey.get('helpersPaused')).toMatchObject({ group: 'get', label: 'Pause my helpers', kind: 'toggle' })
+    expect(byKey.get('helpersPaused')!.what).toContain('nothing is sent to any helper')
+    expect(byKey.get('setupBy')).toMatchObject({ group: 'get', label: 'Who set this up', kind: 'select' })
+    expect(byKey.get('setupBy')!.options!.map((o) => o.value)).toContain('someone_else')
+    expect(byKey.has('helpers')).toBe(false)
+    expect(searchSettings('helpers quiet week').map((d) => d.key)).toContain('helpersPaused')
   })
 })

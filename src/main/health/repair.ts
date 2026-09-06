@@ -143,6 +143,8 @@ export function createHealthContext(w: HealthWiring): HealthCtx {
     syncBridge: w.syncBridge,
     probeAi: w.probeAi,
     resetSync: (id) => void resetSync(w, id),
-    reauthAccount: (id) => reauthAccount(w, id)
+    reauthAccount: (id) => reauthAccount(w, id),
+    // Trusted helpers (v1.4)
+    lastHelperSend: (helperId) => repo.lastHelperSend(w.db, helperId)
   }
 }

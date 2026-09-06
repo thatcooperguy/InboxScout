@@ -41,7 +41,13 @@ export const PHONE_OPS = [
   'get_schedule',
   'list_promises',
   'list_people',
-  'health_check'
+  'health_check',
+  // Trusted helpers (v1.4): the phone can ask a helper for a hand, never add or change helpers.
+  'helper_list',
+  'helper_ask',
+  'helper_cancel',
+  // Conversation (v1.4, Part B): the box at the top of the phone page. Read-only; one in flight per client.
+  'ask'
 ] as const
 
 export const DEFAULT_PHONE_PORT = 47321

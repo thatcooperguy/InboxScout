@@ -60,6 +60,8 @@ J="content-type: application/json"
 | Promises the person made in their own mail | `list_promises` | `GET /promises` |
 | Who is this inbox for? (50+ profiles) | `list_profiles`, `detect_profile`, `set_profile {id or "auto"}` | `GET /profiles`, `GET /profiles/detect`, `POST /profiles` |
 | Preferences (safe subset) | `get_settings`, `update_settings {patch}` | `GET /settings`, `PATCH /settings` |
+| The person's trusted helpers (family/friends who get a plain-words note; contact details masked) and everything ever sent to them, verbatim | `helper_list` → `{paused, helpers[{id, name, relationship, level, cadence, paused}]}`, `helper_log {limit?, helperId?}` | `GET /helpers`, `GET /helpers/log` |
+| Ask a helper for a hand with one item (goes after 10 s unless cancelled), or manage helpers (Full access; adding one sends them a hello and shows the person a 7-day notice) | `helper_ask {helperId, title, nextStep?, whyNow?, note?}` → `{sendId, sendsAt}`, `helper_cancel {sendId}`, `helper_add {name, level, relationship?, email?, phone?, carrier?, cadence?}`, `helper_update {id, patch}`, `helper_remove {id}`, `helper_pause_all {paused}` | `POST /helpers/ask`, `POST /helpers/cancel`, `POST /helpers`, `PATCH /helpers/{id}`, `DELETE /helpers/{id}`, `POST /helpers/pause` |
 | Live events (scan progress, Assistant steps) | — | `GET /events` (Server-Sent Events) |
 
 ### System control (Full access only — a popup may appear on the person's screen)

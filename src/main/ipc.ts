@@ -16,6 +16,7 @@ import { bridgeInfo, regenerateBridgeToken, syncBridge, type BridgeDeps } from '
 import { phoneInfo, regeneratePhoneToken, syncPhone } from './api/phone'
 import { deleteSignin, getSignin, listSignins, pickSigninForHost, saveSignin } from './signins'
 import { speakWithOs } from './voice'
+import { ask, askAndWait, invalidateAskCache, type AskDeps } from './ask/index'
 import { randomUUID } from 'node:crypto'
 import type { DB } from './db/index'
 import * as repo from './db/repo'
@@ -32,6 +33,8 @@ import { CHECKS, runHealth, runRepairs } from './health/checks'
 import { createHealthContext, markAccountHealthy, reauthAccount as repairReauth } from './health/repair'
 import { log, openInFolder, readTail } from './health/diagnostics'
 import type { AccountConfig, AppSettings, HealthReport } from '../shared/types'
+// Trusted helpers (v1.4, Part A)
+import { addHelper, cancelAsk, listHelperLog, pauseAll, removeHelper, scheduleAsk, updateHelper, type AskRequest, type HelperDeps, type HelperPatch, type NewHelper } from './helpers/index'
 
 export interface IpcContext {
   db: DB
@@ -234,9 +237,54 @@ export function registerIpc(ctx: IpcContext): IpcHooks {
   ipcMain.handle('diagnostics:text', () => readTail(200))
   ipcMain.handle('diagnostics:open', () => openInFolder())
 
+  // ---- Conversation (v1.4, Part B): "Ask about your mail…" — local answer first, AI answer later ----
+  // The ask engine never touches the SecretStore: the model closure below is the only thing that reads a key.
+  const ownerName = (): string => {
+    const email = repo.listAccounts(db)[0]?.email ?? ''
+    const local = email.split('@')[0]?.split(/[._-]/)[0] ?? ''
+    return local ? local[0].toUpperCase() + local.slice(1) : ''
+  }
+  const askDeps: AskDeps = {
+    db,
+    settings: () => loadSettings(db),
+    getModel: () => {
+      const settings = loadSettings(db)
+      if (settings.ai.provider === 'builtin') return null
+      const apiKey = secrets.get(providerSecretName(settings.ai.provider)) ?? ''
+      if (!apiKey && !LOCAL_PROVIDERS.includes(settings.ai.provider) && settings.ai.provider !== 'custom') return null
+      try {
+        return resolveModel(settings.ai, apiKey)
+      } catch {
+        return null
+      }
+    },
+    healthStatus: () => healthStatus(),
+    get ownerName() {
+      return ownerName()
+    },
+    log: (level, message, detail) => log(level, 'ask', message, detail)
+  }
+  /** Returns the local answer at once; the AI answer (when one comes) arrives on `ask:answer` with the same id. */
+  ipcMain.handle('ask:question', async (_e, input: { q: string; id?: string } | string) => {
+    const q = typeof input === 'string' ? input : String(input?.q ?? '')
+    const id = (typeof input === 'object' && input?.id) || randomUUID()
+    let aiPending = false
+    const answer = await ask(askDeps, q, {
+      onAi: (a) => ctx.broadcast('ask:answer', { id, answer: a })
+    })
+    // ask() only calls onAi when the AI is configured; tell the renderer whether to show "thinking…".
+    try {
+      aiPending = loadSettings(db).ai.provider !== 'builtin' && askDeps.getModel() !== null
+    } catch {
+      aiPending = false
+    }
+    return { id, answer, aiPending }
+  })
+
   const bridgeDeps: BridgeDeps = {
     db,
     secrets,
+    ask: (q) => askAndWait(askDeps, q),
     version: app.getVersion(),
     agent,
     desktop,
@@ -494,7 +542,8 @@ export function registerIpc(ctx: IpcContext): IpcHooks {
     if (!to) return { ok: false, error: kind === 'email' ? 'Enter an email address first.' : 'Enter a valid 10-digit phone number and pick a carrier.' }
     try {
       const text = 'InboxScout test: your briefs will arrive here.'
-      await sendMail(outbox, password, to, kind === 'email' ? 'InboxScout test' : '', `<p>${text}</p>`, text)
+      // v1.4 item 14: texts go plain (no HTML part) so carrier gateways deliver one clean segment.
+      await sendMail(outbox, password, to, kind === 'email' ? 'InboxScout test' : '', kind === 'email' ? `<p>${text}</p>` : undefined, text)
       return { ok: true }
     } catch (err: any) {
       return { ok: false, error: String(err?.message ?? err) }
@@ -710,5 +759,36 @@ export function registerIpc(ctx: IpcContext): IpcHooks {
     return true
   })
 
-  return { agent, afterRun: healthRepair, reauthAccount }
+  // ---- Trusted helpers (v1.4, Part A): the person's own screen — full contact details, never masked ----
+  const helperDeps: HelperDeps = { db, secrets, log }
+  ipcMain.handle('helpers:list', () => {
+    const s = loadSettings(db)
+    return { helpers: s.helpers, paused: s.helpersPaused, setupBy: s.setupBy, helperNoticeUntil: s.helperNoticeUntil }
+  })
+  ipcMain.handle('helpers:add', (_e, input: NewHelper & { addedBy?: 'person' | 'helper_setup' }) =>
+    addHelper(helperDeps, input, input?.addedBy === 'helper_setup' ? 'helper_setup' : 'person')
+  )
+  ipcMain.handle('helpers:update', (_e, id: string, patch: HelperPatch) => updateHelper(helperDeps, String(id), patch ?? {}))
+  ipcMain.handle('helpers:remove', (_e, id: string) => removeHelper(helperDeps, String(id)))
+  ipcMain.handle('helpers:ask', (_e, input: AskRequest) => scheduleAsk(helperDeps, input))
+  ipcMain.handle('helpers:cancel', (_e, sendId: string) => cancelAsk(helperDeps, String(sendId)))
+  ipcMain.handle('helpers:log', (_e, limit?: number, helperId?: string) => listHelperLog(helperDeps, { limit: Math.min(500, Number(limit) || 100), helperId: helperId || undefined }))
+  ipcMain.handle('helpers:pauseAll', (_e, paused: boolean) => pauseAll(helperDeps, !!paused))
+  ipcMain.handle('helpers:setSetupBy', (_e, setupBy: AppSettings['setupBy']) => {
+    const s = loadSettings(db)
+    saveSettings(db, { ...s, setupBy: setupBy === 'me' || setupBy === 'someone_else' ? setupBy : null })
+    return true
+  })
+  ipcMain.handle('helpers:dismissNotice', () => {
+    const s = loadSettings(db)
+    saveSettings(db, { ...s, helperNoticeUntil: null })
+    return true
+  })
+
+  // After every finished run: drop the ask engine's cached brief (v1.4 Part B), then the self-healing pass.
+  const afterRun = async (): Promise<HealthReport> => {
+    invalidateAskCache()
+    return healthRepair()
+  }
+  return { agent, afterRun, reauthAccount }
 }

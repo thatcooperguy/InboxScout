@@ -9,7 +9,7 @@ import { ensureAccessToken, syncGmail, GMAIL_FOLDER, type GoogleTokens } from '.
 import { googleClient, microsoftClientId } from '../config'
 import { pickOutbox, sendMail, smsAddress, smsText } from '../delivery/email'
 import { appendTrackerRows, uploadBriefAsDoc } from '../mail/drive'
-import { classifyBatch, chunk, BATCH_SIZE } from '../ai/classify'
+import { classifyBatch, chunk, isObviousNoise, mapConcurrent, withTransientRetry, BATCH_SIZE, CLASSIFY_CONCURRENCY } from '../ai/classify'
 import { decideTracking, applyTrackingDecisions } from '../ai/track'
 import { generateBrief } from '../ai/brief'
 import { trackReplies } from './replies'
@@ -20,7 +20,8 @@ import { buildPeople, inferOwnerName, inferVipAddresses, summarizePeople } from 
 import { buildSchedule, type ScheduleItem } from '../schedule/engine'
 import { extractPromises } from './promises'
 import { dedupeAcrossAccounts, summarizeInboxes } from './inboxes'
-import { loadSettings, saveSettings } from '../settings'
+import { loadSettings, markLastRunAt } from '../settings'
+import { META_LAST_ATTEMPT_AT } from '../scheduler'
 import { SecretStore, accountSecretName, providerSecretName } from '../secrets'
 import { resolveModel, DEFAULT_MODELS, LOCAL_PROVIDERS } from '../ai/provider'
 import { classifyMessageHeuristically, deriveIssues, buildBasicBrief } from '../ai/builtin'
@@ -106,12 +107,14 @@ export async function runPipeline(
     messagesScanned: 0,
     error: null
   })
+  // The scheduler backs off catch-up retries from this stamp; `lastRunAt` only moves when a run succeeds.
+  repo.setMeta(db, META_LAST_ATTEMPT_AT, startedAt)
 
   try {
     const useBuiltin = settings.ai.provider === 'builtin'
     const apiKey = secrets.get(providerSecretName(settings.ai.provider)) ?? ''
     if (!apiKey && !LOCAL_PROVIDERS.includes(settings.ai.provider) && settings.ai.provider !== 'custom') {
-      throw new Error(`No API key connected for provider "${settings.ai.provider}". Open Connect AI to add one.`)
+      throw new Error(`No API key connected for provider "${settings.ai.provider}". Open Setup → AI helper to add one.`)
     }
     const model = useBuiltin ? null : resolveModel(settings.ai, apiKey)
     const modelName = useBuiltin ? 'builtin/rules-v1' : settings.ai.model || DEFAULT_MODELS[settings.ai.provider]
@@ -232,8 +235,15 @@ export async function runPipeline(
 
     // 1a. Who is in this person's life (all inboxes). Inner circle counts as important automatically.
     const myAddresses = accounts.map((a) => a.email.trim().toLowerCase())
-    const circleMessages = repo.messagesSince(db, 120)
-    const categoryOfStored = (id: string): Category | undefined => repo.getClassifications(db, [id])[0]?.category
+    // Bodies clipped to the 2000 characters the people engine actually reads (item 6): a mature
+    // database no longer materialises ~80 MB of message text for every run.
+    const circleMessages = repo.messagesSinceLite(db, 120, 4000, 2000)
+    // One IN (…) query per 500 ids instead of one query per message (item 7); refreshed after classification.
+    const categories = repo.categoryMap(
+      db,
+      circleMessages.map((m) => m.id)
+    )
+    const categoryOfStored = (id: string): Category | undefined => categories.get(id)
     const people = settings.insightsEnabled
       ? buildPeople({
           messages: circleMessages,
@@ -251,6 +261,9 @@ export async function runPipeline(
 
     // 1b. "Choose for me": pick the profile that fits this mail, then re-resolve skills if it changed.
     {
+      // Fetching can take a minute; reload first so a profile switch is saved on top of any preference
+      // the person changed meanwhile, not on top of the copy this run loaded at start.
+      settings = { ...loadSettings(db), ai: settings.ai }
       const auto = applyAutoProfile(db, settings)
       profileNotice = auto.notice
       if (auto.changed) {
@@ -264,7 +277,7 @@ export async function runPipeline(
 
     // 2. Classify (skip our own sent mail)
     const toClassify = newMessages.filter((m) => !m.fromMe)
-    onProgress({ phase: 'classify', detail: `Classifying ${toClassify.length} new messages…` })
+    onProgress({ phase: 'classify', detail: `Sorting ${toClassify.length} new messages…` })
     const corrections = repo.listCorrections(db, 10)
     const classifications: Classification[] = []
     const heuristicBatch = (batch: MessageRecord[]): Map<string, MessageClassificationOutput> => {
@@ -272,16 +285,31 @@ export async function runPipeline(
       for (const m of batch) map.set(m.id, classifyMessageHeuristically(m, profile))
       return map
     }
-    const classifyChunk = async (batch: MessageRecord[]): Promise<Map<string, MessageClassificationOutput>> => {
-      if (!model || aiDown) return heuristicBatch(batch)
-      return withAiFallback(
-        () => classifyBatch(model, profile, batch, corrections, promptHints),
-        () => heuristicBatch(batch),
+    // Item 4: obvious noise keeps the built-in verdict and never costs an AI call.
+    const obviousNoise = new Set(model ? toClassify.filter(isObviousNoise).map((m) => m.id) : [])
+    const forAi = toClassify.filter((m) => !obviousNoise.has(m.id))
+    type ChunkResult = { results: Map<string, MessageClassificationOutput>; byRules: boolean }
+    const classifyChunk = async (batch: MessageRecord[]): Promise<ChunkResult> => {
+      if (!model || aiDown) return { results: heuristicBatch(batch), byRules: true }
+      let byRules = false
+      const results = await withAiFallback(
+        () => withTransientRetry(() => classifyBatch(model, profile, batch, corrections, promptHints)),
+        () => {
+          byRules = true
+          return heuristicBatch(batch)
+        },
         (reason) => aiFailed('Classifying', reason)
       )
+      return { results, byRules }
     }
-    for (const batch of chunk(toClassify, BATCH_SIZE)) {
-      const results = await classifyChunk(batch)
+    // Item 3: a few chunks in flight at once; results are applied in input order below.
+    const batches = [...chunk(toClassify.filter((m) => obviousNoise.has(m.id)), BATCH_SIZE), ...chunk(forAi, BATCH_SIZE)]
+    const batchResults = await mapConcurrent(batches, CLASSIFY_CONCURRENCY, async (batch): Promise<ChunkResult> =>
+      obviousNoise.has(batch[0].id) ? { results: heuristicBatch(batch), byRules: true } : classifyChunk(batch)
+    )
+    for (let b = 0; b < batches.length; b++) {
+      const batch = batches[b]
+      const { results, byRules } = batchResults[b]
       for (const m of batch) {
         const r = results.get(m.id)
         if (!r) continue
@@ -299,7 +327,7 @@ export async function runPipeline(
           people: r.people,
           sensitivity: r.sensitivity,
           runId,
-          model: aiDown ? 'builtin/rules-v1' : modelName,
+          model: byRules ? 'builtin/rules-v1' : modelName,
           corrected: false
         }
         const c = applySkillEffects(m, raw, matches, skills, skillCtx)
@@ -326,7 +354,7 @@ export async function runPipeline(
       } else {
         await withAiFallback(
           async () => {
-            const decisions = await decideTracking(model, profile, repo.listProjects(db), repo.listIssues(db, true), workPairs)
+            const decisions = await withTransientRetry(() => decideTracking(model, profile, repo.listProjects(db), repo.listIssues(db, true), workPairs))
             const applied = applyTrackingDecisions(repo.listProjects(db), repo.listIssues(db), decisions, new Date().toISOString())
             for (const p of applied.projects) repo.upsertProject(db, p)
             for (const i of applied.issues) repo.upsertIssue(db, i)
@@ -339,11 +367,15 @@ export async function runPipeline(
 
     // 4. Brief
     onProgress({ phase: 'brief', detail: 'Writing your brief…' })
-    const replies = trackReplies(
-      recentThreadMessages(db),
-      (id) => repo.getClassifications(db, [id])[0]?.category,
-      new Date()
-    )
+    for (const c of classifications) categories.set(c.messageId, c.category)
+    const threadMessages = recentThreadMessages(db)
+    for (const [id, cat] of repo.categoryMap(
+      db,
+      threadMessages.filter((m) => !categories.has(m.id)).map((m) => m.id)
+    )) {
+      categories.set(id, cat)
+    }
+    const replies = trackReplies(threadMessages, categoryOfStored, new Date())
     const personalPairs = classifications
       .filter((c) => c.category === 'personal' && messageById.has(c.messageId))
       .map(pair)
@@ -375,7 +407,7 @@ export async function runPipeline(
     const brief =
       model && !aiDown
         ? await withAiFallback(
-            () => generateBrief(model, briefInputs),
+            () => withTransientRetry(() => generateBrief(model, briefInputs)),
             () => buildBasicBrief(briefInputs),
             (reason) => aiFailed('Writing the brief', reason)
           )
@@ -387,7 +419,7 @@ export async function runPipeline(
     if (settings.insightsEnabled) {
       const nowDate = new Date()
       brief.people = summarizePeople(people, nowDate)
-      const promises = extractPromises({ messages: circleMessages, myAddresses, now: nowDate })
+      const promises = extractPromises({ messages: ownMessagesWithBodies(db, circleMessages, myAddresses, nowDate), myAddresses, now: nowDate })
       brief.promises = promises
       const items: ScheduleItem[] = []
       for (const d of repo.recentDeadlines(db, 45)) {
@@ -442,8 +474,10 @@ export async function runPipeline(
       JSON.stringify(brief)
     )
 
-    saveSettings(db, { ...settings, lastRunAt: now.toISOString() })
+    markLastRunAt(db, now.toISOString())
     repo.finishRun(db, runId, 'succeeded', newMessages.length, null)
+
+    // v1.4 integration: helpers + ask cache (integrator adds calls here)
 
     // 6. Deliver (to you only) and export - never fatal.
     const notices: string[] = [...(profileNotice ? [profileNotice] : []), ...runNotices]
@@ -467,7 +501,8 @@ export async function runPipeline(
         if (sms) {
           try {
             const text = smsText(brief.headline, topTitles)
-            await sendMail(outbox, outboxPassword, sms, '', `<p>${text}</p>`, text)
+            // Plain text only (item 14): carrier gateways render a multipart HTML part as an attachment or drop it.
+            await sendMail(outbox, outboxPassword, sms, '', undefined, text)
           } catch (err: any) {
             notices.push(`Text delivery failed: ${String(err?.message ?? err)}`)
           }
@@ -547,10 +582,18 @@ export async function runPipeline(
   }
 }
 
+/** The reply tracker reads who spoke last in each thread — never a body — so the 30-day window loads none. */
 function recentThreadMessages(db: DB): MessageRecord[] {
-  const cutoff = new Date(Date.now() - 30 * 86400000).toISOString()
-  return repo.getMessages(
-    db,
-    (db.prepare('SELECT id FROM messages WHERE date >= ?').all(cutoff) as any[]).map((r) => r.id)
-  )
+  return repo.messagesSinceLite(db, 30, 50000, 0)
+}
+
+/** Promise window: the owner's own mail from the last 21 days, with full bodies (the only rows that need them). */
+const PROMISE_WINDOW_DAYS = 21
+function ownMessagesWithBodies(db: DB, messages: MessageRecord[], myAddresses: string[], now: Date): MessageRecord[] {
+  const mine = new Set(myAddresses)
+  const cutoff = now.getTime() - PROMISE_WINDOW_DAYS * 86400000
+  const ids = messages
+    .filter((m) => (m.fromMe || mine.has(m.fromAddress.trim().toLowerCase())) && Date.parse(m.date) >= cutoff)
+    .map((m) => m.id)
+  return repo.getMessages(db, ids)
 }

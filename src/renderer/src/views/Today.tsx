@@ -1,18 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
 import { delegateMailto, replyMailto } from '../../../shared/mailto'
 import { briefToSpeech } from '../../../shared/speech'
+import { plainError } from '../../../shared/errors'
+import { RUN_PHASES, lastRunSeconds, remainingLabel, slotOf, stepOf } from '../../../shared/runProgress'
+import type { RunProgress } from '../../../shared/types'
 import { lastChecked, t } from '../copy'
-import { speak } from '../useLevel'
+import { speak, stopSpeaking } from '../useLevel'
 
 type Level = 'simple' | 'standard' | 'pro'
 
-/** "Why am I seeing this?" — one calm sentence per card, on request; spoken at Simple. */
+/** "Why am I seeing this?" — one calm sentence per card, on request; spoken at Simple. Full-size button (WCAG 2.5.8). */
 function Why({ text, level }: { text: string; level: Level }): JSX.Element {
   const [open, setOpen] = useState(false)
   return (
     <span style={{ marginLeft: 'auto', fontWeight: 400 }}>
       <button
-        className="ghost tiny"
+        className="ghost why"
         aria-label={t('why.button', level)}
         title={t('why.button', level)}
         aria-expanded={open}
@@ -54,6 +57,14 @@ interface Props {
   level?: Level
   /** Progress line while a check runs. */
   status?: string
+  /** Structured progress (phase + detail) while a check runs — drives the step bar. */
+  progress?: RunProgress | null
+  /** Bumped by App after every run and settings change: Today refetches in place, without remounting. */
+  refreshKey?: number
+  /** Raw error from the last run (null when it succeeded). Shown in plain words; raw text behind "Show details". */
+  lastError?: string | null
+  /** "at 7:30 AM" — when the next scheduled check will try again (for the offline message). */
+  nextSlot?: string | null
   onGoTo?: (tab: string) => void
   /**
    * Notices from the latest run (App passes r.notices from onRunFinished). Only the self-healing lines —
@@ -71,11 +82,35 @@ interface Card {
   count: number
 }
 
+/** Item 10: a five-segment bar labelled from the pipeline phase, so runs over 10 s never look hung. */
+function RunBar({ progress, level, lastSeconds }: { progress: RunProgress | null | undefined; level: Level; lastSeconds: number | null }): JSX.Element {
+  const step = stepOf(progress?.phase)
+  const total = RUN_PHASES.length
+  const remaining = remainingLabel(step, total, lastSeconds)
+  return (
+    <div className="run-bar" role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={step} aria-label={`Step ${step} of ${total}`}>
+      <div className="run-bar-track">
+        {RUN_PHASES.map((p, i) => (
+          <span key={p.phase} className={`seg${i + 1 < step ? ' done' : i + 1 === step ? ' now' : ''}`} />
+        ))}
+      </div>
+      <div className="run-bar-label" aria-live="polite">
+        Step {step} of {total}
+        {progress?.detail ? ` · ${progress.detail}` : ''}
+        {remaining && level !== 'simple' ? ` · ${remaining}` : ''}
+      </div>
+    </div>
+  )
+}
+
+/** Rows that J/K can walk and D can finish (Standard/Pro). */
+const rowProps = { 'data-row': true, tabIndex: -1 } as const
+
 /**
  * The one screen most people need: what needs you, who is waiting on you,
  * what's coming up - and one big button. Adapts to the layout level.
  */
-export default function Today({ running, onRun, level = 'standard', status = '', onGoTo, notices = [] }: Props): JSX.Element {
+export default function Today({ running, onRun, level = 'standard', status = '', progress = null, refreshKey = 0, lastError = null, nextSlot = null, onGoTo, notices = [] }: Props): JSX.Element {
   const simple = level === 'simple'
   const pro = level === 'pro'
   const healing = notices.filter(isHealingNotice)
@@ -87,14 +122,64 @@ export default function Today({ running, onRun, level = 'standard', status = '',
   const [undo, setUndo] = useState<{ id: string; title: string } | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [inboxFilter, setInboxFilter] = useState<string | null>(null)
+  const [lastSeconds, setLastSeconds] = useState<number | null>(null)
+  const [showDetails, setShowDetails] = useState(false)
 
+  // Item 9: refetch in place after every run — the previous brief stays on screen (no "Opening…" flash),
+  // and "Show me everything", the inbox filter, and the undo toast survive a check.
   useEffect(() => {
-    void window.inboxScout.latestBrief().then(setLatest)
-    void window.inboxScout.listAccounts().then(setAccounts)
+    let alive = true
+    void window.inboxScout.latestBrief().then((b) => alive && setLatest(b))
+    void window.inboxScout.listAccounts().then((a) => alive && setAccounts(a))
     void window.inboxScout
       .listIssues()
-      .then((issues) => setDoneIds(new Set(issues.filter((i) => i.state === 'resolved').map((i) => i.id))))
-  }, [])
+      .then((issues) => alive && setDoneIds(new Set(issues.filter((i) => i.state === 'resolved').map((i) => i.id))))
+    void window.inboxScout.listRuns().then((runs) => alive && setLastSeconds(lastRunSeconds(runs)))
+    return () => {
+      alive = false
+    }
+  }, [refreshKey])
+
+  // Item 11: leaving Today (or the app switching layouts) must stop the voice — Stop always works.
+  useEffect(
+    () => () => {
+      stopSpeaking()
+    },
+    []
+  )
+  useEffect(() => {
+    if (running) setSpeaking(false)
+  }, [running])
+  useEffect(() => setShowDetails(false), [lastError])
+
+  // Item 15: J/K walk the rows, D finishes the focused one (Standard/Pro; never while typing).
+  useEffect(() => {
+    if (simple) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const target = e.target as HTMLElement | null
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable)) return
+      const key = e.key.toLowerCase()
+      if (key !== 'j' && key !== 'k' && key !== 'd') return
+      const rows = Array.from(document.querySelectorAll<HTMLElement>('main [data-row]'))
+      if (rows.length === 0) return
+      const current = rows.findIndex((r) => r === document.activeElement || r.contains(document.activeElement))
+      if (key === 'd') {
+        const btn = current >= 0 ? rows[current].querySelector<HTMLButtonElement>('[data-done]') : null
+        if (btn) {
+          e.preventDefault()
+          btn.click()
+        }
+        return
+      }
+      e.preventDefault()
+      const next = key === 'j' ? Math.min(rows.length - 1, current + 1) : Math.max(0, current <= 0 ? 0 : current - 1)
+      rows[next]?.focus()
+      rows[next]?.scrollIntoView({ block: 'nearest' })
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [simple])
 
   useEffect(() => {
     if (!msg?.ok) return
@@ -111,7 +196,7 @@ export default function Today({ running, onRun, level = 'standard', status = '',
   const readAloud = (): void => {
     if (!('speechSynthesis' in window) || !brief) return
     if (speaking) {
-      window.speechSynthesis.cancel()
+      stopSpeaking()
       setSpeaking(false)
       return
     }
@@ -236,7 +321,7 @@ export default function Today({ running, onRun, level = 'standard', status = '',
           rows.length,
           <ul>
             {rows.slice(0, 8).map((r) => (
-              <li key={r.key} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+              <li key={r.key} {...rowProps} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
                 <span>
                   <strong>{r.title}</strong>
                   <div className="next">{r.detail}</div>
@@ -253,7 +338,7 @@ export default function Today({ running, onRun, level = 'standard', status = '',
                     </button>
                   )}
                   {r.issueId && (
-                    <button className="ghost" onClick={() => void markDone(r.issueId!, r.title)}>
+                    <button className="ghost" data-done onClick={() => void markDone(r.issueId!, r.title)}>
                       Done
                     </button>
                   )}
@@ -275,7 +360,7 @@ export default function Today({ running, onRun, level = 'standard', status = '',
         brief.topIssues.length,
         <ul>
           {items.map((i: any, idx: number) => (
-            <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+            <li key={idx} {...rowProps} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
               <span>
                 <strong>{i.title}</strong>
                 <div className="next">→ {i.nextStep}</div>
@@ -289,7 +374,7 @@ export default function Today({ running, onRun, level = 'standard', status = '',
                   </button>
                 )}
                 {i.issueId && (
-                  <button className="ghost" onClick={() => void markDone(i.issueId, i.title)}>
+                  <button className="ghost" data-done onClick={() => void markDone(i.issueId, i.title)}>
                     Done ✓
                   </button>
                 )}
@@ -304,7 +389,8 @@ export default function Today({ running, onRun, level = 'standard', status = '',
             </li>
           )}
         </ul>,
-        { full: !simple, attention: true }
+        // Pro spans the dense grid; Standard keeps it at the top of the left column (fixed slots, item 15).
+        { full: pro, attention: true }
       )
     }
 
@@ -315,7 +401,7 @@ export default function Today({ running, onRun, level = 'standard', status = '',
         waiting.length,
         <ul>
           {waiting.slice(0, simple ? 3 : 50).map((w: any, idx: number) => (
-            <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+            <li key={idx} {...rowProps} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
               <span>
                 <strong>{w.subject}</strong>
                 {w.counterpart && <div className="next">{w.counterpart}</div>}
@@ -387,7 +473,7 @@ export default function Today({ running, onRun, level = 'standard', status = '',
         shownPromises.length,
         <ul>
           {shownPromises.slice(0, simple ? 2 : 6).map((p: any, idx: number) => (
-            <li key={idx} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+            <li key={idx} {...rowProps} style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
               <span>
                 <strong>
                   {p.overdue ? '‼ ' : ''}To {p.to}
@@ -503,6 +589,10 @@ export default function Today({ running, onRun, level = 'standard', status = '',
   const visibleCards = simple && !expanded ? cards.slice(0, 3) : cards
   const hiddenCount = cards.length - visibleCards.length
   const hasAnything = cards.length > 0
+  const standard = !simple && !pro
+  const leftCards = standard ? visibleCards.filter((c) => slotOf(c.id) === 'left') : []
+  const rightCards = standard ? visibleCards.filter((c) => slotOf(c.id) === 'right') : []
+  const problem = lastError && !running ? plainError(lastError, level, { nextSlot }) : null
 
   return (
     <div>
@@ -517,7 +607,7 @@ export default function Today({ running, onRun, level = 'standard', status = '',
               Connect my email
             </button>
           )}
-          {running && status && (
+          {running && !progress && status && (
             <p className="hint" role="status" aria-live="polite" style={{ marginTop: 6 }}>
               ⏳ {status}
             </p>
@@ -556,9 +646,13 @@ export default function Today({ running, onRun, level = 'standard', status = '',
           )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-end' }}>
-          <button className="big-btn" onClick={onRun} disabled={running}>
-            {running ? t('hero.running', level) : `✉ ${t('hero.run', level)}`}
-          </button>
+          {running ? (
+            <RunBar progress={progress} level={level} lastSeconds={lastSeconds} />
+          ) : (
+            <button className="big-btn" onClick={onRun}>
+              ✉ {t('hero.run', level)}
+            </button>
+          )}
           {brief && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               <button className={simple ? 'big-btn' : 'ghost'} style={simple ? { fontSize: 18 } : {}} onClick={readAloud}>
@@ -588,6 +682,24 @@ export default function Today({ running, onRun, level = 'standard', status = '',
           )}
         </div>
       </div>
+      {problem && (
+        <div className="error" role="alert" style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span>{problem.text}</span>
+          {problem.kind === 'auth' && onGoTo && (
+            <button className="ghost" onClick={() => onGoTo('setup')}>
+              Fix it for me
+            </button>
+          )}
+          {problem.detail && (
+            <button className="ghost" aria-expanded={showDetails} onClick={() => setShowDetails(!showDetails)}>
+              {showDetails ? 'Hide details' : 'Show details'}
+            </button>
+          )}
+          {showDetails && problem.detail && (
+            <code style={{ width: '100%', whiteSpace: 'pre-wrap', fontSize: 12 }}>{problem.detail}</code>
+          )}
+        </div>
+      )}
       {msg && (
         <div className={msg.ok ? 'success' : 'error'} role="status">
           {msg.text}
@@ -613,7 +725,15 @@ export default function Today({ running, onRun, level = 'standard', status = '',
 
       {brief && hasAnything && (
         <>
-          <div className="today-grid">{visibleCards.map((c) => c.node)}</div>
+          {standard ? (
+            // Fixed two-column slots at Standard (HUMAN-FACTORS 3.3): the same card order as every level, split by slot.
+            <div className="today-grid two-col">
+              <div className="today-col">{leftCards.map((c) => c.node)}</div>
+              <div className="today-col">{rightCards.map((c) => c.node)}</div>
+            </div>
+          ) : (
+            <div className="today-grid">{visibleCards.map((c) => c.node)}</div>
+          )}
           {hiddenCount > 0 && (
             <button className="big-btn" style={{ marginTop: 12, width: '100%' }} onClick={showMore}>
               {t('more.show', level)} ({hiddenCount} more)

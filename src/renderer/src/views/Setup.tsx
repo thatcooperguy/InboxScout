@@ -6,9 +6,10 @@ import SettingsView from './Settings'
 import SetupAssistant from './SetupAssistant'
 import Assistant from './Assistant'
 import Phone from './Phone'
+import Helpers from './Helpers'
 import { useLevel } from '../useLevel'
 
-type Sub = 'hub' | 'accounts' | 'ai' | 'skills' | 'prefs' | 'helper' | 'assistant' | 'phone'
+type Sub = 'hub' | 'accounts' | 'ai' | 'skills' | 'prefs' | 'helper' | 'assistant' | 'phone' | 'helpers'
 
 interface Props {
   onSettingsChanged: () => void
@@ -37,9 +38,21 @@ interface HubState {
   attention: number | null
   /** "On your phone" switched on; null until known. */
   phone: boolean | null
+  /** Trusted helpers (v1.4): the first helper's name and level, how many, and whether all are paused; null until known. */
+  helpers: { count: number; first: string; level: string; paused: boolean } | null
 }
 
-const EMPTY: HubState = { accounts: null, aiName: null, aiBuiltin: true, watchers: null, webReady: null, google: null, microsoft: null, attention: null, phone: null }
+const EMPTY: HubState = { accounts: null, aiName: null, aiBuiltin: true, watchers: null, webReady: null, google: null, microsoft: null, attention: null, phone: null, helpers: null }
+
+/** Trusted helpers tile state line: "Nobody yet" / "Sarah · what needs you" / "Paused". */
+const HELPER_LEVEL_WORDS: Record<string, string> = { ask: 'ask only', schedule: 'appointments only', needs: 'what needs you', all: 'everything' }
+function helpersStateLine(h: HubState['helpers']): string {
+  if (h === null) return ''
+  if (h.count === 0) return 'Nobody yet'
+  if (h.paused) return 'Paused'
+  const rest = h.count > 1 ? ` +${h.count - 1}` : ''
+  return `${h.first}${rest} · ${HELPER_LEVEL_WORDS[h.level] ?? h.level}`
+}
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
 
@@ -78,6 +91,10 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
       .then((r) => alive && setHub((h) => ({ ...h, attention: r.ok ? 0 : r.items.filter((i) => i.status === 'warn' || i.status === 'fail').length || 1 })))
       .catch(() => undefined)
     void api.phoneInfo().then((p) => alive && setHub((h) => ({ ...h, phone: p.enabled }))).catch(() => undefined)
+    void api
+      .helpersList()
+      .then((r) => alive && setHub((h) => ({ ...h, helpers: { count: r.helpers.length, first: r.helpers[0]?.name ?? '', level: r.helpers[0]?.level ?? '', paused: r.paused } })))
+      .catch(() => undefined)
     return () => {
       alive = false
     }
@@ -131,6 +148,13 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
       state: phoneState
     },
     {
+      id: 'helpers',
+      icon: '🙋',
+      label: 'Trusted helpers',
+      sub: simple ? 'A family member or friend who gets a short note when something needs you.' : 'People who get a short note when something needs you — by email or text, no app. You choose how much they see.',
+      state: helpersStateLine(hub.helpers)
+    },
+    {
       id: 'ai',
       icon: '🧠',
       label: simple ? 'Smarter sorting' : 'Smarter sorting (AI)',
@@ -154,7 +178,7 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
   ]
   const tiles = allTiles.filter((t) => t.id !== 'helper' || showSignin)
 
-  const frontIds: Tile['id'][] = simple ? ['accounts', 'prefs', 'phone', 'assistant'] : tiles.map((t) => t.id)
+  const frontIds: Tile['id'][] = simple ? ['accounts', 'helpers', 'prefs', 'phone', 'assistant'] : tiles.map((t) => t.id)
   const front = frontIds.map((id) => tiles.find((t) => t.id === id)).filter((t): t is Tile => !!t)
   const more = tiles.filter((t) => !frontIds.includes(t.id))
 
@@ -171,6 +195,7 @@ export default function Setup({ onSettingsChanged }: Props): JSX.Element {
         {sub === 'helper' && <SetupAssistant onConnectAccount={() => setSub('accounts')} />}
         {sub === 'assistant' && <Assistant />}
         {sub === 'phone' && <Phone />}
+        {sub === 'helpers' && <Helpers />}
       </div>
     )
   }

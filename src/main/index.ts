@@ -6,14 +6,17 @@ import { SecretStore } from './secrets'
 import { registerIpc, type IpcHooks } from './ipc'
 import { runPipeline } from './pipeline/run'
 import { log } from './health/diagnostics'
-import { Scheduler } from './scheduler'
+import { META_LAST_ATTEMPT_AT, Scheduler, attemptStateFrom } from './scheduler'
 import { loadSettings, saveSettings } from './settings'
 import type { RunProgress } from '../shared/types'
 import { briefToSpeech } from '../shared/speech'
 import { speakWithOs } from './voice'
-import { latestBrief } from './db/repo'
+import { getMeta, latestBrief, listRuns } from './db/repo'
 import { bridgeBroadcast } from './api/local'
-import { recordRun, recordSession } from './usage'
+import { readLevelState, recordRun, recordSession } from './usage'
+import { resolveLevel } from '../shared/adapt'
+import { notificationCopy, tShared } from '../shared/copy'
+import { nextSlotLabel } from '../shared/errors'
 
 let db: DB
 let secrets: SecretStore
@@ -35,7 +38,8 @@ function snag(kind: string, err: unknown): void {
   lastSnagAt = now
   try {
     if (app.isReady() && Notification.isSupported()) {
-      new Notification({ title: 'InboxScout', body: 'InboxScout hit a snag and kept going — see Settings → Health' }).show()
+      const level = db ? resolveLevel(loadSettings(db).uiLevel, readLevelState(db)) : 'standard'
+      new Notification({ title: 'InboxScout', body: tShared('notify.snag', level) }).show()
     }
   } catch {
     // a notification that cannot be shown is not worth a second snag
@@ -64,17 +68,10 @@ async function runNow(trigger: 'manual' | 'scheduled' | 'catchup' | 'cli' = 'man
     if (result.error) log('error', 'pipeline', `run failed (${trigger})`, { runId: result.runId, error: result.error })
     else log('info', 'pipeline', `run finished (${trigger})`, { runId: result.runId, messages: result.messagesScanned, issues: result.issueCount, notices: result.notices })
     if (trigger !== 'manual' && Notification.isSupported()) {
-      // Failures must be visible too - a silently skipped brief is worse than an error.
-      new Notification(
-        result.error
-          ? { title: 'InboxScout — scan failed', body: result.error.slice(0, 200) }
-          : {
-              title: 'InboxScout — brief ready',
-              body:
-                `${result.messagesScanned} new messages scanned, ${result.issueCount} issue${result.issueCount === 1 ? '' : 's'} need attention.` +
-                (result.notices.length ? ` (${result.notices[0]})` : '')
-            }
-      ).show()
+      // Failures must be visible too - a silently skipped brief is worse than an error. Words come from the stored level.
+      const s = loadSettings(db)
+      const level = resolveLevel(s.uiLevel, readLevelState(db))
+      new Notification(notificationCopy(result, level, { nextSlot: nextSlotLabel(s.schedule) })).show()
     }
     if (!result.error && loadSettings(db).speakBriefs) {
       const latest = latestBrief(db)
@@ -181,12 +178,14 @@ async function bootstrap(): Promise<void> {
   createTray()
 
   const scheduler = new Scheduler((trigger) => void runNow(trigger))
-  scheduler.apply(loadSettings(db).schedule, loadSettings(db).lastRunAt)
-  // Reapply schedule whenever settings change.
-  setInterval(() => {
+  // The cron job is re-armed only when the schedule changes; the catch-up check backs off after failed runs
+  // (15 min → 1 h → 6 h) so a locked account is not retried — and reported — every five minutes.
+  const applySchedule = (): void => {
     const current = loadSettings(db)
-    scheduler.apply(current.schedule, current.lastRunAt)
-  }, 5 * 60 * 1000)
+    scheduler.apply(current.schedule, current.lastRunAt, attemptStateFrom(listRuns(db, 10), getMeta(db, META_LAST_ATTEMPT_AT)))
+  }
+  applySchedule()
+  setInterval(applySchedule, 5 * 60 * 1000)
 
   // Start with Windows/macOS/Linux so scheduled runs actually happen.
   const applyLoginItem = (): void => {

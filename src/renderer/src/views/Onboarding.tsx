@@ -67,6 +67,36 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
   const [helperBusy, setHelperBusy] = useState(false)
   const [helperNote, setHelperNote] = useState('')
   const helperEmail = useRef('')
+  // Trusted helpers (v1.4): "Who is setting this up?" on step 0; a pre-filled helper on the last step.
+  const [setupBy, setSetupBy] = useState<'me' | 'someone_else'>('me')
+  const [trusted, setTrusted] = useState({ name: '', relationship: '', email: '', phone: '', carrier: '' })
+  const [carriers, setCarriers] = useState<{ id: string; name: string }[]>([])
+  const [trustedBusy, setTrustedBusy] = useState(false)
+  const [trustedError, setTrustedError] = useState('')
+  const [trustedAdded, setTrustedAdded] = useState('')
+
+  useEffect(() => {
+    void window.inboxScout.deliveryCarriers().then(setCarriers).catch(() => setCarriers([]))
+  }, [])
+
+  const chooseSetupBy = (who: 'me' | 'someone_else'): void => {
+    setSetupBy(who)
+    void window.inboxScout.helpersSetSetupBy(who).catch(() => undefined)
+  }
+
+  const addTrustedHelper = async (): Promise<void> => {
+    if (trustedBusy) return
+    setTrustedBusy(true)
+    setTrustedError('')
+    try {
+      const h = await window.inboxScout.helpersAdd({ ...trusted, level: 'needs', cadence: 'each_brief', addedBy: 'helper_setup' })
+      setTrustedAdded(h.name)
+    } catch (err) {
+      setTrustedError(cleanError(err))
+    } finally {
+      setTrustedBusy(false)
+    }
+  }
 
   useEffect(() => {
     void window.inboxScout.accountPresets().then(setPresets)
@@ -258,8 +288,31 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
             </div>
           </fieldset>
 
+          <fieldset style={{ border: '1px solid var(--line, #dde2ea)', borderRadius: 8, padding: '10px 12px', margin: '0 0 16px' }}>
+            <legend style={{ fontWeight: 600, padding: '0 4px' }}>Who is setting this up?</legend>
+            <p className="hint" style={{ margin: '0 0 8px' }}>
+              {simple
+                ? 'If someone is helping you, they can get a short note when something needs you.'
+                : 'If you are setting this up for someone else, you can be their first trusted helper: a short note when something needs them — never their emails.'}
+            </p>
+            <div role="group" aria-label="Who is setting this up" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button type="button" className={setupBy === 'me' ? 'primary' : 'ghost'} aria-pressed={setupBy === 'me'} onClick={() => chooseSetupBy('me')}>
+                Me{setupBy === 'me' ? ' ✓' : ''}
+              </button>
+              <button type="button" className={setupBy === 'someone_else' ? 'primary' : 'ghost'} aria-pressed={setupBy === 'someone_else'} onClick={() => chooseSetupBy('someone_else')}>
+                Someone I&apos;m helping{setupBy === 'someone_else' ? ' ✓' : ''}
+              </button>
+            </div>
+          </fieldset>
+
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="primary" onClick={() => setStep(1)}>
+            <button
+              className="primary"
+              onClick={() => {
+                void window.inboxScout.helpersSetSetupBy(setupBy).catch(() => undefined)
+                setStep(1)
+              }}
+            >
               Get started
             </button>
             <button className="ghost" onClick={onDone}>
@@ -564,6 +617,62 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
               ? 'Every morning I check your email and write you a short summary of what needs you.'
               : 'Every morning at 7:30, InboxScout checks your email and writes you a short brief of what needs you.'}
           </p>
+
+          {setupBy === 'someone_else' && (
+            <div className="card" style={{ background: 'var(--blue-soft)', borderColor: 'var(--blue)' }}>
+              <strong>🙋 Be their trusted helper</strong>
+              {trustedAdded ? (
+                <p className="success" role="status" style={{ marginBottom: 0 }}>
+                  {trustedAdded} is added as a helper and gets a short note when something needs them. They can change or stop it any time under Setup → Trusted helpers.
+                </p>
+              ) : (
+                <>
+                  <p className="hint" style={{ margin: '4px 0 10px' }}>
+                    You get a short note when something needs them — titles and next steps only, never their emails or passwords. They see every message you get and can stop it in one press.
+                  </p>
+                  <div className="grid2">
+                    <label className="field">
+                      <span>Your name</span>
+                      <input value={trusted.name} onChange={(e) => setTrusted({ ...trusted, name: e.target.value })} placeholder="Sarah" />
+                    </label>
+                    <label className="field">
+                      <span>Who you are to them</span>
+                      <input value={trusted.relationship} onChange={(e) => setTrusted({ ...trusted, relationship: e.target.value })} placeholder="daughter, neighbour, friend" />
+                    </label>
+                    <label className="field">
+                      <span>Your email</span>
+                      <input type="email" value={trusted.email} onChange={(e) => setTrusted({ ...trusted, email: e.target.value })} placeholder="sarah@example.com" />
+                    </label>
+                    <label className="field">
+                      <span>Your mobile (for texts, optional)</span>
+                      <input value={trusted.phone} onChange={(e) => setTrusted({ ...trusted, phone: e.target.value })} placeholder="(555) 123-4567" />
+                    </label>
+                    {trusted.phone.trim() && (
+                      <label className="field">
+                        <span>Your mobile carrier</span>
+                        <select value={trusted.carrier} onChange={(e) => setTrusted({ ...trusted, carrier: e.target.value })}>
+                          <option value="">Choose…</option>
+                          {carriers.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                  </div>
+                  {trustedError && (
+                    <div className="error" role="alert">
+                      {trustedError}
+                    </div>
+                  )}
+                  <button className="primary" disabled={trustedBusy || !trusted.name.trim() || !(trusted.email.trim() || (trusted.phone.trim() && trusted.carrier))} onClick={() => void addTrustedHelper()}>
+                    {trustedBusy ? 'Adding…' : 'Add me as a helper'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
           <div style={{ display: 'flex', gap: 8 }}>
             {connected ? (
               <button className="primary" onClick={() => finish(true)}>

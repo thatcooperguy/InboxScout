@@ -53,7 +53,73 @@ export const COPY: Record<string, Variants> = {
   'decide.title': { standard: 'Decide today' },
   'decide.why': {
     standard: 'Urgent items, dates within two days, overdue promises, and replies owed to people who matter — the decisions for today, pulled from everything below.'
+  },
+
+  // ---- Trusted helpers (v1.4, Part A). {name}, {title}, {n}, {time} are filled in by fill(). ----
+  'help.button': { simple: 'Ask for help', standard: 'Ask for help', pro: 'Ask' },
+  'help.prompt': {
+    simple: 'Send this to {name}? You can add a note.',
+    standard: 'Send "{title}" to {name} with an optional note. They get the title, the next step, and your note — not the email itself.',
+    pro: 'Send to {name}'
+  },
+  'help.sending': { simple: 'Sending to {name} in {n} seconds.', standard: 'Sending to {name} in {n} s…', pro: '→ {name} in {n}s' },
+  'help.cancel': { simple: "Don't send", standard: 'Cancel', pro: 'Cancel' },
+  'help.sent': { simple: 'Sent to {name}.', standard: 'Sent to {name} at {time}. See everything you\'ve sent under Setup → Trusted helpers.', pro: 'Sent · {name} · {time}' },
+  'help.none': {
+    simple: 'First, add a helper. Press Setup, then Trusted helpers.',
+    standard: 'No helper yet — add one under Setup → Trusted helpers.',
+    pro: 'No helper. Setup → Helpers.'
+  },
+  'help.paused': { simple: 'Your helpers are paused.', standard: 'Your helpers are paused — turn them back on under Setup → Trusted helpers.', pro: 'Helpers paused.' },
+  'help.note': { simple: 'Add a note (you can skip this)', standard: 'A note for them (optional)', pro: 'Note' },
+  'help.send': { simple: 'Send', standard: 'Send', pro: 'Send' },
+  'help.mailapp': { simple: 'Open in my mail app', standard: 'Open in my mail app — press Send there', pro: 'Open in mail app' },
+  'helpers.title': { simple: 'Trusted helpers', standard: 'Trusted helpers', pro: 'Helpers' },
+  'helpers.notes': { simple: 'Notes from your helpers', standard: 'Notes from your helpers', pro: 'Helper notes' },
+  'helpers.notes.why': {
+    simple: 'A helper wrote back to you. This is what they said.',
+    standard: 'A helper replied to a note InboxScout sent them. It arrived in your inbox; this is a copy.',
+    pro: 'Replies from helpers to InboxScout mail.'
+  },
+  'helpers.notice': {
+    simple: '{name} now gets a copy of what needs you. Press here to change that.',
+    standard: '{name} now gets a copy of what needs you. Change this.',
+    pro: '{name} gets a copy of what needs you. Change'
+  },
+  'helpers.setupBy': {
+    simple: '{name} set this up for you. {name} gets a short note when something needs you. Press here to change that.',
+    standard: '{name} set this up for you and gets a short note when something needs you. Change this.',
+    pro: 'Set up by {name}, who gets a note when something needs you. Change'
+  },
+  'helpers.done': { simple: 'Done', standard: 'Done', pro: 'Done' },
+
+  // ---- Conversation (v1.4, Part B): "Ask about your mail…" ----
+  'ask.placeholder': { simple: 'Ask me anything about your email', standard: 'Ask about your mail…', pro: 'Ask…' },
+  'ask.button': { standard: 'Ask' },
+  'ask.thinking': { simple: 'Thinking…', standard: 'thinking…', pro: 'AI thinking…' },
+  'ask.nothing': { simple: 'I could not find anything about that.', standard: 'Nothing found for that.', pro: 'No hits.' },
+  'ask.draftOpened': {
+    simple: 'I opened a draft. Read it, then press Send in your mail app.',
+    standard: 'Draft opened in your mail app — read it, then press Send.',
+    pro: 'Draft opened — review and send.'
+  },
+  'ask.private': {
+    simple: 'That email has private details. Open it to read it.',
+    standard: 'That message contains private details — open it to read.',
+    pro: 'Contains private details — open to read.'
+  },
+  'ask.unsure': { standard: 'Not sure — these are only word matches.', pro: 'unsure' },
+  'ask.voiceHint': { simple: 'You can also press the microphone key on your keyboard and talk.', standard: 'Tip: your computer can type for you — press the microphone key and talk.' },
+  'ask.help': {
+    simple: 'Try: Who is waiting on me? What do I owe? Did the dentist write back?',
+    standard: 'Try "Who is waiting on me?", "What do I owe this month?", "Did the dentist write back?", or "Tell Jane I\'ll sign it Friday".',
+    pro: 'Intents: wrote back · owe · when is · waiting · promises · tell · what\'s new · from X · day · health · read. Anything else: search.'
   }
+}
+
+/** Fill {name}-style placeholders in a copy string. */
+export function fill(text: string, values: Record<string, string | number>): string {
+  return text.replace(/\{(\w+)\}/g, (m, k) => (k in values ? String(values[k]) : m))
 }
 
 export function t(key: string, level: UiLevel): string {

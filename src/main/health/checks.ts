@@ -1,5 +1,6 @@
 import { join } from 'node:path'
-import type { AccountConfig, AppSettings, HealthItem, HealthReport } from '../../shared/types'
+import { pickOutbox } from '../delivery/email'
+import type { AccountConfig, AppSettings, HealthItem, HealthReport, HelperSend } from '../../shared/types'
 
 /**
  * Self-healing, part 1: the pure checks. Each check looks at the app through a
@@ -65,6 +66,8 @@ export interface HealthCtx {
   resetSync: (accountId: string) => void
   /** Mint a fresh app password through the Assistant, or say what the person must do. */
   reauthAccount: (accountId: string) => Promise<{ ok: boolean; message: string }>
+  /** Trusted helpers (v1.4): the newest sent-log row for a helper, so the check can say when the last message failed. Optional for lean hosts. */
+  lastHelperSend?: (helperId: string) => HelperSend | null
 }
 
 export interface Check {
@@ -295,7 +298,29 @@ const diskCheck: Check = {
   }
 }
 
-export const CHECKS: Check[] = [dbCheck, reportsDirCheck, accountsCheck, aiCheck, scheduleCheck, bridgeCheck, desktopLinuxCheck, keyringLinuxCheck, diskCheck]
+// ---- Trusted helpers (v1.4, A7): never fatal, never auto-repaired (sending is not a "safe" repair) ----
+export const NO_OUTBOX_FOR_HELPERS = 'You have helpers but no account that can send mail. Add a Gmail, Yahoo, or iCloud account with an app password, or your helpers will not hear from InboxScout.'
+
+export const helpersCheck: Check = {
+  id: 'helpers',
+  title: 'Trusted helpers',
+  detect(ctx) {
+    const s = ctx.settings()
+    const helpers = (s.helpers ?? []).filter((h) => !h.paused)
+    if (helpers.length === 0) return item(this, 'ok', s.helpers?.length ? 'Your helpers are all paused.' : 'No helpers yet.')
+    if (s.helpersPaused) return item(this, 'ok', 'Helpers are paused; nothing is sent.')
+    if (!pickOutbox(ctx.accounts(), null)) return item(this, 'warn', NO_OUTBOX_FOR_HELPERS)
+    const stuck: string[] = []
+    for (const h of helpers) {
+      const last = ctx.lastHelperSend?.(h.id) ?? null
+      if (last && last.status === 'failed') stuck.push(`the last message to ${h.name} did not go through (${shortReason(last.error ?? 'unknown error')})`)
+    }
+    if (stuck.length) return item(this, 'warn', `${stuck.join('; ')}. Check the outbox account under Setup → Email accounts, then press Ask for help again or wait for the next check.`.replace(/^./, (c) => c.toUpperCase()))
+    return item(this, 'ok', `${helpers.length === 1 ? `${helpers[0].name} hears` : `${helpers.length} helpers hear`} from InboxScout.`)
+  }
+}
+
+export const CHECKS: Check[] = [dbCheck, reportsDirCheck, accountsCheck, aiCheck, scheduleCheck, bridgeCheck, desktopLinuxCheck, keyringLinuxCheck, diskCheck, helpersCheck]
 
 // ---- Running them ----
 

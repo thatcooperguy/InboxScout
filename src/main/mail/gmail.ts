@@ -236,7 +236,84 @@ export function mapGmailMessage(raw: GmailMessage, account: AccountConfig, store
   }
 }
 
-async function fetchMessages(token: string, ids: string[], account: AccountConfig, storeFullBodies: boolean): Promise<MessageRecord[]> {
+// ---- Batched fetch (v1.4 item 5): 50 messages per HTTP round trip instead of one each ----
+
+const BATCH_URL = 'https://gmail.googleapis.com/batch/gmail/v1'
+export const GMAIL_BATCH_SIZE = 50
+const SKIP_LABELS = new Set(['SPAM', 'TRASH', 'DRAFT'])
+
+/** One part of a multipart/mixed batch response: the inner HTTP status and body, keyed by the request's Content-ID. */
+export interface BatchPart {
+  contentId: string | null
+  status: number
+  body: string
+}
+
+/** The multipart/mixed request body for a batch of `messages.get?format=full` calls. Content-ID `item-<i>` maps back to `ids[i]`. */
+export function buildBatchBody(ids: string[], boundary: string): string {
+  const parts = ids.map((id, i) =>
+    [`--${boundary}`, 'Content-Type: application/http', `Content-ID: <item-${i}>`, '', `GET /gmail/v1/users/me/messages/${encodeURIComponent(id)}?format=full HTTP/1.1`, '', ''].join('\r\n')
+  )
+  return `${parts.join('')}--${boundary}--\r\n`
+}
+
+/** The boundary named in a `multipart/mixed; boundary=…` header (quotes tolerated), or null. */
+export function batchBoundary(contentType: string | null | undefined): string | null {
+  const m = String(contentType ?? '').match(/boundary="?([^";]+)"?/i)
+  return m ? m[1].trim() : null
+}
+
+/**
+ * Pure parser for the batch response. Each part is `<part headers>\r\n\r\nHTTP/1.1 <status> …\r\n<headers>\r\n\r\n<body>`.
+ * Throws on anything that does not look like that — the caller then falls back to one request per message.
+ */
+export function parseBatchResponse(text: string, boundary: string): BatchPart[] {
+  const out: BatchPart[] = []
+  const pieces = text.split(`--${boundary}`)
+  if (pieces.length < 2) throw new Error('batch response has no parts')
+  for (let i = 1; i < pieces.length; i++) {
+    let piece = pieces[i]
+    if (piece.startsWith('--')) break // closing delimiter
+    piece = piece.replace(/^\r?\n/, '')
+    const split = splitHeaders(piece)
+    if (!split) throw new Error('batch part without headers')
+    const contentId = split.headers.match(/^content-id:\s*<?([^>\r\n]+)>?/im)?.[1]?.trim() ?? null
+    const inner = splitHeaders(split.rest)
+    if (!inner) throw new Error('batch part without an inner response')
+    const status = inner.headers.match(/^HTTP\/\d(?:\.\d)?\s+(\d{3})/i)
+    if (!status) throw new Error('batch part without an HTTP status line')
+    out.push({ contentId, status: Number(status[1]), body: inner.rest.replace(/\r?\n$/, '') })
+  }
+  return out
+}
+
+function splitHeaders(block: string): { headers: string; rest: string } | null {
+  const m = block.match(/\r?\n\r?\n/)
+  if (!m || m.index === undefined) return null
+  return { headers: block.slice(0, m.index), rest: block.slice(m.index + m[0].length) }
+}
+
+/** POST one batch; resolves to the parsed parts. Rejects on transport, HTTP, or parse problems. */
+async function gmailBatch(token: string, ids: string[]): Promise<BatchPart[]> {
+  const boundary = `batch_inboxscout_${randomBytes(8).toString('hex')}`
+  const res = await fetch(BATCH_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'content-type': `multipart/mixed; boundary=${boundary}` },
+    body: buildBatchBody(ids, boundary)
+  })
+  const text = await res.text()
+  if (!res.ok) {
+    const err: any = new Error(`Gmail batch error ${res.status}: ${text.slice(0, 200)}`)
+    err.status = res.status
+    throw err
+  }
+  const replyBoundary = batchBoundary(res.headers.get('content-type'))
+  if (!replyBoundary) throw new Error('Gmail batch reply without a multipart boundary')
+  return parseBatchResponse(text, replyBoundary)
+}
+
+/** The original path: four workers, one `messages.get` each. Still used when a batch cannot be read. */
+async function fetchMessagesOneByOne(token: string, ids: string[], account: AccountConfig, storeFullBodies: boolean): Promise<MessageRecord[]> {
   const out: MessageRecord[] = []
   const queue = [...ids]
   const worker = async (): Promise<void> => {
@@ -244,7 +321,7 @@ async function fetchMessages(token: string, ids: string[], account: AccountConfi
       const id = queue.shift()!
       try {
         const raw = (await gmailGet(token, `${API}/messages/${id}?format=full`)) as GmailMessage
-        if ((raw.labelIds ?? []).some((l) => l === 'SPAM' || l === 'TRASH' || l === 'DRAFT')) continue
+        if ((raw.labelIds ?? []).some((l) => SKIP_LABELS.has(l))) continue
         out.push(mapGmailMessage(raw, account, storeFullBodies))
       } catch {
         // one bad message never blocks the run
@@ -252,6 +329,51 @@ async function fetchMessages(token: string, ids: string[], account: AccountConfi
     }
   }
   await Promise.all([worker(), worker(), worker(), worker()])
+  return out
+}
+
+/**
+ * Batched fetch: 50 `format=full` reads per round trip (a 300-message first sync is 6 requests, not 300).
+ * Any batch that fails or cannot be parsed hands its ids to the one-by-one path; a part that answers
+ * 404 (message gone) is skipped, any other non-200 part is retried one by one.
+ */
+export async function fetchMessages(token: string, ids: string[], account: AccountConfig, storeFullBodies: boolean): Promise<MessageRecord[]> {
+  const out: MessageRecord[] = []
+  const leftovers: string[] = []
+  for (let i = 0; i < ids.length; i += GMAIL_BATCH_SIZE) {
+    const group = ids.slice(i, i + GMAIL_BATCH_SIZE)
+    let parts: BatchPart[]
+    try {
+      parts = await gmailBatch(token, group)
+    } catch {
+      leftovers.push(...group)
+      continue
+    }
+    const seen = new Set<number>()
+    parts.forEach((part, order) => {
+      const m = part.contentId?.match(/item-(\d+)/)
+      const index = m ? Number(m[1]) : order
+      const id = group[index]
+      if (!id || seen.has(index)) return
+      seen.add(index)
+      if (part.status === 404) return
+      if (part.status !== 200) {
+        leftovers.push(id)
+        return
+      }
+      try {
+        const raw = JSON.parse(part.body) as GmailMessage
+        if ((raw.labelIds ?? []).some((l) => SKIP_LABELS.has(l))) return
+        out.push(mapGmailMessage(raw, account, storeFullBodies))
+      } catch {
+        leftovers.push(id)
+      }
+    })
+    group.forEach((id, index) => {
+      if (!seen.has(index)) leftovers.push(id)
+    })
+  }
+  if (leftovers.length) out.push(...(await fetchMessagesOneByOne(token, leftovers, account, storeFullBodies)))
   return out
 }
 

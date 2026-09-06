@@ -181,7 +181,16 @@ const ROUTES: Route[] = [
   { method: 'POST', path: '/v1/desktop/run', op: 'desktop_run' },
   { method: 'POST', path: '/v1/files/read', op: 'files_read' },
   { method: 'POST', path: '/v1/files/write', op: 'files_write' },
-  { method: 'POST', path: '/v1/files/list', op: 'files_list' }
+  { method: 'POST', path: '/v1/files/list', op: 'files_list' },
+  // Trusted helpers (v1.4, Part A): masked list + log are reads; everything else needs Full access.
+  { method: 'GET', path: '/v1/helpers', op: 'helper_list' },
+  { method: 'POST', path: '/v1/helpers', op: 'helper_add' },
+  { method: 'PATCH', path: '/v1/helpers/:id', op: 'helper_update', args: ({ body }) => ({ patch: body?.patch ?? body }) },
+  { method: 'DELETE', path: '/v1/helpers/:id', op: 'helper_remove' },
+  { method: 'POST', path: '/v1/helpers/ask', op: 'helper_ask' },
+  { method: 'POST', path: '/v1/helpers/cancel', op: 'helper_cancel' },
+  { method: 'GET', path: '/v1/helpers/log', op: 'helper_log', args: ({ query }) => ({ limit: Number(query.get('limit')) || undefined, helperId: query.get('helperId') ?? undefined }) },
+  { method: 'POST', path: '/v1/helpers/pause', op: 'helper_pause_all' }
 ]
 
 function matchRoute(method: string, pathname: string): { route: Route; params: Record<string, string> } | null {

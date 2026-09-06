@@ -36,6 +36,12 @@ export function smsAddress(phone: string, carrier: string): string | null {
   return `${digits}@${gw.domain}`
 }
 
+/** Pure: is this address a carrier email-to-SMS gateway? Such mail must go text-only (no HTML part). */
+export function isSmsGateway(address: string): boolean {
+  const domain = String(address ?? '').trim().toLowerCase().split('@')[1] ?? ''
+  return !!domain && Object.values(SMS_GATEWAYS).some((g) => g.domain === domain)
+}
+
 /** Pure: a text message that fits one SMS segment-ish. */
 export function smsText(headline: string, topTitles: string[]): string {
   let text = `InboxScout: ${headline}`
@@ -58,7 +64,8 @@ export async function sendMail(
   password: string,
   to: string,
   subject: string,
-  html: string,
+  /** Omit (undefined) for plain-text-only messages such as texts through a carrier gateway. */
+  html: string | undefined,
   text: string
 ): Promise<void> {
   const cfg = SMTP[outbox.provider]
@@ -69,5 +76,5 @@ export async function sendMail(
     secure: cfg.secure,
     auth: { user: outbox.email, pass: password }
   })
-  await transport.sendMail({ from: outbox.email, to, subject, text, html })
+  await transport.sendMail({ from: outbox.email, to, subject, text, ...(html ? { html } : {}) })
 }

@@ -159,11 +159,30 @@ CREATE TRIGGER IF NOT EXISTS messages_fts_delete AFTER DELETE ON messages BEGIN
 END;
 `
 
+// ---- Trusted helpers (v1.4): the sent log. Its own table because it grows; additive, never migrated. ----
+const HELPERS_SCHEMA = `
+CREATE TABLE IF NOT EXISTS helper_sends (
+  id TEXT PRIMARY KEY,
+  helper_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  channel TEXT NOT NULL,
+  sent_at TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  text TEXT NOT NULL,
+  trigger_key TEXT,
+  status TEXT NOT NULL,
+  error TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_helper_sends_helper ON helper_sends(helper_id, sent_at);
+`
+
 export function openDatabase(path: string): DB {
   const db = new Database(path)
   db.pragma('journal_mode = WAL')
   db.exec(SCHEMA)
+  db.exec(HELPERS_SCHEMA)
   migrate(db)
+  ensureIndexes(db)
   return db
 }
 
@@ -173,6 +192,15 @@ function migrate(db: DB): void {
   ensureColumn(db, 'messages', 'has_attachments', 'INTEGER NOT NULL DEFAULT 0')
   ensureColumn(db, 'reports', 'brief_json', 'TEXT')
   ensureColumn(db, 'messages', 'provider_hints', 'TEXT')
+}
+
+// ---- v1.4 quality sweep (item 8): every recent-mail window filters or sorts on messages.date; deadlines join on it too. ----
+const INDEXES_V14 = `
+CREATE INDEX IF NOT EXISTS idx_messages_date ON messages(date);
+CREATE INDEX IF NOT EXISTS idx_classifications_deadline ON classifications(deadline);
+`
+export function ensureIndexes(db: DB): void {
+  db.exec(INDEXES_V14)
 }
 
 function ensureColumn(db: DB, table: string, column: string, type: string): void {

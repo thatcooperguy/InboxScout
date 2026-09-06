@@ -7,7 +7,10 @@ import { PROFILES, PROFILE_GROUPS, PROFILE_LIST, getProfile } from '../profiles/
 import { detectProfile } from '../profiles/detect'
 import { recentDetectInput } from '../profiles/auto'
 import type { DesktopControl } from '../desktop/control'
-import type { AccountConfig, AppSettings, HealthReport } from '../../shared/types'
+import type { AccountConfig, Answer, AppSettings, HealthReport } from '../../shared/types'
+import { askAndWait } from '../ask/index'
+// Trusted helpers (v1.4, A5)
+import { addHelper, cancelAsk, listHelperLog, listHelpers, maskHelper, pauseAll, removeHelper, scheduleAsk, updateHelper, type HelperDeps } from '../helpers/index'
 
 /**
  * Everything another agent may do with InboxScout, as one list of named
@@ -58,6 +61,13 @@ export interface OpsDeps {
     status: () => HealthReport | Promise<HealthReport>
     repair: () => Promise<HealthReport>
   }
+  /** Trusted helpers (v1.4): overrides for the sender, the Ask delay, and the clock (tests). */
+  helpers?: Partial<Pick<HelperDeps, 'send' | 'askDelayMs' | 'now' | 'personName' | 'log'>>
+  /**
+   * Conversation (v1.4, Part B): answer a question about the mail — local engine, then the AI within its
+   * 8-second budget. Optional: without it the op answers with the local engine alone (lean hosts, tests).
+   */
+  ask?: (q: string) => Promise<Answer>
 }
 
 /** Shown in the consent popup so the person knows who is asking. */
@@ -98,7 +108,33 @@ export function buildOps(deps: OpsDeps): Op[] {
     for (const k of SETTINGS_ALLOWLIST) (out as any)[k] = s[k]
     return out
   }
+  // Conversation (v1.4, Part B): one question in flight per client (each server builds its own ops, so the
+  // bridge and the phone each get their own slot). Read-only: the answer can only ever open a draft.
+  let askBusy = false
+  const askOp = async (q: string): Promise<Answer> => {
+    if (askBusy) {
+      const e = new Error('One question at a time — the last one is still being answered.')
+      ;(e as any).status = 429
+      throw e
+    }
+    askBusy = true
+    try {
+      return deps.ask
+        ? await deps.ask(q)
+        : await askAndWait({ db, settings: () => loadSettings(db), getModel: () => null, healthStatus: deps.health ? () => deps.health!.status() : undefined }, q)
+    } finally {
+      askBusy = false
+    }
+  }
   return [
+    {
+      name: 'ask',
+      description:
+        'Ask a question about the mail in plain words ("Who is waiting on me?", "Did the dentist write back?", "What do I owe this month?"). Returns {text, sources, actions, engine, unsure}. Read-only: it can open a reply draft in the person\'s mail app (an open_draft action with a mailto:) but never sends anything.',
+      write: false,
+      input: obj({ q: { type: 'string', description: 'The question' } }, ['q']),
+      run: (a) => askOp(String(a.q ?? '').slice(0, 500))
+    },
     {
       name: 'get_brief',
       description: "The latest InboxScout brief: headline, top issues with next steps, who is waiting on the person, deadlines, project pulse, personal items, skill sections. Null if no scan has run yet.",
@@ -530,6 +566,100 @@ export function buildOps(deps: OpsDeps): Op[] {
       write: true,
       input: obj({ path: { type: 'string', description: 'Folder path, ~ allowed' } }, ['path']),
       run: (a) => deps.desktop.listDir(String(a.path ?? ''), BRIDGE_REQUESTER)
+    },
+    ...helperOps(deps)
+  ]
+}
+
+// ---- Trusted helpers (v1.4, A5): the only way helpers change, so every path logs and sends the hello ----
+
+function helperOps(deps: OpsDeps): Op[] {
+  const hd: HelperDeps = { db: deps.db, secrets: deps.secrets, ...(deps.helpers ?? {}) }
+  return [
+    {
+      name: 'helper_list',
+      description: "The person's trusted helpers (family or friends who get a plain-words slice of the brief): name, relationship, sharing level (ask/schedule/needs/all), cadence, paused. Contact details are masked (s***@gmail.com).",
+      write: false,
+      input: obj({}),
+      run: () => ({ paused: loadSettings(deps.db).helpersPaused, helpers: listHelpers(hd).map(maskHelper) })
+    },
+    {
+      name: 'helper_add',
+      description:
+        "Add a trusted helper (needs Full access). Sends the helper one hello message saying what they will get, and shows the person a notice on Today for seven days. level: ask (only when the person presses Ask for help), schedule (appointments only), needs (what needs the person + heads-ups), all (the full brief). cadence: each_brief | weekly | off.",
+      write: true,
+      input: obj(
+        {
+          name: { type: 'string' },
+          relationship: { type: 'string', description: 'e.g. daughter, neighbour, friend' },
+          email: { type: 'string' },
+          phone: { type: 'string', description: '10-digit US number for texts (needs carrier)' },
+          carrier: { type: 'string', description: 'att, verizon, tmobile, …' },
+          level: { type: 'string', enum: ['ask', 'schedule', 'needs', 'all'] },
+          cadence: { type: 'string', enum: ['each_brief', 'weekly', 'off'] }
+        },
+        ['name', 'level']
+      ),
+      run: async (a) => maskHelper(await addHelper(hd, a as any, 'bridge'))
+    },
+    {
+      name: 'helper_update',
+      description: 'Change a helper: patch may hold level, cadence, weekday (0–6), paused.',
+      write: true,
+      input: obj({ id: { type: 'string' }, patch: { type: 'object' } }, ['id', 'patch']),
+      run: (a) => {
+        const p = (a.patch ?? {}) as Record<string, unknown>
+        const patch: Record<string, unknown> = {}
+        for (const k of ['level', 'cadence', 'weekday', 'paused']) if (k in p) patch[k] = p[k]
+        return maskHelper(updateHelper(hd, String(a.id), patch))
+      }
+    },
+    {
+      name: 'helper_remove',
+      description: 'Remove a helper. They get nothing further.',
+      write: true,
+      input: obj({ id: { type: 'string' } }, ['id']),
+      run: (a) => removeHelper(hd, String(a.id))
+    },
+    {
+      name: 'helper_ask',
+      description: 'Ask a helper for a hand with one item (title, next step, why now, optional note — never the email itself). Waits 10 seconds before sending; helper_cancel with the returned sendId stops it.',
+      write: true,
+      input: obj(
+        {
+          helperId: { type: 'string' },
+          title: { type: 'string' },
+          nextStep: { type: 'string' },
+          whyNow: { type: 'string' },
+          note: { type: 'string', description: 'One line from the person' }
+        },
+        ['helperId', 'title']
+      ),
+      run: (a) => {
+        const r = scheduleAsk(hd, { helperId: String(a.helperId), title: String(a.title), nextStep: a.nextStep ? String(a.nextStep) : undefined, whyNow: a.whyNow ? String(a.whyNow) : undefined, note: a.note ? String(a.note) : undefined })
+        return { sendId: r.sendId, sendsAt: r.sendsAt, helperName: r.helperName, outboxMissing: r.outboxMissing }
+      }
+    },
+    {
+      name: 'helper_cancel',
+      description: 'Stop a queued Ask for help before its 10 seconds are up.',
+      write: true,
+      input: obj({ sendId: { type: 'string' } }, ['sendId']),
+      run: (a) => cancelAsk(hd, String(a.sendId))
+    },
+    {
+      name: 'helper_log',
+      description: 'Everything ever sent to helpers, verbatim, newest first: kind (hello/ask/digest/headsup), channel, status (sent/failed/cancelled), the full text.',
+      write: false,
+      input: obj({ limit: { type: 'number' }, helperId: { type: 'string' } }),
+      run: (a) => listHelperLog(hd, { helperId: a.helperId ? String(a.helperId) : undefined, limit: Math.min(500, Number(a.limit) || 50) })
+    },
+    {
+      name: 'helper_pause_all',
+      description: 'Pause (or resume) every helper in one go: no digests, no heads-ups, no Ask for help while paused.',
+      write: true,
+      input: obj({ paused: { type: 'boolean' } }, ['paused']),
+      run: (a) => pauseAll(hd, a.paused === true || a.paused === 'true')
     }
   ]
 }

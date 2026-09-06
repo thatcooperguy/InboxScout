@@ -4,11 +4,61 @@ import type { WorkProfile } from '../profiles/profiles'
 import { classificationBatchSchema, type MessageClassificationOutput } from './schemas'
 
 export const BATCH_SIZE = 20
+/** Chunks classified at the same time (item 3): ~8 serial calls on a 150-message first sync become ~3 rounds. */
+export const CLASSIFY_CONCURRENCY = 3
 
 export function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = []
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size))
   return out
+}
+
+/** Run `fn` over `items` with at most `limit` in flight; results keep the input order. */
+export async function mapConcurrent<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const results: R[] = new Array(items.length)
+  let next = 0
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const i = next++
+      results[i] = await fn(items[i], i)
+    }
+  }
+  const n = Math.max(1, Math.min(limit, items.length))
+  await Promise.all(Array.from({ length: n }, worker))
+  return results
+}
+
+/**
+ * Item 4: senders and provider categories that the built-in engine already files as noise with certainty.
+ * These skip the AI batch (same brief, 40–60 % fewer messages sent). Mirrors NOISE_SENDER in ai/builtin.ts;
+ * anything the provider marked important or starred still goes to the AI.
+ */
+const OBVIOUS_NOISE_SENDER = /(no-?reply|newsletter|marketing|notification|notifications|updates?|promo|deals|offers|digest|mailer|bounce)@/i
+const NOISE_CATEGORIES = new Set(['promotions', 'social', 'forums'])
+export function isObviousNoise(m: MessageRecord): boolean {
+  const hints = m.providerHints ?? null
+  if (hints && (hints.important || hints.starred)) return false
+  if (OBVIOUS_NOISE_SENDER.test(m.fromAddress)) return true
+  return !!hints?.category && NOISE_CATEGORIES.has(hints.category)
+}
+
+/** Rate limits and provider hiccups: "429", "503", "overloaded"… — worth one retry before giving up on the AI for this run. */
+export const TRANSIENT_AI_RE = /\b(429|5\d\d)\b|too many requests|rate limit|overloaded|temporarily unavailable/i
+export const TRANSIENT_RETRY_MS = 2000
+
+/**
+ * Extra (a): retry once after a short back-off when the AI helper answers 429/5xx, so a busy free tier
+ * does not flip the whole run to the built-in engine on the first blip. Any other error is rethrown at once.
+ */
+export async function withTransientRetry<T>(fn: () => Promise<T>, sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms))): Promise<T> {
+  try {
+    return await fn()
+  } catch (err) {
+    const reason = err instanceof Error ? `${err.message} ${(err as any).statusCode ?? (err as any).status ?? ''}` : String(err)
+    if (!TRANSIENT_AI_RE.test(reason)) throw err
+    await sleep(TRANSIENT_RETRY_MS)
+    return await fn()
+  }
 }
 
 export interface CorrectionExample {
