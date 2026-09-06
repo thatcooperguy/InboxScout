@@ -7,8 +7,11 @@ The landing page lives in `site/` and is published free with **GitHub Pages** wh
 
 ### inboxscout.ai (the site)
 
-1. GitHub → repo **Settings → Pages**: Source should read **GitHub Actions** (the workflow enables this on first run).
-   Under **Custom domain** enter `inboxscout.ai`, Save, and tick **Enforce HTTPS** once the check passes.
+1. **Enable Pages once** (the workflow cannot do this itself — GitHub only lets a repo owner turn it on):
+   GitHub → repo **Settings → Pages** → under *Build and deployment*, set **Source: GitHub Actions**.
+   Then run the **Website** workflow (Actions → Website → *Run workflow*) or push any change under `site/`.
+   Back in **Settings → Pages**, under **Custom domain** enter `inboxscout.ai`, Save, and tick **Enforce HTTPS**
+   once the DNS check passes.
 2. Squarespace → **Domains → inboxscout.ai → DNS settings** → add these records (delete any Squarespace
    parking records for `@` first):
 
