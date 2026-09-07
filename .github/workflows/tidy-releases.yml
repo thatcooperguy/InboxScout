@@ -1,0 +1,54 @@
+name: Tidy releases
+
+# Deletes a broken release (and its tag) using the repository token, which has permissions the
+# maintainer's tooling may not. Refuses to delete a complete release unless `force` is "yes".
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to delete, e.g. v1.5.3"
+        required: true
+        type: string
+      force:
+        description: "Delete even if the release has every installer"
+        type: choice
+        options: ['no', 'yes']
+        default: 'no'
+
+permissions:
+  contents: write
+
+jobs:
+  tidy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete ${{ github.event.inputs.tag }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag }}
+          FORCE: ${{ github.event.inputs.force }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json")
+          releases=$(curl -sS "${auth[@]}" "$api/releases?per_page=100" | jq -c --arg tag "$TAG" '[.[] | select(.tag_name==$tag)]')
+          count=$(echo "$releases" | jq 'length')
+          if [ "$count" = "0" ]; then echo "no release for $TAG (drafts included); only removing the tag if it exists"; fi
+          required="InboxScout-Setup.exe InboxScout-arm64.dmg InboxScout-x64.dmg InboxScout-x64.AppImage InboxScout-x64.deb latest.yml latest-mac.yml latest-linux.yml"
+          for id in $(echo "$releases" | jq -r '.[].id'); do
+            names=$(curl -sS "${auth[@]}" "$api/releases/$id/assets?per_page=100" | jq -r '.[].name')
+            missing=""
+            for want in $required; do echo "$names" | grep -qx "$want" || missing="$missing $want"; done
+            if [ -z "$missing" ] && [ "$FORCE" != "yes" ]; then
+              echo "::error::release $id for $TAG is complete; re-run with force=yes to delete it anyway"; exit 1
+            fi
+            echo "deleting release $id for $TAG (missing:${missing:- nothing})"
+            curl -sS -f -X DELETE "${auth[@]}" "$api/releases/$id"
+          done
+          code=$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE "${auth[@]}" "$api/git/refs/tags/$TAG")
+          case "$code" in
+            204) echo "deleted tag $TAG" ;;
+            404|422) echo "tag $TAG did not exist" ;;
+            *) echo "::error::deleting tag $TAG returned HTTP $code"; exit 1 ;;
+          esac

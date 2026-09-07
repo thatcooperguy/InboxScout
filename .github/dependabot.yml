@@ -1,0 +1,27 @@
+# Keep dependency updates useful instead of noisy: one grouped pull request a week for version bumps,
+# security fixes grouped as they arrive, and no automatic Electron major jumps (those are done by hand,
+# proven with a release dry run first — see docs/RELEASING.md).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    groups:
+      security-fixes:
+        applies-to: security-updates
+        patterns: ['*']
+      weekly-updates:
+        applies-to: version-updates
+        patterns: ['*']
+    ignore:
+      - dependency-name: electron
+        update-types: ['version-update:semver-major']
+      - dependency-name: electron-builder
+        update-types: ['version-update:semver-major']
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
