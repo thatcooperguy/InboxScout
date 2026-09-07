@@ -1,5 +1,6 @@
 appId: com.inboxscout.app
 productName: InboxScout
+copyright: "Copyright © 2026 Cooper Studios LLC"
 directories:
   output: dist
 files:
@@ -16,6 +17,14 @@ win:
   artifactName: InboxScout-Setup.${ext}
   target:
     - nsis
+  # Code signing with Azure Trusted Signing (docs/SIGNING.md). electron-builder calls build/sign.js for the app exe,
+  # the installer and the uninstaller before it hashes the installer into latest.yml. The hook no-ops when the
+  # AZURE_* secrets are absent, so a build without them is unsigned — exactly as before.
+  signtoolOptions:
+    sign: ./build/sign.js
+    # Trusted Signing certificates are SHA-256 only; the default (sha1 + sha256) would call the hook twice per file.
+    signingHashAlgorithms:
+      - sha256
 nsis:
   oneClick: true
   perMachine: false
@@ -28,6 +37,15 @@ mac:
         - arm64
         - x64
   category: public.app-category.productivity
+  # Signing + notarization with a Developer ID certificate (docs/SIGNING.md). Everything below only takes effect when
+  # electron-builder finds a certificate (CSC_LINK in the release workflow); without one it logs "skipped macOS
+  # application code signing" and never reads the entitlements. `notarize: true` is itself gated on the
+  # APPLE_ID / APPLE_APP_SPECIFIC_PASSWORD / APPLE_TEAM_ID environment — absent, notarization is skipped with a warning.
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  notarize: true
 linux:
   # electron-builder expands ${arch} to "x86_64" for AppImage and "amd64" for .deb on Linux,
   # so the arch is spelled out to keep the README's "latest" links stable:
@@ -44,7 +62,7 @@ linux:
   synopsis: Know what needs you. Skip the rest.
   description: A free desktop app that reads your email (read-only) and hands you a 30-second brief, in plain words.
   # Debian packages need a maintainer with an email address; this is the project mailbox, not a person.
-  maintainer: InboxScout <hello@inboxscout.ai>
+  maintainer: Cooper Studios LLC <hello@inboxscout.ai>
   desktop:
     Name: InboxScout
     Comment: Know what needs you. Skip the rest.

@@ -56,8 +56,36 @@ and it must not be a personal address in the repo). Make sure that address actua
 
 ## 4. Later / optional
 
-- [ ] **Code signing** when you're ready to hand installers to non-technical folks: Azure Trusted Signing (~$10/mo)
-      and an Apple Developer ID ($99/yr) — `docs/RELEASING.md`
+- [ ] **Code signing** when you're ready to hand installers to non-technical folks (no more "Windows protected your PC" /
+      "can't be opened" warnings). The release pipeline is already wired: it signs as soon as the secrets below exist and
+      stays unsigned until then. Every click is spelled out in `docs/SIGNING.md`.
+
+      **Windows — Azure Trusted Signing (~$9.99/mo)**  → `docs/SIGNING.md` § Windows
+      - [ ] Check first: Trusted Signing verifies the *company*, and Microsoft has required a company history of 3+ years
+            (SIGNING.md explains the fallbacks if the LLC is younger)
+      - [ ] Azure account (portal.azure.com) → register the **Microsoft.CodeSigning** resource provider
+      - [ ] Create a **Trusted Signing account** (Basic tier), region East US
+      - [ ] **Identity validation** for "Cooper Studios LLC" (organization; upload the LLC papers/EIN letter when asked; takes days)
+      - [ ] **Certificate profile** (Public Trust) tied to that validation
+      - [ ] **App registration** in Microsoft Entra ID + a client secret; give it the **Trusted Signing Certificate Profile Signer**
+            role on the account
+      - [ ] Add the six secrets at https://github.com/thatcooperguy/InboxScout/settings/secrets/actions:
+            `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_ENDPOINT`,
+            `AZURE_CODE_SIGNING_ACCOUNT_NAME`, `AZURE_CERTIFICATE_PROFILE_NAME` (all six, or none)
+      - [ ] Cut a release; the Windows job prints `signing: on`; check the installer's **Digital Signatures** tab
+      - [ ] Calendar reminder for the client-secret expiry date (max 24 months)
+
+      **macOS — Apple Developer ID ($99/yr)**  → `docs/SIGNING.md` § macOS
+      - [ ] Get a free **D-U-N-S number** for Cooper Studios LLC (needed to enroll as an organization; takes days)
+      - [ ] Enroll in the **Apple Developer Program** as an organization (developer.apple.com/programs/enroll)
+      - [ ] On a Mac: create a **Developer ID Application** certificate (Xcode → Settings → Accounts, or developer.apple.com)
+      - [ ] Export it from Keychain Access as a password-protected **.p12**; base64 it
+      - [ ] Create an **app-specific password** at account.apple.com; note the **Team ID** (developer.apple.com/account → Membership)
+      - [ ] Add the five secrets at https://github.com/thatcooperguy/InboxScout/settings/secrets/actions:
+            `CSC_LINK` (base64 of the .p12), `CSC_KEY_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`
+      - [ ] Cut a release; the macOS job prints `signing: on` and `notarization: on`; run `spctl -a -vv` on the installed app
+      - [ ] Keep an offline copy of the .p12 + password (the certificate lasts 5 years)
+      - [ ] Afterwards: remove the "one-time warning at install" note from the README and the website
 - [x] Owner is **Cooper Studios LLC** everywhere: `LICENSE.md` (InboxScout Source-Available License 1.0), `NOTICE`,
       `TRADEMARK.md`, `SECURITY.md`, `CONTRIBUTING.md` (contributors assign copyright to the LLC), package metadata, the
       in-app terms, the site footer, and the README. Releases up to v1.5.0 stay FSL-1.1-MIT; everything after is the new license.

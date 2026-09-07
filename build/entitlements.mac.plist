@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened-runtime entitlements for the signed macOS build (electron-builder.yml → mac.entitlements /
+  mac.entitlementsInherit). Only used when a Developer ID certificate is present (docs/SIGNING.md);
+  unsigned builds never read this file. Kept to the minimum Electron needs — no camera, microphone,
+  location, or Apple Events.
+-->
+<plist version="1.0">
+  <dict>
+    <!-- V8 writes machine code at runtime. On Apple silicon it uses MAP_JIT (allow-jit); on Intel it uses
+         plain writable+executable pages (allow-unsigned-executable-memory). Both arches are built, and the
+         renderer/GPU helpers inherit this file, so both keys stay. -->
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <!-- Outbound connections (Gmail / Microsoft Graph / update checks). Only enforced under the App
+         Sandbox, but declared so the intent is explicit and a future sandboxed build keeps working. -->
+    <key>com.apple.security.network.client</key>
+    <true/>
+    <!-- Files the person picks in open/save dialogs (attachments, exports). Same note as above. -->
+    <key>com.apple.security.files.user-selected.read-write</key>
+    <true/>
+  </dict>
+</plist>

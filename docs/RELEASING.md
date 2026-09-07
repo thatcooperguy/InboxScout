@@ -44,9 +44,10 @@ Google note: keep the OAuth app in **Testing** (add users' emails as test users,
 or **Publish** it (unverified-app warning on first sign-in, but sign-ins persist). Verification is only required
 beyond 100 users.
 
-## Code signing (later)
+## Code signing
 
-Unsigned builds show a one-time warning on each OS (documented in the README). When ready: Azure Trusted
-Signing for Windows (~$10/mo) and an Apple Developer ID ($99/yr) with notarization; electron-builder picks up
-the certificates from environment variables. Linux packages are not signed; the AppImage just needs to be
+Unsigned builds show a one-time warning on each OS (documented in the README). The pipeline is wired for
+Azure Trusted Signing on Windows (~$10/mo) and a Developer ID certificate + notarization on macOS ($99/yr):
+it signs whenever the corresponding repository secrets exist and stays unsigned when they don't. Purchase
+and setup steps, secret names and how to verify a signed build: `docs/SIGNING.md`. Linux packages are not signed; the AppImage just needs to be
 marked executable.

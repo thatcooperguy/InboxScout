@@ -20,6 +20,25 @@ jobs:
           - os: ubuntu-latest
             artifact: Linux AppImage + .deb
     runs-on: ${{ matrix.os }}
+    env:
+      # Code-signing secrets (docs/SIGNING.md). Each one is handed only to the runner that uses it and is an empty
+      # string everywhere else, which electron-builder and build/sign.js read as "signing off" — so a repository
+      # without these secrets keeps producing unsigned builds exactly as before. CSC_LINK in particular must not reach
+      # Windows: electron-builder would try the Apple certificate as a Windows one.
+      #
+      # Windows — Azure Trusted Signing
+      AZURE_TENANT_ID: ${{ startsWith(matrix.os, 'windows') && secrets.AZURE_TENANT_ID || '' }}
+      AZURE_CLIENT_ID: ${{ startsWith(matrix.os, 'windows') && secrets.AZURE_CLIENT_ID || '' }}
+      AZURE_CLIENT_SECRET: ${{ startsWith(matrix.os, 'windows') && secrets.AZURE_CLIENT_SECRET || '' }}
+      AZURE_ENDPOINT: ${{ startsWith(matrix.os, 'windows') && secrets.AZURE_ENDPOINT || '' }}
+      AZURE_CODE_SIGNING_ACCOUNT_NAME: ${{ startsWith(matrix.os, 'windows') && secrets.AZURE_CODE_SIGNING_ACCOUNT_NAME || '' }}
+      AZURE_CERTIFICATE_PROFILE_NAME: ${{ startsWith(matrix.os, 'windows') && secrets.AZURE_CERTIFICATE_PROFILE_NAME || '' }}
+      # macOS — Developer ID certificate (.p12 as base64) and notarization credentials
+      CSC_LINK: ${{ startsWith(matrix.os, 'macos') && secrets.CSC_LINK || '' }}
+      CSC_KEY_PASSWORD: ${{ startsWith(matrix.os, 'macos') && secrets.CSC_KEY_PASSWORD || '' }}
+      APPLE_ID: ${{ startsWith(matrix.os, 'macos') && secrets.APPLE_ID || '' }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ startsWith(matrix.os, 'macos') && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+      APPLE_TEAM_ID: ${{ startsWith(matrix.os, 'macos') && secrets.APPLE_TEAM_ID || '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,6 +49,67 @@ jobs:
         run: npm ci
       - name: Test
         run: npm test
+
+      # Prints "signing: on/off" (never a secret value). When the six AZURE_* secrets are present it also installs
+      # the Trusted Signing client + a /dlib-capable signtool and fails fast if either is missing, so a broken
+      # signing setup stops here instead of after the build.
+      - name: Signing status (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $required = 'AZURE_TENANT_ID', 'AZURE_CLIENT_ID', 'AZURE_CLIENT_SECRET', 'AZURE_ENDPOINT', 'AZURE_CODE_SIGNING_ACCOUNT_NAME', 'AZURE_CERTIFICATE_PROFILE_NAME'
+          $present = @($required | Where-Object { -not [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_)) })
+          if ($present.Count -eq $required.Count) {
+            $dir = Join-Path $env:RUNNER_TEMP 'trusted-signing'
+            # Pinned NuGet packages (same ones azure/trusted-signing-action installs). Needs the .NET 8 runtime, which
+            # GitHub's Windows images carry. -x drops the version from the folder name.
+            nuget install Microsoft.Trusted.Signing.Client -Version 1.0.95 -x -OutputDirectory $dir -NonInteractive
+            if ($LASTEXITCODE -ne 0) { throw 'nuget install Microsoft.Trusted.Signing.Client failed' }
+            nuget install Microsoft.Windows.SDK.BuildTools -Version 10.0.26100.9169 -x -OutputDirectory $dir -NonInteractive
+            if ($LASTEXITCODE -ne 0) { throw 'nuget install Microsoft.Windows.SDK.BuildTools failed' }
+            $dlib = Join-Path $dir 'Microsoft.Trusted.Signing.Client\bin\x64\Azure.CodeSigning.Dlib.dll'
+            $signtool = Get-ChildItem -Path (Join-Path $dir 'Microsoft.Windows.SDK.BuildTools') -Recurse -Filter signtool.exe |
+              Where-Object { $_.FullName -like '*\x64\*' } | Select-Object -First 1 -ExpandProperty FullName
+            if (-not (Test-Path $dlib)) { throw "Azure.CodeSigning.Dlib.dll not found under $dir" }
+            if (-not $signtool) { throw "x64 signtool.exe not found under $dir" }
+            "AZURE_CODE_SIGNING_DLIB=$dlib" >> $env:GITHUB_ENV
+            "SIGNTOOL_PATH=$signtool" >> $env:GITHUB_ENV
+            $env:AZURE_CODE_SIGNING_DLIB = $dlib
+            $env:SIGNTOOL_PATH = $signtool
+          }
+          node build/sign.js
+
+      # Prints "signing: on/off" and "notarization: on/off" (never a secret value). electron-builder only searches
+      # for a certificate when CSC_IDENTITY_AUTO_DISCOVERY is not "false", so it is switched on exactly when a
+      # certificate (CSC_LINK) was provided; otherwise it stays off and the build is unsigned, as before.
+      - name: Signing status (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          if [ -n "${CSC_LINK:-}" ]; then
+            echo "CSC_IDENTITY_AUTO_DISCOVERY=true" >> "$GITHUB_ENV"
+            echo "signing: on (Developer ID certificate from CSC_LINK)"
+            [ -n "${CSC_KEY_PASSWORD:-}" ] || echo "::warning::CSC_KEY_PASSWORD is empty; the .p12 must have no password"
+          else
+            echo "signing: off (no CSC_LINK secret) — macOS builds will be unsigned"
+          fi
+          missing=""
+          for name in APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do
+            [ -n "$(printenv "$name")" ] || missing="$missing $name"
+          done
+          if [ -z "$missing" ]; then
+            if [ -n "${CSC_LINK:-}" ]; then
+              echo "notarization: on"
+            else
+              echo "::warning::notarization credentials are set but there is no certificate (CSC_LINK); nothing will be notarized"
+            fi
+          elif [ "$missing" = " APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID" ]; then
+            echo "notarization: off (no APPLE_* secrets)"
+          else
+            echo "::error::notarization is half-configured; missing:$missing (set all three secrets or none; see docs/SIGNING.md)"
+            exit 1
+          fi
+
       - name: Build and publish ${{ matrix.artifact }}
         run: npm run release
         env:
@@ -38,5 +118,5 @@ jobs:
           INBOXSCOUT_GOOGLE_CLIENT_ID: ${{ secrets.INBOXSCOUT_GOOGLE_CLIENT_ID }}
           INBOXSCOUT_GOOGLE_CLIENT_SECRET: ${{ secrets.INBOXSCOUT_GOOGLE_CLIENT_SECRET }}
           INBOXSCOUT_MS_CLIENT_ID: ${{ secrets.INBOXSCOUT_MS_CLIENT_ID }}
-          # Unsigned builds until signing certs are configured:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # "true" only when the macOS status step found a certificate; otherwise unsigned builds, as before.
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ env.CSC_IDENTITY_AUTO_DISCOVERY || 'false' }}
