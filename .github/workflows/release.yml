@@ -17,6 +17,8 @@ permissions:
 jobs:
   build:
     strategy:
+      # One platform at a time: uploads into the draft release never race on creating it.
+      max-parallel: 1
       matrix:
         include:
           - os: windows-latest
@@ -132,7 +134,16 @@ jobs:
 
       - name: Build and publish ${{ matrix.artifact }}
         # A dry run ("publish: no") packages without touching GitHub Releases; the installers are attached to the run.
-        run: ${{ github.event.inputs.publish == 'no' && 'npm run package' || 'npm run release' }}
+        # macOS builds its two architectures one after the other so their uploads never race.
+        shell: bash
+        run: |
+          if [ "${{ github.event.inputs.publish }}" = "no" ]; then
+            npm run package
+          elif [ "$RUNNER_OS" = "macOS" ]; then
+            npm run release:mac
+          else
+            npm run release
+          fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Optional: bake sign-in app IDs into official builds so nobody else needs to register apps.
@@ -152,3 +163,36 @@ jobs:
             dist/*.AppImage
             dist/*.deb
           if-no-files-found: error
+
+  publish:
+    # Flips the draft release live once every installer is attached. Skipped on dry runs and when a build failed,
+    # so a half-built release can never become "latest".
+    needs: build
+    if: github.event.inputs.publish != 'no'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish the draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="v$version"
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json")
+          # Drafts are not served by /releases/tags/<tag>; find the newest release carrying this tag in the list.
+          release=$(curl -sS "${auth[@]}" "$api/releases?per_page=30" | jq -c --arg tag "$tag" '[.[] | select(.tag_name==$tag)] | first')
+          if [ -z "$release" ] || [ "$release" = "null" ]; then echo "::error::no release found for $tag"; exit 1; fi
+          id=$(echo "$release" | jq -r .id)
+          names=$(curl -sS "${auth[@]}" "$api/releases/$id/assets?per_page=100" | jq -r '.[].name')
+          echo "assets on $tag:"; echo "$names" | sed 's/^/  /'
+          for want in InboxScout-Setup.exe InboxScout-arm64.dmg InboxScout-x64.dmg InboxScout-x64.AppImage InboxScout-x64.deb latest.yml latest-mac.yml latest-linux.yml; do
+            echo "$names" | grep -qx "$want" || { echo "::error::$tag is missing $want; leaving it as a draft"; exit 1; }
+          done
+          if [ "$(echo "$release" | jq -r .draft)" = "true" ]; then
+            curl -sS -f -X PATCH "${auth[@]}" "$api/releases/$id" -d '{"draft":false,"make_latest":"true"}' > /dev/null
+            echo "published $tag"
+          else
+            echo "$tag was already published"
+          fi

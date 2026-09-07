@@ -74,5 +74,8 @@ publish:
   provider: github
   owner: thatcooperguy
   repo: inboxscout
-  releaseType: release
+  # Draft first: the platform jobs upload into an unpublished release, and the workflow's final "publish"
+  # job flips it live only when every installer is attached. Nobody ever sees a half-uploaded release,
+  # and concurrent uploads can't race on creating the tag.
+  releaseType: draft
 npmRebuild: true
