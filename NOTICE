@@ -1,0 +1,10 @@
+InboxScout
+Copyright © 2026 Cooper Studios LLC. All rights reserved.
+
+Licensed under the InboxScout Source-Available License 1.0 (see LICENSE.md).
+"InboxScout", the InboxScout logo, and "Your email, scouted." are trademarks of Cooper Studios LLC (see TRADEMARK.md).
+
+Releases up to and including v1.5.0 were published under FSL-1.1-MIT and remain available under that license.
+
+This product includes open-source software from third parties under their own licenses; see package.json and
+the licenses shipped inside node_modules of each dependency.

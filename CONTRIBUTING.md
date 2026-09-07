@@ -4,13 +4,21 @@ Thanks for your interest in improving InboxScout!
 
 ## License and contribution terms
 
-InboxScout is **source-available** under the [Functional Source License 1.1 with MIT future license (FSL-1.1-MIT)](LICENSE.md). In short: you may use, read, modify, and redistribute the code for any purpose **except building a competing product or service**; each release automatically becomes MIT-licensed two years after publication.
+InboxScout is **source-available** under the [InboxScout Source-Available License 1.0](LICENSE.md), owned by
+Cooper Studios LLC. In short: you may read, build, and run the code yourself, and use the official app for free;
+you may not redistribute it, ship a modified version, or build another product from it.
 
 By submitting a contribution (pull request, patch, or code suggestion), you agree that:
 
 1. You wrote the contribution yourself, or otherwise have the right to submit it (Developer Certificate of Origin — see below).
-2. Your contribution is licensed to the project under the same FSL-1.1-MIT terms as the rest of the codebase.
-3. You grant the project maintainer (github.com/thatcooperguy) a perpetual, worldwide, non-exclusive, royalty-free, irrevocable license to use, reproduce, modify, distribute, sublicense, and **relicense** your contribution as part of InboxScout — this keeps the project's licensing options unified in one place.
+2. You **assign** to Cooper Studios LLC all copyright in your contribution, to the extent permitted by law, and where
+   assignment is not possible you grant Cooper Studios LLC a perpetual, worldwide, exclusive, royalty-free, irrevocable
+   license to use, reproduce, modify, distribute, sublicense, and **relicense** it as part of InboxScout or any other product.
+3. You keep the right to use your own contribution for any purpose.
+4. You grant Cooper Studios LLC a patent license for any patent claims you can license that your contribution necessarily infringes.
+
+This keeps all rights in one place so the project can be sold, licensed to businesses, or relicensed later without
+tracking down every contributor.
 
 If you cannot agree to these terms, please open an issue describing your idea instead of submitting code.
 

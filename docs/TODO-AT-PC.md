@@ -58,6 +58,24 @@ and it must not be a personal address in the repo). Make sure that address actua
 
 - [ ] **Code signing** when you're ready to hand installers to non-technical folks: Azure Trusted Signing (~$10/mo)
       and an Apple Developer ID ($99/yr) — `docs/RELEASING.md`
-- [ ] **Trademark** "InboxScout" (USPTO, ~$250–350) — the license protects the code, not the name
-- [ ] Put your legal name in `LICENSE.md` (currently `thatcooperguy (github.com/thatcooperguy)`)
+- [x] Owner is **Cooper Studios LLC** everywhere: `LICENSE.md` (InboxScout Source-Available License 1.0), `NOTICE`,
+      `TRADEMARK.md`, `SECURITY.md`, `CONTRIBUTING.md` (contributors assign copyright to the LLC), package metadata, the
+      in-app terms, the site footer, and the README. Releases up to v1.5.0 stay FSL-1.1-MIT; everything after is the new license.
+- [ ] **Have a lawyer read `LICENSE.md` and `CONTRIBUTING.md` once** before the first paid sale or business license
+      (about an hour of their time). They are written in plain words and modeled on standard source-available licenses,
+      but they are not lawyer-reviewed.
+- [ ] **File the trademark** for "InboxScout" (protects the *name*; the license protects the *code*):
+      1. Search first: https://tmsearch.uspto.gov → "InboxScout" and "Inbox Scout" — make sure nobody has it in software classes.
+      2. File at https://www.uspto.gov/trademarks/apply → TEAS Plus, applicant **Cooper Studios LLC**, mark = standard characters
+         "INBOXSCOUT". Classes: **009** (downloadable software for organizing and summarizing email) and **042** (software as a
+         service / providing online non-downloadable software). Basis: "use in commerce" (the site and downloads are live) with a
+         specimen = a screenshot of inboxscout.ai showing the name and the download buttons. Fee ≈ $350 per class (2026 schedule).
+      3. Optional later: the logo as a separate design mark; and international filing (Madrid) only if you sell abroad.
+      4. Until registration issues (about a year), you may use ™ next to the name; ® only after registration.
+- [ ] **Lock the GitHub repository** (Settings → Rules → Rulesets → *New branch ruleset*): target `main`, enable
+      **Restrict deletions**, **Block force pushes**, and **Require signed commits** off (Claude sessions push unsigned);
+      leave pull-request review off so releases keep flowing. Also Settings → Code security: turn on **Private vulnerability
+      reporting**, **Secret scanning** and **Push protection** (free on public repos).
+- [ ] Keep the **LLC in good standing** (annual report in its state) — the copyright and trademark are held by the LLC, and
+      registrations lapse if the entity does.
 - [x] `main` is the default branch and the only branch; all work lands there.

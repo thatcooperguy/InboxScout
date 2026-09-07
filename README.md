@@ -26,7 +26,7 @@
 <p align="center">
   <a href="https://github.com/thatcooperguy/InboxScout/releases/latest"><img src="https://img.shields.io/github/v/release/thatcooperguy/InboxScout?label=latest&color=2456a6" alt="Latest release"/></a>
   <a href="https://github.com/thatcooperguy/InboxScout/actions/workflows/ci.yml"><img src="https://github.com/thatcooperguy/InboxScout/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"/></a>
-  <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-FSL--1.1--MIT-blue" alt="License"/></a>
+  <a href="LICENSE.md"><img src="https://img.shields.io/badge/license-source--available-blue" alt="License"/></a>
   <img src="https://img.shields.io/badge/Windows%20%7C%20macOS%20%7C%20Linux-desktop-1e2430" alt="Platforms"/>
   <img src="https://img.shields.io/badge/AI%20account-optional-2e7d4f" alt="No AI account needed"/>
 </p>
@@ -136,4 +136,8 @@ Website: [inboxscout.ai](https://inboxscout.ai) ([how it's hosted](docs/WEBSITE.
 
 ## 📜 License
 
-InboxScout is **source-available** under the [Functional Source License 1.1, MIT future license (FSL-1.1-MIT)](LICENSE.md): free to use, read, modify, and redistribute for any internal, personal, educational, or research purpose; not for building a competing product; each release becomes plain **MIT two years** after it is published. "InboxScout" and the logo identify this project; the license grants no trademark rights.
+InboxScout is **source-available** under the [InboxScout Source-Available License 1.0](LICENSE.md). The code is public so anyone can check exactly what it does with their email: read it, build it, run it on your own devices, and use the official app for free under the terms shown in the app. Copying it into another product, selling it, hosting it as a service, or redistributing a modified version is not allowed; businesses and partners can ask about a commercial license at hello@inboxscout.ai. Releases up to v1.5.0 stay under FSL-1.1-MIT.
+
+"InboxScout", the logo, and "Your email, scouted." are trademarks of **Cooper Studios LLC**. The license grants no trademark rights; see [TRADEMARK.md](TRADEMARK.md). Security reports: [SECURITY.md](SECURITY.md).
+
+© 2026 Cooper Studios LLC. All rights reserved.

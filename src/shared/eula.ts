@@ -38,7 +38,7 @@ export const EULA_SECTIONS: EulaSection[] = [
   {
     title: 'Free software, no warranty',
     body:
-      'InboxScout is provided free under the Functional Source License (FSL-1.1-MIT), as is, without warranty of any kind. You use it at your own risk. The full license is in LICENSE.md.'
+      'InboxScout is made by Cooper Studios LLC and provided free for your own use, as is, without warranty of any kind. You use it at your own risk. The code is published so anyone can check what it does; copying it into another product, reselling it, or sharing a changed version is not allowed. The full license is in LICENSE.md.'
   }
 ]
 
