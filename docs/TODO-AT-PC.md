@@ -14,7 +14,7 @@ exact page. Most take under 10 minutes. Tick them off as you go.
       `185.199.110.153` `185.199.111.153` and **CNAME www → thatcooperguy.github.io** — done.
 - [ ] Tick **Enforce HTTPS** on the Pages page once GitHub allows it (it says "not yet available" for up to an hour
       after the certificate is issued; come back and tick it).
-- [ ] Squarespace: forward **inboxscout.org → https://inboxscout.ai** (permanent)
+- [x] Squarespace: forward **inboxscout.org → https://inboxscout.ai** (permanent, paths kept; covers www too)
 - [ ] Optional: verify the domain under your profile → Settings → Pages → *Add a domain*
 - [ ] **Make the repository public** before sharing the site: Settings → General → Danger Zone → *Change repository
       visibility* → **Public**. Until then the download buttons on inboxscout.ai (release assets), the README links, and
