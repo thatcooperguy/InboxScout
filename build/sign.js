@@ -1,4 +1,5 @@
 'use strict'
+/* eslint-disable @typescript-eslint/no-require-imports -- electron-builder loads this hook with require(); it must stay CommonJS. */
 
 /**
  * electron-builder Windows sign hook: Azure Trusted Signing.
