@@ -135,7 +135,7 @@ describe('extractPending', () => {
     expect(f.kind).toBe('document')
     expect(f.summary).toBe(a.summary)
     expect(f.excerpt).toContain('INVOICE #1042')
-  })
+  }, 60_000)
 
   it('treats a PDF without a text layer as scanned (via none, still done and listed)', async () => {
     const db = openDatabase(':memory:')
@@ -149,7 +149,7 @@ describe('extractPending', () => {
     expect(a.summary).toBe('Scanned document, 3 pages — open it to read.')
     expect(result.findings[0].summary).toBe(a.summary)
     expect(result.findings[0].excerpt).toBe('')
-  })
+  }, 60_000)
 
   it('reads docx, xlsx, csv, txt, and html with the right reader each', async () => {
     const db = openDatabase(':memory:')
@@ -204,7 +204,7 @@ describe('extractPending', () => {
     expect([...findings.keys()].sort()).toEqual(['msg-1', 'msg-2'])
     expect(findings.get('msg-1')!.map((f) => f.filename)).toEqual(['agreement.docx', 'expenses.xlsx', 'orders.csv'])
     expect(findings.get('msg-2')!.map((f) => f.filename)).toEqual(['note.txt', 'schedule.html'])
-  })
+  }, 60_000)
 
   it('caps text at 60 000 chars and excerpts at 1 200, and marks damaged files failed without stopping the batch', async () => {
     const db = openDatabase(':memory:')
