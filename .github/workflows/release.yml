@@ -143,7 +143,7 @@ jobs:
           # "true" only when the macOS status step found a certificate; otherwise unsigned builds, as before.
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ env.CSC_IDENTITY_AUTO_DISCOVERY || 'false' }}
       - name: Attach installers and update metadata to this run
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: installers-${{ matrix.os }}
           path: |
