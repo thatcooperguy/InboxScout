@@ -27,7 +27,7 @@
     "@ai-sdk/groq": "^2.0.0",
     "@ai-sdk/openai": "^2.0.0",
     "@ai-sdk/openai-compatible": "^1.0.0",
-    "@ai-sdk/xai": "^2.0.0",
+    "@ai-sdk/xai": "^4.0.54",
     "@azure/msal-node": "^3.8.10",
     "@tesseract.js-data/eng": "^1.0.0",
     "@types/qrcode": "^1.5.6",
