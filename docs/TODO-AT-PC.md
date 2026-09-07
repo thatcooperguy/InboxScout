@@ -5,19 +5,21 @@ exact page. Most take under 10 minutes. Tick them off as you go.
 
 ## 1. Website live at inboxscout.ai  (~10 min)  → full steps: `docs/PHONE-SETUP.md`
 
-- [ ] **GitHub Pages on**: https://github.com/thatcooperguy/InboxScout/settings/pages → Source: **GitHub Actions**
-- [ ] **Let `main` deploy the site** (needed since the branch switch — deploys currently fail with
-      *"Branch main is not allowed to deploy to github-pages"*): https://github.com/thatcooperguy/InboxScout/settings/environments
-      → **github-pages** → *Deployment branches and tags* → either choose **No restriction**, or *Add deployment branch or tag rule* → `main` → Save.
-- [ ] Run the deploy: https://github.com/thatcooperguy/InboxScout/actions/workflows/pages.yml → *Run workflow*
-      (or at a terminal: `GITHUB_TOKEN=ghp_… bash scripts/setup-pages.sh` does this and the next step)
-- [ ] Custom domain on that Pages page: `inboxscout.ai` → Save
-- [ ] Squarespace DNS for inboxscout.ai: four **A @** records `185.199.108.153` `185.199.109.153`
-      `185.199.110.153` `185.199.111.153` and **CNAME www → thatcooperguy.github.io**
-      (https://account.squarespace.com/domains)
+- [x] **GitHub Pages on**: https://github.com/thatcooperguy/InboxScout/settings/pages → Source: **GitHub Actions**
+- [x] **Let `main` deploy the site**: Settings → Environments → **github-pages** → *Deployment branches and tags* → `main` allowed.
+- [x] Run the deploy: https://github.com/thatcooperguy/InboxScout/actions/workflows/pages.yml → *Run workflow*
+      (it also runs on every push that touches `site/`)
+- [x] Custom domain on that Pages page: `inboxscout.ai` → Save — **DNS check successful**, certificate active.
+- [x] Squarespace DNS for inboxscout.ai: four **A @** records `185.199.108.153` `185.199.109.153`
+      `185.199.110.153` `185.199.111.153` and **CNAME www → thatcooperguy.github.io** — done.
+- [ ] Tick **Enforce HTTPS** on the Pages page once GitHub allows it (it says "not yet available" for up to an hour
+      after the certificate is issued; come back and tick it).
 - [ ] Squarespace: forward **inboxscout.org → https://inboxscout.ai** (permanent)
-- [ ] After "DNS check successful": tick **Enforce HTTPS**
 - [ ] Optional: verify the domain under your profile → Settings → Pages → *Add a domain*
+- [ ] **Make the repository public** before sharing the site: Settings → General → Danger Zone → *Change repository
+      visibility* → **Public**. Until then the download buttons on inboxscout.ai (release assets), the README links, and
+      "Source on GitHub" fail for anyone who is not a collaborator. The license (FSL-1.1-MIT) is written for a public repo;
+      no secrets live in the code (client IDs are GitHub Actions secrets).
 
 ## 2. Zero-setup sign-in for everyone  (~15 min, once)  → `docs/RELEASING.md`
 
