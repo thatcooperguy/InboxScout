@@ -12,14 +12,10 @@ exact page. Most take under 10 minutes. Tick them off as you go.
 - [x] Custom domain on that Pages page: `inboxscout.ai` → Save — **DNS check successful**, certificate active.
 - [x] Squarespace DNS for inboxscout.ai: four **A @** records `185.199.108.153` `185.199.109.153`
       `185.199.110.153` `185.199.111.153` and **CNAME www → thatcooperguy.github.io** — done.
-- [ ] Tick **Enforce HTTPS** on the Pages page once GitHub allows it (it says "not yet available" for up to an hour
-      after the certificate is issued; come back and tick it).
+- [x] **Enforce HTTPS** ticked; certificate issued.
 - [x] Squarespace: forward **inboxscout.org → https://inboxscout.ai** (permanent, paths kept; covers www too)
 - [ ] Optional: verify the domain under your profile → Settings → Pages → *Add a domain*
-- [ ] **Make the repository public** before sharing the site: Settings → General → Danger Zone → *Change repository
-      visibility* → **Public**. Until then the download buttons on inboxscout.ai (release assets), the README links, and
-      "Source on GitHub" fail for anyone who is not a collaborator. The license (FSL-1.1-MIT) is written for a public repo;
-      no secrets live in the code (client IDs are GitHub Actions secrets).
+- [x] **Repository is public**; the site's download buttons and README links work for everyone.
 
 ## 2. Zero-setup sign-in for everyone  (~15 min, once)  → `docs/RELEASING.md`
 
