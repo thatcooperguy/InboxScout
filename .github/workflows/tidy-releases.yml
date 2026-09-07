@@ -35,7 +35,7 @@ jobs:
           releases=$(curl -sS "${auth[@]}" "$api/releases?per_page=100" | jq -c --arg tag "$TAG" '[.[] | select(.tag_name==$tag)]')
           count=$(echo "$releases" | jq 'length')
           if [ "$count" = "0" ]; then echo "no release for $TAG (drafts included); only removing the tag if it exists"; fi
-          required="InboxScout-Setup.exe InboxScout-arm64.dmg InboxScout-x64.dmg InboxScout-x64.AppImage InboxScout-x64.deb latest.yml latest-mac.yml latest-linux.yml"
+          required="InboxScout-Setup.exe InboxScout-arm64.dmg InboxScout-x64.dmg InboxScout-arm64.zip InboxScout-x64.zip InboxScout-x64.AppImage InboxScout-x64.deb latest.yml latest-mac.yml latest-linux.yml"
           for id in $(echo "$releases" | jq -r '.[].id'); do
             names=$(curl -sS "${auth[@]}" "$api/releases/$id/assets?per_page=100" | jq -r '.[].name')
             missing=""

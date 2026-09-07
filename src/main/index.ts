@@ -102,8 +102,7 @@ function createWindow(): void {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: false
+      nodeIntegration: false
     }
   })
   if (process.env['ELECTRON_RENDERER_URL']) {
@@ -211,7 +210,11 @@ async function bootstrap(): Promise<void> {
     log('info', 'updater', 'not running from an AppImage; automatic updates are off (install new versions with apt)')
   } else if (app.isPackaged) {
     try {
-      const { autoUpdater } = await import('electron-updater')
+      // electron-updater is CommonJS; through a native import() its exports live on `default`, and the
+      // namespace itself has no `autoUpdater` (that is why packaged builds never updated before v1.5.5).
+      const mod = (await import('electron-updater')) as unknown as { default?: { autoUpdater: import('electron-updater').AppUpdater }; autoUpdater?: import('electron-updater').AppUpdater }
+      const autoUpdater = mod.default?.autoUpdater ?? mod.autoUpdater
+      if (!autoUpdater) throw new Error('electron-updater exposed no autoUpdater')
       autoUpdater.autoDownload = true
       autoUpdater.autoInstallOnAppQuit = true
       // A failed check (offline, GitHub down) is a log line, not a "hit a snag" notification.
@@ -219,7 +222,7 @@ async function bootstrap(): Promise<void> {
       check()
       setInterval(check, 6 * 60 * 60 * 1000)
     } catch (err) {
-      log('warn', 'updater', 'updater unavailable', err)
+      log('error', 'updater', 'updater unavailable', err)
     }
   }
 }

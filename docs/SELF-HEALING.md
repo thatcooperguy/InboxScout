@@ -17,6 +17,8 @@ what it cannot, and where to look when you want the details.
 | **Scheduled scans** | On a daily or weekly schedule, the last scan is not more than two periods old. |
 | **Desktop control** | On Linux with system control on, `xdotool` is installed for mouse and keyboard control. |
 | **Disk space** | At least 500 MB is free where InboxScout keeps its data. |
+| **Password storage** | On Linux, a system keyring (gnome-keyring or KDE Wallet) is available so passwords are encrypted rather than obfuscated; if not, the item says how to install one. |
+| **Trusted helpers** | When helpers are set up, at least one connected account can send mail, and the last message to a helper did not fail. |
 | **Attachment files** | The attached files InboxScout kept (v1.5) take less than 2 GB and none is older than the keep-days setting. Fix it for me clears the old files; what they said stays searchable. |
 
 Each check gives one item: a short title, a status (`ok`, `warn`, `fail`, or `fixed`), a plain-language
@@ -77,8 +79,8 @@ Under **Settings → Health → Details ▸**:
   versions on the clipboard — paste it into a message to whoever helps you. It contains no email content and
   no passwords.
 - **Show the log file** reveals the log in your file manager. It is `diagnostics.log` in InboxScout's data folder
-  (`%APPDATA%\InboxScout` on Windows, `~/Library/Application Support/InboxScout` on macOS,
-  `~/.config/InboxScout` on Linux), capped at 1 MB with one older copy kept as `diagnostics.log.1`.
+  (`%APPDATA%\inboxscout` on Windows, `~/Library/Application Support/inboxscout` on macOS,
+  `~/.config/inboxscout` on Linux), capped at 1 MB with one older copy kept as `diagnostics.log.1`.
 
 ## Hermes and other agents
 

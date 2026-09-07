@@ -2,7 +2,7 @@
 
 From v0.9 InboxScout learns a few things about a person's life from their mail across **every connected inbox**.
 Nothing to switch on, nothing to configure, and none of it gets in the way: each insight is computed on every scan
-and shows up only when there is something worth saying. One switch under *Preferences → Comfort* turns all of it off.
+and shows up only when there is something worth saying. One switch under *Preferences → Reading & display → Extra cards on Today* turns all of it off.
 
 ## Your circle (People tab)
 

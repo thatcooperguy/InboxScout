@@ -22,7 +22,7 @@ const lines: string[] = [
   '(`list_profiles`, `detect_profile`, `set_profile`).',
   '',
   'Every profile still gets the universal skills (important people, bills, appointments…) and you can switch any',
-  'skill on or off under **Setup → Skills**. Companies can add their own profiles and skills as JSON — see `docs/SKILLS.md`.',
+  'skill on or off under **Setup → What to watch for**. Companies can add their own profiles and skills as JSON — see `docs/SKILLS.md`.',
   ''
 ]
 

@@ -4,6 +4,10 @@
 [`UX-AUDIT.md`](UX-AUDIT.md), which audits the screens; this document specifies the evolving-UI system. No code is
 changed by this document.*
 
+*Status (September 2026): implemented in v1.0 except these items, which were not built: `views/today/pickCards.ts`,
+`level-anchors.test.tsx` / `today-cards.test.ts`, the `describe_settings` bridge op, and `scripts/gen-settings-doc.ts` →
+`docs/SETTINGS.md`.*
+
 **Goal (owner's words):** "UI and product must be something so simple a child or grandparent could use, AND as
 intuitive and automatic yet feature-rich that a business owner or CEO can use. A user-based evolving UI with
 overrides in settings for deep-dive customization, with clear info on what each setting does."

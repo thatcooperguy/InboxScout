@@ -38,6 +38,8 @@ computer.
   fresh brief.
 - Mark things **Done**.
 - Open **past briefs**.
+- **Ask about your mail** at the top of the page, and **Ask for help** from a trusted helper on any *Needs you* item.
+- See what an **attachment** said (its summary), when a brief item came from one.
 - **Refresh** at any time (it also refreshes on its own when you come back to it).
 
 ## What the phone cannot do
@@ -47,7 +49,8 @@ The phone only ever reaches a short, fixed list of operations. It cannot:
 - change any setting,
 - connect or remove email accounts, or see passwords or saved sign-ins,
 - run the web-chores helper, or use the computer (screen, keyboard, files, commands),
-- search or read individual emails.
+- browse or open individual emails (the Ask box answers questions and shows short snippets; it never shows a full
+  message or an attachment file).
 
 If you want more than the brief on the go, the agent bridge (Setup → Preferences → Who can help) is
 the door for that, and it is only reachable from the computer itself.
@@ -105,6 +108,7 @@ the door for that, and it is only reachable from the computer itself.
 - Page: `src/main/api/phoneApp.ts` (one HTML string, vanilla JS, dark mode, web app manifest).
 - Allow-list: `PHONE_OPS` in `phone.ts` — `get_brief`, `list_issues`, `resolve_issue`, `run_scan`,
   `scan_status`, `list_reports`, `read_report`, `get_schedule`, `list_promises`, `list_people`,
-  `health_check`. Everything goes through the same `runOp` machinery as the agent bridge.
+  `health_check`, `helper_list`, `helper_ask`, `helper_cancel` (v1.4), `ask` (v1.4), `list_attachments`,
+  `read_attachment` (v1.5). Everything goes through the same `runOp` machinery as the agent bridge.
 - Settings: `phoneAccess` (`'on' | 'off'`, default off) and `phonePort` (default 47321).
 - Tests: `tests/phone.test.ts`.

@@ -11,7 +11,7 @@ for non-technical people first.
 
 ## How a run works
 
-1. Pick a job (a *recipe*) in **Setup → Assistant**, or click **Let the assistant do it** in the account wizard.
+1. Pick a job (a *recipe*) in **Setup → Web chores**, or click **Let the assistant do it** in the account wizard.
 2. The assistant opens the starting page. Each step it looks at the page (a numbered list of buttons,
    links, and fields — plus a screenshot when the AI backend supports images), decides one action, and does it.
 3. If the page asks for a password, it either signs in with your **saved sign-in** (see below) or **hands control
@@ -21,7 +21,7 @@ for non-technical people first.
    saves the IDs). A page-watcher runs underneath and captures those values directly from the page even if
    the AI narrates poorly.
 
-## How far it goes on its own (Setup → Assistant → Autonomy)
+## How far it goes on its own (Setup → Web chores → How far it goes)
 
 | Level | Sign-in pages | Payment / delete / password-change pages | Leaving the task's sites |
 |---|---|---|---|
@@ -36,7 +36,7 @@ Verification codes, phone approvals, and security keys are **always** handed to 
 
 ### Saved sign-ins
 
-Under *Setup → Assistant → Saved sign-ins* (or in the account wizard's "Let the assistant do it" box) you can store
+Under *Setup → Web chores → Website passwords InboxScout may use* (or in the account wizard's "Let the assistant do it" box) you can store
 your normal website password for an email address. It is encrypted with the OS keystore, like every other secret.
 The AI model **never receives it**: on a sign-in page it types the placeholders `{{EMAIL}}` and `{{PASSWORD}}`, and
 InboxScout swaps in the real values at the keyboard. Logs and history are scrubbed of the password. If the saved
@@ -102,7 +102,7 @@ REST API, or an event stream — including saving sign-ins and starting recipes.
 
 ## Requirements
 
-It needs an AI backend to think — the free Gemini or Groq tiers work (Setup → AI helper). Backends with
+It needs an AI backend to think — the free Gemini or Groq tiers work (Setup → Smarter sorting (AI)). Backends with
 image support (Gemini, OpenAI, Claude, Grok, OpenRouter vision models) see screenshots; text-only backends
 (Groq, Mistral, DeepSeek, Ollama, LM Studio) work from the element list alone.
 

@@ -1,0 +1,37 @@
+name: Edit release notes
+
+# Replaces the body of an existing release with the repository token (the maintainer's tooling may lack
+# release write access). Used, for example, when generated notes link to a tag that was later deleted.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. v1.5.4"
+        required: true
+        type: string
+      body:
+        description: "New release notes (Markdown)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  edit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update ${{ github.event.inputs.tag }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.event.inputs.tag }}
+          BODY: ${{ github.event.inputs.body }}
+        run: |
+          set -euo pipefail
+          api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
+          auth=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json")
+          id=$(curl -sS "${auth[@]}" "$api/releases/tags/$TAG" | jq -r '.id // empty')
+          [ -n "$id" ] || { echo "::error::no published release for $TAG"; exit 1; }
+          curl -sS -f -X PATCH "${auth[@]}" "$api/releases/$id" -d "$(jq -nc --arg body "$BODY" '{body:$body}')" > /dev/null
+          echo "updated notes on $TAG"

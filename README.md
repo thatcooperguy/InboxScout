@@ -53,7 +53,8 @@ Then press **Check my email**. Your first brief is ready before your coffee cool
 > **Windows:** *"Windows protected your PC"* → **More info** → **Run anyway**.
 > **macOS:** *"InboxScout can't be opened"* → **System Settings → Privacy & Security** → **Open Anyway**.
 > **Linux:** make the AppImage executable — right-click → Properties → Allow executing, or `chmod +x InboxScout-x64.AppImage` — or install the .deb with `sudo apt install ./InboxScout-x64.deb` ([Linux notes](docs/LINUX.md)).
-> After that, the app updates itself (on Linux: the AppImage does; the .deb is updated through apt).
+> After that, the app updates itself (on Linux: the AppImage does; for the .deb, download the new file and run `sudo apt install ./InboxScout-x64.deb` again).
+> If you installed a version before 1.5.5, download once more: those builds never checked for updates.
 
 ## 🎚 Simple enough for a grandparent, sharp enough for a CEO
 
@@ -73,7 +74,7 @@ The same app shows more as you use more. **Simple** is one big button, three car
 | 🔎 **Watches for what matters to you** | Bills, appointments, deals, work orders, deliveries, travel, school, health, job search, customer requests, the people you care about. Tick what fits. [Skills →](docs/SKILLS.md) |
 | 🧭 **Knows who you are** | 56 profiles: nurse, contractor, teacher, landlord, retiree, developer, pastor, caregiver, restaurant owner and more. Each tunes what counts as work, what's urgent, and what your brief tracks. [Profiles →](docs/PROFILES.md) |
 | 👥 **Knows your people and your week** | Learns who matters across every inbox, tells you when someone has gone quiet, gathers the week's dates from all your accounts, and remembers what you promised. Nothing to set up. [Insights →](docs/INSIGHTS.md) |
-| 📰 **Daily or weekly brief** | Top issues with a next step each, a pulse on your projects or deals, a reply tracker, and upcoming dates. Saved as HTML, PDF, and Markdown. |
+| 📰 **Daily or weekly brief** | Top issues with a next step each, a pulse on your projects or deals, a reply tracker, and upcoming dates. Saved as HTML and Markdown; any brief can be saved as PDF. |
 | 💬 **Ask about your mail** | Type a plain question on Today or on your phone: "Did the dentist write back?", "What do I owe this month?", "Tell Jane I'll sign it Friday" (opens a draft; nothing is ever sent for you). Answered from your own mail in under two seconds; the AI helper sharpens the answer when you have one. Private details are hidden before anything reaches a model. [Ask →](docs/ASK.md) |
 | 👪 **Trusted helpers** | Name a family member, guardian, or friend and choose what they may see: only when you ask, appointments only, what needs you, or everything. One tap **Ask for help** on any item (with ten seconds to cancel), a digest that says "all fine" when it is, and a heads-up when a stranger pushes you to pay, a private document arrives, an account stops working, or someone close goes quiet. Helpers reply by plain email and their notes show on Today. Every message ever sent is in the log; **Pause all** is one press. [Helpers →](docs/HELPERS.md) |
 | 📨 **Comes to you** | Email yourself the brief, get the headline as a text message, or have InboxScout read it out loud when it's ready. It only ever sends to *you* and the helpers you name. |
@@ -110,7 +111,7 @@ Otherwise Gmail, Yahoo, and iCloud use an **app password** (a special 16-charact
 <summary><strong>Make it yours</strong></summary>
 
 - **Setup → What to watch for** — tick the skills that matter in your life; name your *Important people*; list senders to *Never bother me about*.
-- **Setup → AI helper** — free built-in engine by default; connect any AI in one click for smarter briefs.
+- **Setup → Smarter sorting (AI)** — free built-in engine by default; connect any AI in one click for smarter briefs.
 - **Setup → Preferences** — schedule (daily 7:30 by default), text size, work profile, privacy, the Agent bridge, and **Send me my brief** (email / text).
 - **Settings → Who can help** — how far the assistant goes, what it may do on your computer, and the remembered answers to its popups.
 - **Settings → Health** — what InboxScout checked, what it fixed, and **Fix it for me**.

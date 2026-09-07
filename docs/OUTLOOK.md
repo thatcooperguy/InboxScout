@@ -6,7 +6,7 @@ into InboxScout — they type a code on Microsoft's own page.
 
 ## One-time setup (whoever installs InboxScout for the family)
 
-> **Easiest:** open **Setup → Connect helper** in InboxScout. It opens each page below for you and captures the IDs
+> **Easiest:** open **Setup → Sign-in setup** in InboxScout (shown when the IDs are not already built in). It opens each page below for you and captures the IDs
 > automatically. Official builds may already include the IDs (the helper says "Ready") — then skip this entirely.
 > Maintainers: see `docs/RELEASING.md` to bake IDs into releases.
 

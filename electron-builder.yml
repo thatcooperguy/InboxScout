@@ -36,6 +36,11 @@ mac:
       arch:
         - arm64
         - x64
+    # electron-updater on macOS installs from the zip (the dmg is what people download by hand).
+    - target: zip
+      arch:
+        - arm64
+        - x64
   category: public.app-category.productivity
   # Signing + notarization with a Developer ID certificate (docs/SIGNING.md). Everything below only takes effect when
   # electron-builder finds a certificate (CSC_LINK in the release workflow); without one it logs "skipped macOS

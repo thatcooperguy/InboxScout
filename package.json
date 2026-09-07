@@ -1,6 +1,6 @@
 {
   "name": "inboxscout",
-  "version": "1.5.4",
+  "version": "1.5.5",
   "description": "AI email intelligence assistant - sorts personal from work mail and delivers daily briefs",
   "main": "out/main/index.js",
   "author": "Cooper Studios LLC <hello@inboxscout.ai>",
@@ -19,7 +19,7 @@
     "media": "node scripts/render-media.mjs",
     "docs:profiles": "esbuild scripts/gen-profiles-doc.ts --bundle --platform=node --outfile=out/gen-profiles-doc.cjs --log-level=warning && node out/gen-profiles-doc.cjs",
     "package": "electron-vite build && electron-builder --publish never",
-    "release": "electron-vite build && electron-builder --publish always"
+    "release": "echo 'Releases are cut by the Release workflow (docs/RELEASING.md); use npm run package locally.' && exit 1"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.0",
@@ -49,7 +49,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.11",
     "@types/mailparser": "^3.4.5",
-    "@types/node": "^22.10.0",
+    "@types/node": "^24.0.0",
     "@types/nodemailer": "^8.0.1",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
@@ -69,8 +69,6 @@
     "@ai-sdk/provider-utils": {
       "undici": "^8.10.2"
     },
-    "@azure/msal-node": {
-      "uuid": "^11.1.1"
-    }
+    "uuid": "^11.1.1"
   }
 }

@@ -1,9 +1,10 @@
 # InboxScout Skills
 
 A **skill** is a small JSON file that teaches InboxScout about one kind of mail. Skills power the
-"What to watch for" list. Ten are built in (bills, appointments, real-estate deals, work orders &
-compliance, deliveries, travel, school & family, health, job search, customer requests, important
-people). Anyone can add more — no code required.
+"What to watch for" list. Forty-six are built in: eleven universal ones (important people, bills, appointments, real-estate deals,
+work orders & compliance, deliveries, travel, school & family, health, job search, customer requests) plus
+thirty-five that come with the profiles (shifts, permits, tenants, loads, bookings, orders, incidents, gigs,
+benefits, medications…). Anyone can add more — no code required.
 
 ## Where custom skills live
 

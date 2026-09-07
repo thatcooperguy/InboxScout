@@ -5,7 +5,7 @@ description: Use InboxScout (the desktop email assistant on this computer) as a 
 
 # InboxScout skill for Hermes (and any HTTP- or MCP-capable agent)
 
-InboxScout runs on this computer and exposes a local API when **Setup → Preferences → Agent bridge** is turned on.
+InboxScout runs on this computer and exposes a local API when **Setup → Preferences → Who can help → Let other AI tools on this computer use InboxScout** is turned on.
 Everything is on `127.0.0.1` and needs the bearer token shown on that screen. The person also picks an access
 level there: **Read only** (brief, issues, mail, status) or **Full** (everything below).
 
@@ -17,7 +17,7 @@ mcp_servers:
   inboxscout:
     url: http://127.0.0.1:47311/mcp
     headers:
-      Authorization: Bearer <token from Preferences → Agent bridge>
+      Authorization: Bearer <token from Preferences → Who can help>
 ```
 
 **Or call the REST API** (same operations):
@@ -63,6 +63,8 @@ J="content-type: application/json"
 | Promises the person made in their own mail | `list_promises` | `GET /promises` |
 | Who is this inbox for? (50+ profiles) | `list_profiles`, `detect_profile`, `set_profile {id or "auto"}` | `GET /profiles`, `GET /profiles/detect`, `POST /profiles` |
 | Preferences (safe subset) | `get_settings`, `update_settings {patch}` | `GET /settings`, `PATCH /settings` |
+| Ask a plain question about the mail (local engine first, then the AI helper within 8 s; one question in flight per client) | `ask {q}` → `{text, sources[], actions[]}` | `POST /ask` |
+| Disconnect a mailbox (Full access) | `remove_account {id}` | `DELETE /accounts/{id}` |
 | The person's trusted helpers (family/friends who get a plain-words note; contact details masked) and everything ever sent to them, verbatim | `helper_list` → `{paused, helpers[{id, name, relationship, level, cadence, paused}]}`, `helper_log {limit?, helperId?}` | `GET /helpers`, `GET /helpers/log` |
 | Ask a helper for a hand with one item (goes after 10 s unless cancelled), or manage helpers (Full access; adding one sends them a hello and shows the person a 7-day notice) | `helper_ask {helperId, title, nextStep?, whyNow?, note?}` → `{sendId, sendsAt}`, `helper_cancel {sendId}`, `helper_add {name, level, relationship?, email?, phone?, carrier?, cadence?}`, `helper_update {id, patch}`, `helper_remove {id}`, `helper_pause_all {paused}` | `POST /helpers/ask`, `POST /helpers/cancel`, `POST /helpers`, `PATCH /helpers/{id}`, `DELETE /helpers/{id}`, `POST /helpers/pause` |
 | Live events (scan progress, Assistant steps) | — | `GET /events` (Server-Sent Events) |
@@ -114,7 +116,7 @@ accepted terms describing it at first launch). The rules:
 - **Sign-ins.** If the person has saved a sign-in (or gives you their password and agrees to save it with `save_signin`),
   the Assistant logs in for them. It types a placeholder that InboxScout swaps at the keyboard, so neither you nor the
   browser model ever needs to see the password again. The person chooses how far it may go in
-  **Setup → Assistant → Autonomy**: *Careful* (hands every sign-in to the person), *Sign in for me* (default), or *Full*.
+  **Setup → Web chores → How far it goes**: *Full* (default: signs in and keeps going), *Sign in for me* (pauses on risky pages), or *Careful* (hands every sign-in to the person).
 - The Assistant opens a **visible browser window**. When `status` is `waiting_user`, the person must act on that window
   (a verification code, a phone approval, or approving a payment/delete page) — tell them, then call `assistant_continue`.
 - When `status` is `waiting_answer`, read `log` for the question and answer with `assistant_answer`.
@@ -126,7 +128,7 @@ accepted terms describing it at first launch). The rules:
 
 ## Getting briefs pushed to you
 
-InboxScout can also **POST every new brief** to a URL of your choosing (Preferences → Agent bridge → webhook). The body is
+InboxScout can also **POST every new brief** to a URL of your choosing (Preferences → Who can help → Also send each brief to another program). The body is
 `{event:"brief", headline, brief, markdown, createdAt, reportId, notices}` with an optional bearer token. Point it at a
 Hermes webhook/gateway endpoint and react on your own schedule — text the person, add to their calendar, whatever your tools allow.
 

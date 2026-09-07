@@ -21,9 +21,9 @@ exact page. Most take under 10 minutes. Tick them off as you go.
 
 So nobody who installs InboxScout ever registers an app with Google or Microsoft:
 
-- [ ] Open InboxScout → **Setup → Assistant → "Register the Google sign-in app" → Start** (it clicks through for you;
-      you only sign in), or **Setup → Connect helper** to click yourself, or follow `docs/GOOGLE.md`
-- [ ] Same for **Microsoft** (Assistant → "Register the Microsoft sign-in app"), or follow `docs/OUTLOOK.md`
+- [ ] Open InboxScout → **Setup → Web chores → "Register the Google sign-in app (one-time, owner)" → Start** (it clicks
+      through for you; you only sign in), or **Setup → Sign-in setup** to click yourself, or follow `docs/GOOGLE.md`
+- [ ] Same for **Microsoft** (Web chores → "Register the Microsoft sign-in app (one-time, owner)"), or follow `docs/OUTLOOK.md`
 - [ ] Add three repository secrets at https://github.com/thatcooperguy/InboxScout/settings/secrets/actions:
       `INBOXSCOUT_GOOGLE_CLIENT_ID`, `INBOXSCOUT_GOOGLE_CLIENT_SECRET`, `INBOXSCOUT_MS_CLIENT_ID`
 - [ ] Cut a release (Actions → Release → *Run workflow*). From then on "Sign in with Google / Microsoft" just works.
@@ -32,7 +32,7 @@ So nobody who installs InboxScout ever registers an app with Google or Microsoft
 
 ## 2a. The project mailbox: hello@inboxscout.ai  (~5 min)
 
-The Linux `.deb` lists `InboxScout <hello@inboxscout.ai>` as its maintainer (Debian requires a contact email,
+The Linux `.deb` lists `Cooper Studios LLC <hello@inboxscout.ai>` as its maintainer (Debian requires a contact email,
 and it must not be a personal address in the repo). Make sure that address actually reaches you:
 
 - [ ] Squarespace → Domains → inboxscout.ai → **Email forwarding** (or Google Workspace if you set that up):
@@ -41,10 +41,11 @@ and it must not be a personal address in the repo). Make sure that address actua
 
 ## 2b. Optional: let Hermes use InboxScout  (~3 min)
 
-- [ ] InboxScout → **Setup → Preferences → Agent bridge → On**, choose **Full** (or Read only), press **Show** on the token
+- [ ] InboxScout → **Setup → Preferences → Who can help → Let other AI tools on this computer use InboxScout → On**,
+      choose **Full** or **Read only** under *What other tools may do*, then press **Show** next to the token
 - [ ] Paste the `mcp_servers:` snippet shown there into `~/.hermes/config.yaml`; restart Hermes → it now has
       `get_brief`, `search_mail`, `assistant_start`, … (`integrations/hermes/README.md`)
-- [ ] Optional: under the same card, set a **webhook URL** so every new brief is POSTed to Hermes
+- [ ] Optional: *Preferences → Who can help → Also send each brief to another program* — a webhook URL so every new brief is POSTed to Hermes
 
 ## 3. Try it on your own inbox  (~5 min)
 
@@ -100,10 +101,16 @@ and it must not be a personal address in the repo). Make sure that address actua
          specimen = a screenshot of inboxscout.ai showing the name and the download buttons. Fee ≈ $350 per class (2026 schedule).
       3. Optional later: the logo as a separate design mark; and international filing (Madrid) only if you sell abroad.
       4. Until registration issues (about a year), you may use ™ next to the name; ® only after registration.
-- [ ] **Lock the GitHub repository** (Settings → Rules → Rulesets → *New branch ruleset*): target `main`, enable
-      **Restrict deletions**, **Block force pushes**, and **Require signed commits** off (Claude sessions push unsigned);
-      leave pull-request review off so releases keep flowing. Also Settings → Code security: turn on **Private vulnerability
-      reporting**, **Secret scanning** and **Push protection** (free on public repos).
+- [x] Branch ruleset **protect main** (restrict deletions, block force pushes) is active; **Private vulnerability
+      reporting** is on.
+- [ ] Settings → Code security: confirm **Secret scanning** and **Push protection** are on (free on public repos).
+- [ ] Settings → Rules → Rulesets: delete the leftover *disabled* ruleset named `main` (it duplicates *protect main* and does nothing).
+- [ ] Settings → Environments → **github-pages** → *Deployment branches and tags* → **Selected branches** → add `main` only.
+      The Website workflow now deploys from `main` only, but the environment itself still accepts any branch.
+- [ ] Repo home → **About** (gear): description `Know what needs you. Skip the rest. A free desktop app that reads your email
+      (read-only) and hands you a 30-second brief.`, website `https://inboxscout.ai`, topics `electron email desktop-app
+      ai-assistant imap gmail outlook privacy`.
 - [ ] Keep the **LLC in good standing** (annual report in its state) — the copyright and trademark are held by the LLC, and
       registrations lapse if the entity does.
-- [x] `main` is the default branch and the only branch; all work lands there.
+- [x] `main` is the default branch; all work lands there. The only other branches are Dependabot's, which arrive as one
+      grouped pull request a week (`.github/dependabot.yml`) and are merged or closed after a release dry run.

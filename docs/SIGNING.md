@@ -279,10 +279,12 @@ Unchanged — AppImage and `.deb` are not signed; see `docs/LINUX.md`.
   `APPLE_TEAM_ID` (absent → *skipped macOS notarization* warning; partially present → error, which the status
   step catches earlier with a clearer message). `CSC_IDENTITY_AUTO_DISCOVERY` is set to `true` by the status
   step only when `CSC_LINK` exists; otherwise the build step passes `false`, as it always has.
-- **Secret scoping.** The job-level `env` hands each secret only to the OS that uses it
-  (`startsWith(matrix.os, …)`); in particular `CSC_LINK` never reaches Windows, where electron-builder would
-  otherwise try to use the Apple `.p12` as a Windows certificate. The Linux job receives empty strings and is
-  otherwise untouched.
+- **Secret scoping.** The first step of every build job (*Export signing secrets that exist*) writes a secret into
+  `GITHUB_ENV` only when it is non-empty and only on the runner that uses it: the six `AZURE_*` on Windows,
+  `CSC_LINK` / `CSC_KEY_PASSWORD` / `APPLE_*` on macOS, nothing on Linux. Absent secrets are never defined at all,
+  because an empty-but-defined `CSC_LINK` makes electron-builder look for a certificate file and fail ("not a
+  file"); and `CSC_LINK` never reaches Windows, where electron-builder would otherwise try to use the Apple `.p12`
+  as a Windows certificate.
 - **Follow-up once Windows signing is live.** electron-updater can verify that a downloaded update is signed by
   the same publisher (`win.publisherName` → `publisherName` in `app-update.yml`). It is deliberately *not* set
   yet: the value must match the certificate's subject exactly (`signtool verify /v /pa` shows it, e.g.
