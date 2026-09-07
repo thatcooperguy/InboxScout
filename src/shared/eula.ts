@@ -18,7 +18,7 @@ export const EULA_SECTIONS: EulaSection[] = [
   {
     title: 'Where your data lives',
     body:
-      'Your mail, passwords, and keys stay on this computer, encrypted with the operating system. Nothing is sent anywhere unless you connect an AI helper (then the text of your mail goes to that service) or turn on a delivery option (email, text, Google Drive, or another agent).'
+      'Your mail, passwords, and keys stay on this computer, encrypted with the operating system. Nothing is sent anywhere unless you connect an AI helper (then the text of your mail goes to that service) or turn on a delivery option (email, text, Google Drive, trusted helpers, your phone, or another agent). The full privacy policy is at inboxscout.ai/privacy.html.'
   },
   {
     title: 'The Assistant can use your computer',

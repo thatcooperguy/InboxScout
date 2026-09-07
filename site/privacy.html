@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — InboxScout</title>
+<meta name="description" content="How InboxScout handles your email and your data: it stays on your computer unless you connect a service that needs it.">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@500;700;900&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+<style>
+  :root { --paper:#fbfbf8; --ink:#1e2430; --ink-soft:#4a5261; --ink-faint:#7b8494; --line:#dcddd4; --blue:#2456a6; --red:#c0392f; --surface:#f3f3ee }
+  @media (prefers-color-scheme: dark) { :root { --paper:#12151c; --ink:#e8eaf0; --ink-soft:#b6bcc8; --ink-faint:#8891a2; --line:#2f3542; --blue:#7ea6e3; --red:#e38a83; --surface:#1a1e27 } }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--paper); color:var(--ink); font-family:"Source Serif 4",Georgia,serif; font-size:17px; line-height:1.65 }
+  .airmail { height:8px; background:repeating-linear-gradient(135deg,var(--blue) 0 18px,var(--paper) 18px 26px,var(--red) 26px 44px,var(--paper) 44px 52px) }
+  .wrap { max-width:760px; margin:0 auto; padding:0 24px 64px }
+  nav { display:flex; align-items:center; justify-content:space-between; padding:18px 0; gap:16px }
+  nav .brand { display:flex; align-items:center; gap:10px; font-family:"Libre Franklin",sans-serif; font-weight:900; font-size:21px; color:var(--ink); text-decoration:none }
+  nav .brand img { width:36px; height:36px }
+  nav a.back { font-family:"Libre Franklin",sans-serif; font-size:14.5px; color:var(--ink-soft); text-decoration:none }
+  h1,h2 { font-family:"Libre Franklin",Arial,sans-serif; line-height:1.15; letter-spacing:-.01em }
+  h1 { font-size:2.2rem; margin:28px 0 6px } h2 { font-size:1.25rem; margin:34px 0 10px }
+  .updated { color:var(--ink-faint); font-size:14px; margin:0 0 22px }
+  .box { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin:18px 0 }
+  ul { padding-left:1.2em } li { margin-bottom:8px }
+  a { color:var(--blue) }
+  footer { border-top:1px solid var(--line); margin-top:48px; padding-top:20px; color:var(--ink-faint); font-size:14px }
+  footer a { color:var(--ink-faint) }
+</style>
+</head>
+<body>
+<div class="airmail"></div>
+<div class="wrap">
+  <nav><a class="brand" href="/"><img src="logo.svg" alt="">InboxScout</a><a class="back" href="/">← Back to the site</a></nav>
+
+  <h1>Privacy policy</h1>
+  <p class="updated">Cooper Studios LLC · Effective September 7, 2026</p>
+
+  <div class="box"><strong>The short version.</strong> InboxScout runs on your computer. Your email, your briefs, your passwords, and everything it learns about you stay there. Cooper Studios LLC has no servers that receive your data, no account system, and no analytics. Data leaves your computer only when <em>you</em> connect a service that needs it, and this page lists every such case.</div>
+
+  <h2>1. What InboxScout stores, and where</h2>
+  <ul>
+    <li><strong>Your email</strong> (headers, text, and attachments you allow it to read) in a database file inside the app's data folder on your computer.</li>
+    <li><strong>What it works out</strong>: categories, issues, people, schedules, promises, briefs, and health logs, in the same folder.</li>
+    <li><strong>Passwords, app passwords, sign-in tokens, and AI keys</strong>, encrypted with your operating system's keychain (Windows Credential Manager, macOS Keychain, or your Linux keyring).</li>
+    <li><strong>Saved website sign-ins for the Assistant</strong>, encrypted the same way. The AI model never receives them; the app types them in for you.</li>
+  </ul>
+  <p>Deleting the app's data folder, or uninstalling and choosing to remove data, removes all of it. Nothing is kept anywhere else by us, because nothing was sent to us.</p>
+
+  <h2>2. When data leaves your computer</h2>
+  <p>Only in these cases, and only because you turned the feature on:</p>
+  <ul>
+    <li><strong>Your mail provider</strong> (Gmail, Yahoo, iCloud, Outlook.com, or an IMAP server): InboxScout signs in to read mail, using the credentials you gave it. It never sends, deletes, or moves messages.</li>
+    <li><strong>An AI helper you connect</strong> (for example Google Gemini, Groq, OpenAI, Anthropic, xAI, Mistral, DeepSeek, OpenRouter): message text, and images from attachments if that helper can see images, are sent to that provider to be sorted and summarized, under that provider's own privacy terms. The built-in engine needs no helper and sends nothing. Local helpers (Ollama, LM Studio) stay on your computer.</li>
+    <li><strong>Delivery you set up</strong>: emailing yourself the brief, texting yourself the headline through your carrier's email-to-text gateway, or saving briefs to your Google Drive. These go through your own accounts.</li>
+    <li><strong>Trusted helpers you name</strong>: the short notes, digests, and heads-ups described in the app go by email or text to the people you added, at the sharing level you chose. You can read every message ever sent in the log, and pause them with one press.</li>
+    <li><strong>The Assistant</strong>: when you ask it to do a task on a website, it visits that website from your computer, like a browser would.</li>
+    <li><strong>Your phone, on your own Wi‑Fi</strong>: if you turn on "On your phone", the app serves a page to devices on your local network that present the code from the QR. It is not reachable from the internet.</li>
+    <li><strong>Other agents on your computer</strong>: if you turn on the Agent bridge, programs on the same computer that hold the bridge token can read the brief and, at Full access, do what the app can do.</li>
+    <li><strong>Update checks</strong>: the app asks GitHub whether a newer version exists. This sends the app's version and your computer's general platform, nothing about you.</li>
+  </ul>
+
+  <h2>3. What we never do</h2>
+  <ul>
+    <li>We do not run analytics, telemetry, crash reporting, or advertising, and we do not track you on this website.</li>
+    <li>We do not sell, rent, or share personal data. We have none to share.</li>
+    <li>We do not use your email to train any model. If you connect an AI helper, that provider's terms govern whether it does; we recommend providers that do not.</li>
+  </ul>
+
+  <h2>4. Google and Microsoft sign-in</h2>
+  <p>If you sign in with Google or Microsoft, InboxScout asks only for read access to your mail (Gmail: <code>gmail.readonly</code>; Microsoft: <code>Mail.Read</code>). Tokens are stored encrypted on your computer and can be revoked at any time from your Google or Microsoft account security page. InboxScout's use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</p>
+
+  <h2>5. Children</h2>
+  <p>InboxScout is not directed at children under 13, and we do not knowingly collect data from them. Since we collect none, there is nothing to delete; a parent can simply uninstall the app.</p>
+
+  <h2>6. Your rights</h2>
+  <p>Because your data never reaches us, requests to access, correct, export, or delete it are things you can do yourself: open the app's data folder, export briefs from the Reports screen, or uninstall. If you believe we hold any personal data about you (for example from an email you sent us), write to <a href="mailto:hello@inboxscout.ai">hello@inboxscout.ai</a> and we will answer within 30 days. Residents of the EU, UK, and California have the rights those laws provide; we honor them for the little we might hold.</p>
+
+  <h2>7. Security</h2>
+  <p>Secrets are encrypted with the operating system keychain. The app is read-only toward your mailbox. The source code is public so you can verify these claims. Report a concern privately via <a href="https://github.com/thatcooperguy/InboxScout/security/advisories/new">GitHub</a> or <a href="mailto:hello@inboxscout.ai">hello@inboxscout.ai</a>.</p>
+
+  <h2>8. Changes</h2>
+  <p>If this policy changes in a way that matters, the app shows the new version once at launch and this page's date changes. Old versions are in the <a href="https://github.com/thatcooperguy/InboxScout/commits/main/site/privacy.html">history</a>.</p>
+
+  <h2>9. Contact</h2>
+  <p>Cooper Studios LLC · <a href="mailto:hello@inboxscout.ai">hello@inboxscout.ai</a></p>
+
+  <footer>© 2026 Cooper Studios LLC · <a href="/terms.html">Terms</a> · <a href="/">Home</a></footer>
+</div>
+</body>
+</html>

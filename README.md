@@ -138,6 +138,6 @@ Website: [inboxscout.ai](https://inboxscout.ai) ([how it's hosted](docs/WEBSITE.
 
 InboxScout is **source-available** under the [InboxScout Source-Available License 1.0](LICENSE.md). The code is public so anyone can check exactly what it does with their email: read it, build it, run it on your own devices, and use the official app for free under the terms shown in the app. Copying it into another product, selling it, hosting it as a service, or redistributing a modified version is not allowed; businesses and partners can ask about a commercial license at hello@inboxscout.ai. Releases up to v1.5.0 stay under FSL-1.1-MIT.
 
-"InboxScout", the logo, and "Your email, scouted." are trademarks of **Cooper Studios LLC**. The license grants no trademark rights; see [TRADEMARK.md](TRADEMARK.md). Security reports: [SECURITY.md](SECURITY.md).
+"InboxScout", the logo, and "Your email, scouted." are trademarks of **Cooper Studios LLC**. The license grants no trademark rights; see [TRADEMARK.md](TRADEMARK.md). Security reports: [SECURITY.md](SECURITY.md). [Privacy policy](https://inboxscout.ai/privacy.html) · [Terms of use](https://inboxscout.ai/terms.html).
 
 © 2026 Cooper Studios LLC. All rights reserved.
