@@ -64,10 +64,12 @@ linux:
   # Debian packages need a maintainer with an email address; this is the project mailbox, not a person.
   maintainer: Cooper Studios LLC <hello@inboxscout.ai>
   desktop:
-    Name: InboxScout
-    Comment: Know what needs you. Skip the rest.
-    Categories: Office;Email;Network;
-    StartupWMClass: InboxScout
+    # electron-builder 26 shape: [Desktop Entry] keys live under `entry`.
+    entry:
+      Name: InboxScout
+      Comment: Know what needs you. Skip the rest.
+      Categories: Office;Email;Network;
+      StartupWMClass: InboxScout
 publish:
   provider: github
   owner: thatcooperguy
