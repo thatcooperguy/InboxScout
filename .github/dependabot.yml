@@ -18,9 +18,9 @@ updates:
         patterns: ['*']
         update-types: ['minor', 'patch']
     ignore:
-      - dependency-name: electron
-        update-types: ['version-update:semver-major']
-      - dependency-name: electron-builder
+      # Major versions are upgraded by hand and proven with a release dry run first (docs/RELEASING.md);
+      # every automatic major so far failed to install or build.
+      - dependency-name: '*'
         update-types: ['version-update:semver-major']
   - package-ecosystem: github-actions
     directory: /
