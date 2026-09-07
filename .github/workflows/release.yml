@@ -4,6 +4,12 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish to GitHub Releases? 'no' builds the installers and attaches them to this run only (a dry run)."
+        type: choice
+        options: ['yes', 'no']
+        default: 'yes'
 
 permissions:
   contents: write
@@ -125,7 +131,8 @@ jobs:
           fi
 
       - name: Build and publish ${{ matrix.artifact }}
-        run: npm run release
+        # A dry run ("publish: no") packages without touching GitHub Releases; the installers are attached to the run.
+        run: ${{ github.event.inputs.publish == 'no' && 'npm run package' || 'npm run release' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Optional: bake sign-in app IDs into official builds so nobody else needs to register apps.
@@ -134,3 +141,14 @@ jobs:
           INBOXSCOUT_MS_CLIENT_ID: ${{ secrets.INBOXSCOUT_MS_CLIENT_ID }}
           # "true" only when the macOS status step found a certificate; otherwise unsigned builds, as before.
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ env.CSC_IDENTITY_AUTO_DISCOVERY || 'false' }}
+      - name: Attach installers (dry run only)
+        if: github.event.inputs.publish == 'no'
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.AppImage
+            dist/*.deb
+          if-no-files-found: error
