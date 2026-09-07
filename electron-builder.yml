@@ -74,8 +74,8 @@ publish:
   provider: github
   owner: thatcooperguy
   repo: inboxscout
-  # Draft first: the platform jobs upload into an unpublished release, and the workflow's final "publish"
-  # job flips it live only when every installer is attached. Nobody ever sees a half-uploaded release,
-  # and concurrent uploads can't race on creating the tag.
+  # This block tells the in-app updater where releases live (it is baked into app-update.yml) and makes
+  # electron-builder write latest*.yml. The CI workflow packages with --publish never and creates the GitHub
+  # release itself (.github/workflows/release.yml, job "publish"), so electron-builder never uploads.
   releaseType: draft
 npmRebuild: true

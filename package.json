@@ -19,8 +19,7 @@
     "media": "node scripts/render-media.mjs",
     "docs:profiles": "esbuild scripts/gen-profiles-doc.ts --bundle --platform=node --outfile=out/gen-profiles-doc.cjs --log-level=warning && node out/gen-profiles-doc.cjs",
     "package": "electron-vite build && electron-builder --publish never",
-    "release": "electron-vite build && electron-builder --publish always",
-    "release:mac": "electron-vite build && electron-builder --mac --arm64 --publish always && electron-builder --mac --x64 --publish always"
+    "release": "electron-vite build && electron-builder --publish always"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.0",

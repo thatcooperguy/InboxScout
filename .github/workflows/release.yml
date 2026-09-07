@@ -17,8 +17,6 @@ permissions:
 jobs:
   build:
     strategy:
-      # One platform at a time: uploads into the draft release never race on creating it.
-      max-parallel: 1
       matrix:
         include:
           - os: windows-latest
@@ -132,28 +130,19 @@ jobs:
             exit 1
           fi
 
-      - name: Build and publish ${{ matrix.artifact }}
-        # A dry run ("publish: no") packages without touching GitHub Releases; the installers are attached to the run.
-        # macOS builds its two architectures one after the other so their uploads never race.
-        shell: bash
-        run: |
-          if [ "${{ github.event.inputs.publish }}" = "no" ]; then
-            npm run package
-          elif [ "$RUNNER_OS" = "macOS" ]; then
-            npm run release:mac
-          else
-            npm run release
-          fi
+      - name: Build ${{ matrix.artifact }}
+        # Packaging only. electron-builder does not talk to GitHub Releases at all: its uploader creates the
+        # release once per file in parallel and produced duplicate drafts. The publish job below attaches the
+        # files itself, in one place, and flips the release live only when every installer is present.
+        run: npm run package
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Optional: bake sign-in app IDs into official builds so nobody else needs to register apps.
           INBOXSCOUT_GOOGLE_CLIENT_ID: ${{ secrets.INBOXSCOUT_GOOGLE_CLIENT_ID }}
           INBOXSCOUT_GOOGLE_CLIENT_SECRET: ${{ secrets.INBOXSCOUT_GOOGLE_CLIENT_SECRET }}
           INBOXSCOUT_MS_CLIENT_ID: ${{ secrets.INBOXSCOUT_MS_CLIENT_ID }}
           # "true" only when the macOS status step found a certificate; otherwise unsigned builds, as before.
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ env.CSC_IDENTITY_AUTO_DISCOVERY || 'false' }}
-      - name: Attach installers (dry run only)
-        if: github.event.inputs.publish == 'no'
+      - name: Attach installers and update metadata to this run
         uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.os }}
@@ -162,37 +151,53 @@ jobs:
             dist/*.dmg
             dist/*.AppImage
             dist/*.deb
+            dist/*.blockmap
+            dist/latest*.yml
           if-no-files-found: error
 
   publish:
-    # Flips the draft release live once every installer is attached. Skipped on dry runs and when a build failed,
-    # so a half-built release can never become "latest".
+    # Creates the GitHub release from the artifacts above and publishes it only when all eight files are present.
+    # Skipped on dry runs ("publish: no") and whenever a platform build failed, so a partial release can never be "latest".
     needs: build
     if: github.event.inputs.publish != 'no'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Publish the draft release
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          merge-multiple: true
+          path: release-assets
+      - name: Create and publish the release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           version=$(node -p "require('./package.json').version")
           tag="v$version"
           api="https://api.github.com/repos/${GITHUB_REPOSITORY}"
           auth=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json")
-          # Drafts are not served by /releases/tags/<tag>; find the newest release carrying this tag in the list.
-          release=$(curl -sS "${auth[@]}" "$api/releases?per_page=30" | jq -c --arg tag "$tag" '[.[] | select(.tag_name==$tag)] | first')
-          if [ -z "$release" ] || [ "$release" = "null" ]; then echo "::error::no release found for $tag"; exit 1; fi
-          id=$(echo "$release" | jq -r .id)
-          names=$(curl -sS "${auth[@]}" "$api/releases/$id/assets?per_page=100" | jq -r '.[].name')
-          echo "assets on $tag:"; echo "$names" | sed 's/^/  /'
+          ls -la release-assets
           for want in InboxScout-Setup.exe InboxScout-arm64.dmg InboxScout-x64.dmg InboxScout-x64.AppImage InboxScout-x64.deb latest.yml latest-mac.yml latest-linux.yml; do
-            echo "$names" | grep -qx "$want" || { echo "::error::$tag is missing $want; leaving it as a draft"; exit 1; }
+            [ -f "release-assets/$want" ] || { echo "::error::missing $want; not publishing"; exit 1; }
           done
-          if [ "$(echo "$release" | jq -r .draft)" = "true" ]; then
-            curl -sS -f -X PATCH "${auth[@]}" "$api/releases/$id" -d '{"draft":false,"make_latest":"true"}' > /dev/null
-            echo "published $tag"
-          else
-            echo "$tag was already published"
+          # A published release for this tag means the version was not bumped: refuse rather than overwrite.
+          existing=$(curl -sS "${auth[@]}" "$api/releases?per_page=50" | jq -c --arg tag "$tag" '[.[] | select(.tag_name==$tag)]')
+          if [ "$(echo "$existing" | jq '[.[] | select(.draft==false)] | length')" != "0" ]; then
+            echo "::error::$tag is already published; bump the version in package.json"; exit 1
           fi
+          # Remove leftover drafts for this tag (from earlier failed attempts) so exactly one release exists.
+          for id in $(echo "$existing" | jq -r '.[] | select(.draft==true) | .id'); do
+            echo "deleting stray draft $id"; curl -sS -f -X DELETE "${auth[@]}" "$api/releases/$id"
+          done
+          release=$(curl -sS -f -X POST "${auth[@]}" "$api/releases" -d "$(jq -nc --arg tag "$tag" --arg sha "$GITHUB_SHA" '{tag_name:$tag, target_commitish:$sha, name:$tag, draft:true, generate_release_notes:true}')")
+          id=$(echo "$release" | jq -r .id)
+          upload=$(echo "$release" | jq -r .upload_url | sed 's/{?name,label}//')
+          for f in release-assets/*; do
+            name=$(basename "$f")
+            echo "uploading $name"
+            curl -sS -f -X POST "${auth[@]}" -H "Content-Type: application/octet-stream" --data-binary @"$f" "$upload?name=$name" > /dev/null
+          done
+          curl -sS -f -X PATCH "${auth[@]}" "$api/releases/$id" -d '{"draft":false,"make_latest":"true"}' > /dev/null
+          echo "published $tag with $(ls release-assets | wc -l) files"
