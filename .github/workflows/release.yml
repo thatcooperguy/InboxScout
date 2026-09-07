@@ -20,26 +20,40 @@ jobs:
           - os: ubuntu-latest
             artifact: Linux AppImage + .deb
     runs-on: ${{ matrix.os }}
-    env:
-      # Code-signing secrets (docs/SIGNING.md). Each one is handed only to the runner that uses it and is an empty
-      # string everywhere else, which electron-builder and build/sign.js read as "signing off" — so a repository
-      # without these secrets keeps producing unsigned builds exactly as before. CSC_LINK in particular must not reach
-      # Windows: electron-builder would try the Apple certificate as a Windows one.
-      #
-      # Windows — Azure Trusted Signing
-      AZURE_TENANT_ID: ${{ startsWith(matrix.os, 'windows') && secrets.AZURE_TENANT_ID || '' }}
-      AZURE_CLIENT_ID: ${{ startsWith(matrix.os, 'windows') && secrets.AZURE_CLIENT_ID || '' }}
-      AZURE_CLIENT_SECRET: ${{ startsWith(matrix.os, 'windows') && secrets.AZURE_CLIENT_SECRET || '' }}
-      AZURE_ENDPOINT: ${{ startsWith(matrix.os, 'windows') && secrets.AZURE_ENDPOINT || '' }}
-      AZURE_CODE_SIGNING_ACCOUNT_NAME: ${{ startsWith(matrix.os, 'windows') && secrets.AZURE_CODE_SIGNING_ACCOUNT_NAME || '' }}
-      AZURE_CERTIFICATE_PROFILE_NAME: ${{ startsWith(matrix.os, 'windows') && secrets.AZURE_CERTIFICATE_PROFILE_NAME || '' }}
-      # macOS — Developer ID certificate (.p12 as base64) and notarization credentials
-      CSC_LINK: ${{ startsWith(matrix.os, 'macos') && secrets.CSC_LINK || '' }}
-      CSC_KEY_PASSWORD: ${{ startsWith(matrix.os, 'macos') && secrets.CSC_KEY_PASSWORD || '' }}
-      APPLE_ID: ${{ startsWith(matrix.os, 'macos') && secrets.APPLE_ID || '' }}
-      APPLE_APP_SPECIFIC_PASSWORD: ${{ startsWith(matrix.os, 'macos') && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
-      APPLE_TEAM_ID: ${{ startsWith(matrix.os, 'macos') && secrets.APPLE_TEAM_ID || '' }}
     steps:
+      # Code-signing secrets (docs/SIGNING.md) are exported into the job ONLY when they exist, and only on the
+      # runner that uses them. An empty-but-defined CSC_LINK makes electron-builder look for a certificate file and
+      # fail ("not a file"), so a repository without these secrets must not define the variables at all — that is
+      # what keeps unsigned builds working exactly as before. Values never appear in the log (GitHub masks secrets).
+      - name: Export signing secrets that exist
+        shell: bash
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_ENDPOINT: ${{ secrets.AZURE_ENDPOINT }}
+          AZURE_CODE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_CODE_SIGNING_ACCOUNT_NAME }}
+          AZURE_CERTIFICATE_PROFILE_NAME: ${{ secrets.AZURE_CERTIFICATE_PROFILE_NAME }}
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          export_if_set() {
+            local name="$1" value="${!1:-}"
+            if [ -n "$value" ]; then
+              { echo "$name<<__INBOXSCOUT_EOF__"; echo "$value"; echo "__INBOXSCOUT_EOF__"; } >> "$GITHUB_ENV"
+              echo "$name: set"
+            else
+              echo "$name: not set"
+            fi
+          }
+          case "$RUNNER_OS" in
+            Windows) for n in AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_ENDPOINT AZURE_CODE_SIGNING_ACCOUNT_NAME AZURE_CERTIFICATE_PROFILE_NAME; do export_if_set "$n"; done ;;
+            macOS) for n in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID; do export_if_set "$n"; done ;;
+            *) echo "Linux: nothing to sign" ;;
+          esac
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
