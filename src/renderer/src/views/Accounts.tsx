@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLevel } from '../useLevel'
+import { appPasswordShape, cleanIpcError } from '../../../shared/appPassword'
 
 type SetupInfo = { google: { configured: boolean }; microsoft: { configured: boolean } }
 
@@ -33,9 +34,7 @@ function serviceName(a: { provider?: string; host?: string }): string {
   return a.host ? `Email at ${a.host}` : (name ?? 'Email')
 }
 
-function friendlyError(err: unknown): string {
-  return String((err as any)?.message ?? err).replace(/^Error invoking remote method[^:]*:\s*/, '')
-}
+const friendlyError = cleanIpcError
 
 export default function Accounts(): JSX.Element {
   const level = useLevel()
@@ -60,6 +59,10 @@ export default function Accounts(): JSX.Element {
   const [autonomy, setAutonomy] = useState<'careful' | 'signin' | 'full'>('signin')
   const [aiReady, setAiReady] = useState(true)
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null)
+  // v1.5.6: "Get it for me" without an AI helper, and a nudge when an everyday password is pasted.
+  const [wizardBusy, setWizardBusy] = useState(false)
+  const [wizardNote, setWizardNote] = useState('')
+  const [shapeHint, setShapeHint] = useState('')
 
   const load = (): void => {
     void window.inboxScout.listAccounts().then(setAccounts)
@@ -80,6 +83,46 @@ export default function Accounts(): JSX.Element {
   }, [])
 
   useEffect(() => window.inboxScout.onOutlookDeviceCode((info: any) => setDeviceCode(info)), [])
+  useEffect(
+    () =>
+      window.inboxScout.onAppPasswordEvent((e) => {
+        setWizardNote(e.message)
+        if (e.status === 'done') {
+          setWizardBusy(false)
+          setOk(`Connected ${e.email} ✓. Now press "Check my email" on Today.`)
+          setAdding(false)
+          setEmail('')
+          setPassword('')
+          load()
+        } else if (e.status === 'failed' || e.status === 'closed') {
+          setWizardBusy(false)
+        }
+      }),
+    []
+  )
+
+  const getItForMe = async (): Promise<void> => {
+    setError('')
+    setShapeHint('')
+    setWizardBusy(true)
+    setWizardNote(`Opening ${serviceOwner}'s page in its own window…`)
+    try {
+      const r = await window.inboxScout.appPasswordStart(provider, email.trim())
+      if (!r.ok) {
+        setWizardBusy(false)
+        setWizardNote(r.message ?? 'Could not open the page. You can paste an app password below instead.')
+      }
+    } catch (err) {
+      setWizardBusy(false)
+      setWizardNote(friendlyError(err))
+    }
+  }
+
+  const stopWizard = (): void => {
+    void window.inboxScout.appPasswordStop().catch(() => undefined)
+    setWizardBusy(false)
+    setWizardNote('')
+  }
 
   const googleReady = setup?.google.configured === true
   const microsoftReady = setup?.microsoft.configured === true
@@ -142,10 +185,16 @@ export default function Accounts(): JSX.Element {
     }
   }
 
-  const add = async (): Promise<void> => {
+  const add = async (force = false): Promise<void> => {
+    const shape = appPasswordShape(provider, password)
+    if (!shape.looksRight && !force) {
+      setShapeHint(shape.hint ?? '')
+      return
+    }
     setBusy(true)
     setError('')
     setOk('')
+    setShapeHint('')
     try {
       await window.inboxScout.addAccount({
         label: email,
@@ -153,7 +202,7 @@ export default function Accounts(): JSX.Element {
         provider,
         host: provider === 'imap' ? host : preset.host,
         port: provider === 'imap' ? port : preset.port,
-        password,
+        password: shape.looksRight ? shape.normalized : password,
         sentFolder: preset.sentFolder
       })
       setOk(`Connected ${email} ✓. Now press "Check my email" on Today.`)
@@ -177,8 +226,11 @@ export default function Accounts(): JSX.Element {
   }
 
   const cancelAdd = (): void => {
+    if (wizardBusy) stopWizard()
     setAdding(false)
     setError('')
+    setShapeHint('')
+    setWizardNote('')
     setAssistantNote('')
     setSigninPassword('')
     setSigninOpen(false)
@@ -323,63 +375,79 @@ export default function Accounts(): JSX.Element {
 
               {serviceOwner && (
                 <div className="card" style={{ background: 'var(--good-soft)', borderColor: 'var(--good)' }}>
-                  <strong>🤖 Don't want to hunt for an app password? Let the assistant do it.</strong>
+                  <strong>✨ Easiest: let InboxScout get the app password</strong>
                   <p className="hint" style={{ margin: '4px 0 10px' }}>
-                    It opens {serviceOwner}'s page in its own window — you sign in yourself there — and it creates the app password and
-                    connects the account for you.
+                    {serviceOwner}'s page opens in its own window. You sign in there and press Create; InboxScout picks up the new app password
+                    and connects the account. Nothing to copy or type.
                   </p>
-                  {!aiReady && (
-                    <p className="hint" style={{ margin: '0 0 10px', color: 'var(--ink)' }}>
-                      Not available yet: the assistant needs an AI helper to think. First connect a free one in{' '}
-                      <strong>Setup → Smarter sorting</strong>, or use an app password below.
-                    </p>
+                  {wizardNote && (
+                    <div className="hint" role="status" aria-live="polite" style={{ marginBottom: 8 }}>
+                      {wizardNote}
+                    </div>
                   )}
-                  {aiReady && autonomy !== 'careful' && (
-                    <div style={{ marginBottom: 10 }}>
-                      <button
-                        className="ghost"
-                        style={{ ...btn, textAlign: 'left' }}
-                        aria-expanded={signinOpen}
-                        aria-controls="account-assistant-signin"
-                        onClick={() => setSigninOpen((v) => !v)}
-                      >
-                        Let it sign in for me {signinOpen ? '▾' : '▸'}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button className="primary" style={btn} onClick={() => void getItForMe()} disabled={!email.trim() || busy || wizardBusy}>
+                      {wizardBusy ? 'Waiting for you to press Create…' : 'Get it for me'}
+                    </button>
+                    {wizardBusy && (
+                      <button className="ghost" style={btn} onClick={stopWizard}>
+                        Stop
                       </button>
-                      {signinOpen && (
-                        <div id="account-assistant-signin" style={{ marginTop: 8 }}>
-                          <p className="hint" style={{ marginTop: 0 }}>
-                            Optional. If you give it your {serviceOwner} password, the assistant can sign in for you and only ask if a code is
-                            needed. The password is stored encrypted on this computer and the AI never sees it — InboxScout types it in for you.
-                            Leave it blank to sign in yourself in its window.
-                          </p>
-                          <label className="field" style={{ marginBottom: 6 }}>
-                            <span>Your {serviceOwner} password (optional)</span>
-                            <span style={{ display: 'flex', gap: 8, fontWeight: 400 }}>
-                              <input
-                                type={showSigninPassword ? 'text' : 'password'}
-                                autoComplete="new-password"
-                                value={signinPassword}
-                                onChange={(e) => setSigninPassword(e.target.value)}
-                                placeholder="Leave blank to sign in yourself"
-                              />
-                              <button className="ghost" style={btn} type="button" aria-pressed={showSigninPassword} onClick={() => setShowSigninPassword((v) => !v)}>
-                                {showSigninPassword ? 'Hide' : 'Show'}
-                              </button>
-                            </span>
-                          </label>
+                    )}
+                  </div>
+                  {aiReady && (
+                    <details style={{ marginTop: 10 }}>
+                      <summary className="hint" style={{ cursor: 'pointer' }}>
+                        Or let the AI assistant do it all, including turning on 2-Step Verification
+                      </summary>
+                      {autonomy !== 'careful' && (
+                        <div style={{ margin: '8px 0 10px' }}>
+                          <button
+                            className="ghost"
+                            style={{ ...btn, textAlign: 'left' }}
+                            aria-expanded={signinOpen}
+                            aria-controls="account-assistant-signin"
+                            onClick={() => setSigninOpen((v) => !v)}
+                          >
+                            Let it sign in for me {signinOpen ? '▾' : '▸'}
+                          </button>
+                          {signinOpen && (
+                            <div id="account-assistant-signin" style={{ marginTop: 8 }}>
+                              <p className="hint" style={{ marginTop: 0 }}>
+                                Optional. If you give it your {serviceOwner} password, the assistant can sign in for you and only ask if a code is
+                                needed. The password is stored encrypted on this computer and the AI never sees it — InboxScout types it in for you.
+                                Leave it blank to sign in yourself in its window.
+                              </p>
+                              <label className="field" style={{ marginBottom: 6 }}>
+                                <span>Your {serviceOwner} password (optional)</span>
+                                <span style={{ display: 'flex', gap: 8, fontWeight: 400 }}>
+                                  <input
+                                    type={showSigninPassword ? 'text' : 'password'}
+                                    autoComplete="new-password"
+                                    value={signinPassword}
+                                    onChange={(e) => setSigninPassword(e.target.value)}
+                                    placeholder="Leave blank to sign in yourself"
+                                  />
+                                  <button className="ghost" style={btn} type="button" aria-pressed={showSigninPassword} onClick={() => setShowSigninPassword((v) => !v)}>
+                                    {showSigninPassword ? 'Hide' : 'Show'}
+                                  </button>
+                                </span>
+                              </label>
+                            </div>
+                          )}
                         </div>
                       )}
-                    </div>
+                      {assistantNote && (
+                        <div className="hint" role="status" aria-live="polite" style={{ marginBottom: 8 }}>
+                          {assistantNote}
+                        </div>
+                      )}
+                      <button className="ghost" style={btn} onClick={() => void letAssistant()} disabled={!email || busy || wizardBusy}>
+                        Let the AI assistant do it
+                      </button>
+                    </details>
                   )}
-                  {assistantNote && (
-                    <div className="hint" role="status" aria-live="polite" style={{ marginBottom: 8 }}>
-                      {assistantNote}
-                    </div>
-                  )}
-                  <button className="primary" style={btn} onClick={() => void letAssistant()} disabled={!email || busy || !aiReady}>
-                    Let the assistant do it
-                  </button>
-                  <p className="hint" style={{ margin: '10px 0 0' }}>Or paste an app password yourself below.</p>
+                  <p className="hint" style={{ margin: '10px 0 0' }}>Already have an app password? Paste it below.</p>
                 </div>
               )}
 
@@ -404,9 +472,12 @@ export default function Accounts(): JSX.Element {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="off"
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value)
+                      setShapeHint('')
+                    }}
                     onKeyDown={(e) => e.key === 'Enter' && canAdd && void add()}
-                    placeholder="16-character app password"
+                    placeholder={serviceOwner ? 'App password (or press Get it for me)' : 'Your mail password'}
                   />
                   <button className="ghost" style={btn} type="button" aria-pressed={showPassword} onClick={() => setShowPassword((v) => !v)}>
                     {showPassword ? 'Hide' : 'Show'}
@@ -425,13 +496,23 @@ export default function Accounts(): JSX.Element {
                   </label>
                 </>
               )}
+              {shapeHint && (
+                <div className="error" role="alert">
+                  {shapeHint}
+                  <div style={{ marginTop: 8 }}>
+                    <button className="ghost" style={btn} onClick={() => void add(true)}>
+                      Try it anyway
+                    </button>
+                  </div>
+                </div>
+              )}
               {error && (
                 <div className="error" role="alert">
                   {error}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className="primary" style={btn} onClick={() => void add()} disabled={!canAdd}>
+                <button className="primary" style={btn} onClick={() => void add()} disabled={!canAdd || wizardBusy}>
                   {busy ? 'Connecting…' : 'Connect'}
                 </button>
                 <button className="ghost" style={btn} onClick={cancelAdd}>

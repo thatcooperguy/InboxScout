@@ -99,7 +99,7 @@ The same app shows more as you use more. **Simple** is one big button, three car
 
 **Gmail's best option is "Sign in with Google"**: a normal Google sign-in page, no app password, and InboxScout gets Gmail's own Promotions/Social/Updates labels and Important markers for much better sorting. It needs a one-time free Google setup by whoever installs InboxScout ([docs/GOOGLE.md](docs/GOOGLE.md)).
 
-Otherwise Gmail, Yahoo, and iCloud use an **app password** (a special 16-character password just for InboxScout). The setup screen shows the steps for whichever provider you pick, or the built-in assistant can create it for you:
+Otherwise Gmail, Yahoo, and iCloud use an **app password**, a separate password the service makes just for InboxScout. You never have to copy it: press **Get it for me**, sign in on the service's own page that opens, press *Create*, and InboxScout picks the password up and connects the account (no AI helper needed). Pasting your everyday password gets a plain explanation instead of a cryptic error. If you would rather fetch one yourself:
 - Gmail: turn on 2-Step Verification, then [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
 - Yahoo: Account Security → *Generate and manage app passwords*
 - iCloud: [appleid.apple.com](https://appleid.apple.com) → Sign-In and Security → App-Specific Passwords

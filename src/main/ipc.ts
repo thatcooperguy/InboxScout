@@ -6,6 +6,8 @@ import { signInWithGoogle, GMAIL_FOLDER } from './mail/gmail'
 import { DRIVE_SCOPE } from './mail/drive'
 import { googleClient, microsoftClientId, hasBakedClients } from './config'
 import { GOOGLE_STEPS, MICROSOFT_STEPS, SetupAssistant, type SetupKind } from './setup/assistant'
+import { AppPasswordWizard, type AppPasswordProvider } from './setup/appPasswordWindow'
+import { explainConnectError } from '../shared/appPassword'
 import { eventsFromBrief, toCsv, toIcs, trackerRows } from './reports/exports'
 import { SMS_GATEWAYS, pickOutbox, sendMail, smsAddress } from './delivery/email'
 import { AgentRunner } from './agent/runner'
@@ -86,31 +88,44 @@ export function registerIpc(ctx: IpcContext): IpcHooks {
       return ''
     }
   }
+  /**
+   * Test an app password against the service, then save the account (v1.5.6: one path shared by the
+   * connect form, the Assistant, and the Get-it-for-me window). Throws a plain-language sentence.
+   */
+  const connectWithAppPassword = async (provider: AppPasswordProvider | 'imap', email: string, password: string, custom?: { host: string; port: number }): Promise<string> => {
+    const preset = PROVIDER_PRESETS[provider] ?? PROVIDER_PRESETS.imap
+    const host = custom?.host ?? preset.host
+    const port = custom?.port ?? preset.port
+    // Reconnecting an account that already exists (self-healing) keeps its id, folders, and history.
+    const existing = repo.listAccounts(db).find((a) => a.email.toLowerCase() === email.toLowerCase() && a.provider === provider)
+    const account: AccountConfig = existing ?? {
+      id: randomUUID(),
+      label: email,
+      email,
+      provider,
+      host,
+      port,
+      folders: preset.sentFolder ? ['INBOX', preset.sentFolder] : ['INBOX'],
+      createdAt: new Date().toISOString()
+    }
+    try {
+      await testConnection(account, password)
+    } catch (err) {
+      log('warn', 'accounts', 'connection test failed', { provider, err: String((err as Error)?.message ?? err) })
+      throw new Error(explainConnectError(provider, err, { hasGetItForMe: provider !== 'imap' }))
+    }
+    repo.upsertAccount(db, account)
+    secrets.set(accountSecretName(account.id), password)
+    markAccountHealthy(db, account.id)
+    log('info', 'health', existing ? 'account reconnected with a fresh app password' : 'account connected', { accountId: account.id })
+    return existing ? `✅ ${email} is reconnected and working again.` : `✅ ${email} is connected. You're all set.`
+  }
   /** Finish a recipe's job with what the assistant captured (connect the account, save IDs). */
   const finishRecipe = async (recipeId: string, params: Record<string, string>, captured: Record<string, string>): Promise<string> => {
     const recipe = RECIPES.find((r) => r.id === recipeId)
     if (!recipe) return ''
     if (recipe.captures === 'appPassword' && captured.appPassword && params.email) {
-      const preset = PROVIDER_PRESETS[recipe.provider ?? 'imap']
-      const email = params.email.trim()
-      // Reconnecting an account that already exists (self-healing) keeps its id, folders, and history.
-      const existing = repo.listAccounts(db).find((a) => a.email.toLowerCase() === email.toLowerCase() && a.provider === (recipe.provider ?? 'imap'))
-      const account: AccountConfig = existing ?? {
-        id: randomUUID(),
-        label: email,
-        email,
-        provider: recipe.provider ?? 'imap',
-        host: preset.host,
-        port: preset.port,
-        folders: preset.sentFolder ? ['INBOX', preset.sentFolder] : ['INBOX'],
-        createdAt: new Date().toISOString()
-      }
-      await testConnection(account, captured.appPassword)
-      repo.upsertAccount(db, account)
-      secrets.set(accountSecretName(account.id), captured.appPassword)
-      markAccountHealthy(db, account.id)
-      log('info', 'health', existing ? 'account reconnected with a fresh app password' : 'account connected by the Assistant', { accountId: account.id })
-      return existing ? `✅ ${email} is reconnected and working again.` : `✅ ${email} is connected. You're all set.`
+      return connectWithAppPassword(recipe.provider ?? 'imap', params.email.trim(), captured.appPassword)
     }
     if (recipe.captures === 'googleClient' && captured.googleClientId) {
       const s = loadSettings(db)
@@ -409,22 +424,27 @@ export function registerIpc(ctx: IpcContext): IpcHooks {
       _e,
       input: { label: string; email: string; provider: string; host: string; port: number; password: string; sentFolder: string }
     ) => {
-      const account: AccountConfig = {
-        id: randomUUID(),
-        label: input.label || input.email,
-        email: input.email.trim(),
-        provider: (input.provider as AccountConfig['provider']) || 'imap',
-        host: input.host.trim(),
-        port: input.port || 993,
-        folders: input.sentFolder ? ['INBOX', input.sentFolder] : ['INBOX'],
-        createdAt: new Date().toISOString()
-      }
-      await testConnection(account, input.password)
-      repo.upsertAccount(db, account)
-      secrets.set(accountSecretName(account.id), input.password)
-      return account
+      const provider = (input.provider as AccountConfig['provider']) || 'imap'
+      const email = input.email.trim()
+      const custom = provider === 'imap' ? { host: input.host.trim(), port: input.port || 993 } : undefined
+      await connectWithAppPassword(provider as AppPasswordProvider | 'imap', email, input.password, custom)
+      return repo.listAccounts(db).find((a) => a.email.toLowerCase() === email.toLowerCase() && a.provider === provider) ?? null
     }
   )
+  // ---- "Get it for me" without an AI helper: the service's own page in an InboxScout window, watched for the password ----
+  const appPasswordWizard = new AppPasswordWizard({
+    emit: (e) => ctx.broadcast('appPassword:event', e),
+    finish: (provider, email, password) => connectWithAppPassword(provider, email, password),
+    log: (level, message, extra) => log(level, 'accounts', message, extra)
+  })
+  ipcMain.handle('appPassword:start', (_e, input: { provider: string; email: string }) => {
+    if (agent.isBusy()) return { ok: false, message: 'The assistant is already working on something. Wait for it to finish, or stop it.' }
+    return appPasswordWizard.start(input.provider as AppPasswordProvider, String(input.email ?? ''))
+  })
+  ipcMain.handle('appPassword:stop', () => {
+    appPasswordWizard.stop()
+    return true
+  })
   ipcMain.handle('accounts:outlookSignIn', async () => {
     const settings = loadSettings(db)
     const clientId = microsoftClientId(settings)

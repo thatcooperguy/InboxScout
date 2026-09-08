@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { cleanIpcError } from '../../../shared/appPassword'
 import type { Helper, HelperCadence, HelperLevel, HelperSend } from '../../../shared/types'
 import { useLevel } from '../useLevel'
 
@@ -39,9 +40,7 @@ interface Form {
 
 const EMPTY: Form = { name: '', relationship: '', email: '', phone: '', carrier: '', level: 'needs', cadence: 'each_brief', weekday: 1 }
 
-function cleanError(err: any): string {
-  return String(err?.message ?? err).replace(/^Error invoking remote method[^:]*:\s*/, '')
-}
+const cleanError = cleanIpcError
 
 const OUTBOX_PROVIDERS = new Set(['gmail', 'yahoo', 'icloud'])
 

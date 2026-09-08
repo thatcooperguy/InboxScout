@@ -64,6 +64,9 @@ export interface InboxScoutApi {
   accountPresets: () => Promise<Record<string, { host: string; port: number; sentFolder: string; help: string; helpUrl: string }>>
   addAccount: (input: unknown) => Promise<any>
   removeAccount: (id: string) => Promise<boolean>
+  appPasswordStart: (provider: string, email: string) => Promise<{ ok: boolean; message?: string }>
+  appPasswordStop: () => Promise<boolean>
+  onAppPasswordEvent: (cb: (e: { status: 'opened' | 'captured' | 'done' | 'failed' | 'closed'; provider: string; email: string; message: string }) => void) => () => void
   outlookSignIn: () => Promise<any>
   googleSignIn: () => Promise<any>
   openExternal: (url: string) => Promise<boolean>

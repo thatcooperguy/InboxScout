@@ -110,7 +110,7 @@ image support (Gemini, OpenAI, Claude, Grok, OpenRouter vision models) see scree
 
 | Recipe | What it does | Produces |
 |---|---|---|
-| Connect Gmail (app password) | Creates a Google app password named InboxScout, connects the account | account |
+| Connect Gmail (app password) | Creates a Google app password named InboxScout, connects the account (the no-AI **Get it for me** button on the account form does the same when the person signs in and presses Create themselves) | account |
 | Connect Yahoo Mail (app password) | Same for Yahoo | account |
 | Connect iCloud Mail (app-specific password) | Same for Apple | account |
 | Register the Google sign-in app (owner) | Project, Gmail API, consent screen, Desktop OAuth client | client ID + secret |

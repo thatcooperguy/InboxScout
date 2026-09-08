@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { cleanIpcError } from '../../../shared/appPassword'
 import { EULA_ACCEPT_LINE, EULA_OPTIONS, EULA_SECTIONS, EULA_VERSION, eulaChoicesToSettings, type EulaOptionId } from '../../../shared/eula'
 import { speak } from '../useLevel'
 
@@ -31,7 +32,7 @@ export default function Eula({ onAccepted }: Props): JSX.Element {
       await window.inboxScout.setSettings({ ...current, eulaAcceptedVersion: EULA_VERSION, ...eulaChoicesToSettings(withChoices) })
       onAccepted()
     } catch (err: any) {
-      setError(String(err?.message ?? err).replace(/^Error invoking remote method[^:]*:\s*/, ''))
+      setError(cleanIpcError(err))
       setSaving(false)
     }
   }

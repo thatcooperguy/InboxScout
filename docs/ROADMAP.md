@@ -116,12 +116,13 @@
 
 - **Reads what is inside attachments**: PDFs, Word files, spreadsheets, and plain-text files are read on the computer; photos, screenshots, and scans go to the AI helper when it can see images and to a bundled offline OCR reader otherwise. Each file gets a one-line summary and facts (amounts, dates, people, what kind of document), and what it says feeds the classifier, the built-in engine (an invoice in a PDF becomes a bill with the amount and due date; a photographed W-2 is flagged private), and the brief ("from the attached invoice.pdf" on the item, 📎 on Today). Inbox review shows 📎 file — summary with **Open**; **Ask** answers "what was in the pdf from Ron?" and the AI gets `read_attachment`. Files are kept 90 days (setting) and cleared by the **Attachment files** health check; the text stays searchable. Bridge ops `list_attachments` / `read_attachment` / `open_attachment`; the phone gets the two read ops. Off switch: *Read attachments and photos*. `docs/ATTACHMENTS.md`.
 
-## ✅ v1.5.1 – v1.5.5 — shipped (release, legal, and runtime plumbing)
+## ✅ v1.5.1 – v1.5.6 — shipped (release, legal, and runtime plumbing)
 
 - **v1.5.1** — code-signing pipeline for Windows (Azure Trusted Signing) and macOS (Developer ID + notarization), inactive until the repository secrets exist; Cooper Studios LLC in build metadata; the InboxScout Source-Available License 1.0, `TRADEMARK.md`, `SECURITY.md`, contributor assignment in `CONTRIBUTING.md`. `docs/SIGNING.md`.
 - **v1.5.2** — privacy policy and terms pages on inboxscout.ai; dependency security updates.
 - **v1.5.3** — Electron 44 (the current security-supported line) and electron-builder 26; a "publish: no" dry run for the Release workflow.
 - **v1.5.4** — releases are built on all three platforms, uploaded as artifacts, and published by one job only when every file is present; `Tidy releases` workflow.
+- **v1.5.6** — connecting email without a fight: **Get it for me** opens the service's own app-password page in an InboxScout window and connects the account the moment the password appears (no AI helper needed); an everyday password pasted into the app-password box gets a plain sentence and a *Try it anyway*; the server's bare `Command failed` becomes "Gmail did not accept that password…"; the Electron error prefix no longer leaks (`add': Error:`); one shared connect path for the form, the Assistant, and the window.
 - **v1.5.5** — the updater actually runs (earlier builds never checked for updates: re-download once), macOS zip targets so macOS can update once signed, the website deploys from `main` only, Dependabot grouped and capped, the renderer sandbox restored to Electron's default, Node 24 in CI and typings, and the audit's documentation fixes.
 
 ## 🟠 Gaps

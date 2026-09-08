@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { cleanIpcError } from '../../../shared/appPassword'
 import { useLevel } from '../useLevel'
 
 interface Props {
@@ -131,7 +132,7 @@ export default function Assistant({ preset }: Props): JSX.Element {
       setShowPassword(false)
       setSigninMsg('Saved ✓ — kept encrypted on this computer.')
     } catch (err: any) {
-      setSigninMsg(String(err?.message ?? err).replace(/^Error invoking remote method[^:]*:\s*/, ''))
+      setSigninMsg(cleanIpcError(err))
     }
   }
 

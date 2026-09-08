@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import ProfilePicker from './ProfilePicker'
 import { useLevel } from '../useLevel'
+import { appPasswordShape, cleanIpcError } from '../../../shared/appPassword'
 
 interface Props {
   onDone: () => void
@@ -32,9 +33,7 @@ function providerName(provider: string): string {
   }
 }
 
-function cleanError(err: any): string {
-  return String(err?.message ?? err).replace(/^Error invoking remote method[^:]*:\s*/, '')
-}
+const cleanError = cleanIpcError
 
 /**
  * First-run wizard: three plain-language steps a non-technical person can
@@ -67,6 +66,11 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
   const [helperBusy, setHelperBusy] = useState(false)
   const [helperNote, setHelperNote] = useState('')
   const helperEmail = useRef('')
+  // v1.5.6: "Get it for me" without an AI helper — the service's page in an InboxScout window, watched for the password.
+  const [wizardBusy, setWizardBusy] = useState(false)
+  const [wizardNote, setWizardNote] = useState('')
+  // The password looks like an everyday password, not an app password; Connect asks once before trying it.
+  const [shapeHint, setShapeHint] = useState('')
   // Trusted helpers (v1.4): "Who is setting this up?" on step 0; a pre-filled helper on the last step.
   const [setupBy, setSetupBy] = useState<'me' | 'someone_else'>('me')
   const [trusted, setTrusted] = useState({ name: '', relationship: '', email: '', phone: '', carrier: '' })
@@ -136,6 +140,20 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
           setHelperBusy(false)
           helperEmail.current = ''
           setHelperNote(e.message ? String(e.message) : 'The helper stopped before it finished. You can paste an app password below instead.')
+        }
+      }),
+    []
+  )
+
+  useEffect(
+    () =>
+      window.inboxScout.onAppPasswordEvent((e) => {
+        setWizardNote(e.message)
+        if (e.status === 'done') {
+          setWizardBusy(false)
+          succeed(e.email)
+        } else if (e.status === 'failed' || e.status === 'closed') {
+          setWizardBusy(false)
         }
       }),
     []
@@ -216,10 +234,39 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
     }
   }
 
-  const connectAccount = async (): Promise<void> => {
+  const getItForMe = async (): Promise<void> => {
+    setError('')
+    setShapeHint('')
+    setWizardBusy(true)
+    setWizardNote(`Opening ${providerName(provider)}'s page in its own window…`)
+    try {
+      const r = await window.inboxScout.appPasswordStart(provider, email.trim())
+      if (!r.ok) {
+        setWizardBusy(false)
+        setWizardNote(r.message ?? 'Could not open the page. You can paste an app password below instead.')
+      }
+    } catch (err) {
+      setWizardBusy(false)
+      setWizardNote(cleanError(err))
+    }
+  }
+
+  const stopWizard = (): void => {
+    void window.inboxScout.appPasswordStop().catch(() => undefined)
+    setWizardBusy(false)
+    setWizardNote('')
+  }
+
+  const connectAccount = async (force = false): Promise<void> => {
     if (busy || !email || !password) return
+    const shape = appPasswordShape(provider, password)
+    if (!shape.looksRight && !force) {
+      setShapeHint(shape.hint ?? '')
+      return
+    }
     setBusy(true)
     setError('')
+    setShapeHint('')
     try {
       await window.inboxScout.addAccount({
         label: email,
@@ -227,7 +274,7 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
         provider,
         host: provider === 'imap' ? host : preset.host,
         port: preset.port ?? 993,
-        password,
+        password: shape.looksRight ? shape.normalized : password,
         sentFolder: preset.sentFolder
       })
       succeed(email)
@@ -419,6 +466,8 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
                 setProvider(e.target.value)
                 setError('')
                 setHelperNote('')
+                setShapeHint('')
+                setWizardNote('')
               }}
             >
               <option value="gmail">Gmail</option>
@@ -494,29 +543,38 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
 
               {usesAppPassword && (
                 <div className="card" style={{ background: 'var(--good-soft)', borderColor: 'var(--good)' }}>
-                  <strong>🤖 Let InboxScout get the app password for me</strong>
-                  {aiReady ? (
-                    <p className="hint" style={{ margin: '4px 0 10px' }}>
-                      {simple
-                        ? `It opens ${providerName(provider)}'s page in its own window. You sign in. It does the rest.`
-                        : `It opens ${providerName(provider)}'s page in its own window; you sign in, and it creates the app password and connects the account for you.`}
-                    </p>
-                  ) : (
-                    <p className="hint" style={{ margin: '4px 0 10px' }}>
-                      {simple
-                        ? 'This needs a free AI helper, which is not set up yet. You can set it up later in Setup → AI helper. For now, paste an app password below.'
-                        : 'This needs a free AI helper (Gemini or Groq work), which is not connected yet. You can set it up later in Setup → AI helper. For now, paste an app password below.'}
-                    </p>
-                  )}
-                  {helperNote && (
+                  <strong>✨ Easiest: let InboxScout get it</strong>
+                  <p className="hint" style={{ margin: '4px 0 10px' }}>
+                    {simple
+                      ? `Press the button. ${providerName(provider)}'s page opens. Sign in there and press Create. That is all.`
+                      : `${providerName(provider)}'s page opens in its own window. You sign in there and press Create; InboxScout picks up the new app password and connects your email. Nothing to copy or type.`}
+                  </p>
+                  {wizardNote && (
                     <div className="hint" role="status" aria-live="polite" style={{ marginBottom: 8 }}>
+                      {wizardNote}
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button className="primary" onClick={() => void getItForMe()} disabled={!email.trim() || busy || helperBusy || wizardBusy}>
+                      {wizardBusy ? 'Waiting for you to press Create…' : 'Get it for me'}
+                    </button>
+                    {wizardBusy && (
+                      <button className="ghost" onClick={stopWizard}>
+                        Stop
+                      </button>
+                    )}
+                    {aiReady && !wizardBusy && (
+                      <button className="ghost" onClick={() => void letHelper()} disabled={!email.trim() || busy || helperBusy}>
+                        {helperBusy ? 'AI helper is working…' : 'Let the AI helper do it all'}
+                      </button>
+                    )}
+                  </div>
+                  {helperNote && (
+                    <div className="hint" role="status" aria-live="polite" style={{ marginTop: 8 }}>
                       {helperNote}
                     </div>
                   )}
-                  <button className="primary" onClick={() => void letHelper()} disabled={!aiReady || !email.trim() || busy || helperBusy}>
-                    {helperBusy ? 'Helper is working…' : 'Let InboxScout get it'}
-                  </button>
-                  {aiReady && !email.trim() && (
+                  {!email.trim() && (
                     <p className="hint" style={{ margin: '8px 0 0' }}>
                       Type your email address first.
                     </p>
@@ -528,15 +586,18 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
                 <span>App password</span>
                 <span className="hint" style={{ fontWeight: 400, marginBottom: 6 }}>
                   {simple
-                    ? 'A special password your email service makes just for apps. It is not your normal password.'
-                    : 'A special 16-character password your email service makes for apps — not your normal password. It is stored encrypted on this computer.'}
+                    ? 'Only if you got one yourself: paste it here. It is not your normal password.'
+                    : 'Already have an app password from your email service? Paste it here (spaces are fine). It is not your normal password, and it is stored encrypted on this computer.'}
                 </span>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="off"
                     value={password}
-                    onChange={(e) => setPassword(provider === 'imap' ? e.target.value : e.target.value.replace(/\s+/g, ''))}
+                    onChange={(e) => {
+                      setPassword(provider === 'imap' ? e.target.value : e.target.value.replace(/\s+/g, ''))
+                      setShapeHint('')
+                    }}
                     onPaste={(e) => {
                       const text = e.clipboardData.getData('text')
                       if (text && /\s/.test(text)) {
@@ -547,7 +608,7 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') void connectAccount()
                     }}
-                    placeholder={provider === 'imap' ? 'Your mail password' : '16-character app password'}
+                    placeholder={provider === 'imap' ? 'Your mail password' : 'App password (or press Get it for me)'}
                     style={{ flex: 1 }}
                   />
                   <button type="button" className="ghost" aria-pressed={showPassword} onClick={() => setShowPassword((v) => !v)} style={{ whiteSpace: 'nowrap' }}>
@@ -580,13 +641,23 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
                 </label>
               )}
 
+              {shapeHint && (
+                <div className="error" role="alert">
+                  {shapeHint}
+                  <div style={{ marginTop: 8 }}>
+                    <button className="ghost" onClick={() => void connectAccount(true)}>
+                      Try it anyway
+                    </button>
+                  </div>
+                </div>
+              )}
               {error && (
                 <div className="error" role="alert">
                   {error}
                 </div>
               )}
               <div style={{ display: 'flex', gap: 8 }}>
-                <button className="primary" disabled={busy || helperBusy || !email || !password || (provider === 'imap' && !host)} onClick={() => void connectAccount()}>
+                <button className="primary" disabled={busy || helperBusy || wizardBusy || !email || !password || (provider === 'imap' && !host)} onClick={() => void connectAccount()}>
                   {busy ? 'Connecting…' : 'Connect'}
                 </button>
                 <button className="ghost" onClick={() => setStep(3)}>

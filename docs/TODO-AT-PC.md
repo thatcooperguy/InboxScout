@@ -19,7 +19,9 @@ exact page. Most take under 10 minutes. Tick them off as you go.
 
 ## 2. Zero-setup sign-in for everyone  (~15 min, once)  → `docs/RELEASING.md`
 
-So nobody who installs InboxScout ever registers an app with Google or Microsoft:
+**This is the "just log in from the browser" fix.** The *Sign in with Google* and *Sign in with Microsoft* buttons are already
+built; they stay hidden until these IDs exist. Until then people use **Get it for me** (v1.5.6), which is easy but still
+means 2-Step Verification on Google's side. So nobody who installs InboxScout ever registers an app with Google or Microsoft:
 
 - [ ] Open InboxScout → **Setup → Web chores → "Register the Google sign-in app (one-time, owner)" → Start** (it clicks
       through for you; you only sign in), or **Setup → Sign-in setup** to click yourself, or follow `docs/GOOGLE.md`

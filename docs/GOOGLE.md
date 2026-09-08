@@ -4,7 +4,7 @@ InboxScout can connect Gmail two ways:
 
 | | App password (default) | Sign in with Google |
 |---|---|---|
-| Setup for the person | Turn on 2-Step Verification, create a 16-character app password | Click a button, sign in on Google's page |
+| Setup for the person | Press **Get it for me**, sign in on Google's page, press Create (2-Step Verification must be on) | Click a button, sign in on Google's page |
 | What InboxScout sees | The mail itself | The mail **plus Gmail's own signals**: Promotions / Social / Updates / Forums categories, Important and Starred markers, read state, real threads, Sent mail in the same pass |
 | Sorting quality | Good | Noticeably better — Gmail already knows what's a newsletter |
 | One-time setup by the installer | None | A free Google Cloud "OAuth client" (10 minutes, below) |

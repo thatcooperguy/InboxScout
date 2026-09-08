@@ -14,6 +14,13 @@ const api = {
   accountPresets: () => ipcRenderer.invoke('accounts:presets'),
   addAccount: (input: unknown) => ipcRenderer.invoke('accounts:add', input),
   removeAccount: (id: string) => ipcRenderer.invoke('accounts:remove', id),
+  appPasswordStart: (provider: string, email: string) => ipcRenderer.invoke('appPassword:start', { provider, email }),
+  appPasswordStop: () => ipcRenderer.invoke('appPassword:stop'),
+  onAppPasswordEvent: (cb: (e: unknown) => void) => {
+    const listener = (_e: unknown, p: unknown): void => cb(p)
+    ipcRenderer.on('appPassword:event', listener)
+    return () => ipcRenderer.removeListener('appPassword:event', listener)
+  },
   outlookSignIn: () => ipcRenderer.invoke('accounts:outlookSignIn'),
   googleSignIn: () => ipcRenderer.invoke('accounts:googleSignIn'),
   openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
