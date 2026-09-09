@@ -20,6 +20,7 @@ import { deleteSignin, getSignin, listSignins, pickSigninForHost, saveSignin } f
 import { speakWithOs } from './voice'
 import { ask, askAndWait, invalidateAskCache, type AskDeps } from './ask/index'
 import { randomUUID } from 'node:crypto'
+import { release } from 'node:os'
 import type { DB } from './db/index'
 import * as repo from './db/repo'
 import { SecretStore, accountSecretName, providerSecretName } from './secrets'
@@ -228,7 +229,17 @@ export function registerIpc(ctx: IpcContext): IpcHooks {
     if (s.ai.provider === 'builtin') return { ok: true }
     return testProvider(s.ai, secrets.get(providerSecretName(s.ai.provider)) ?? '')
   }
-  const repairDeps = { db, secrets, userData, startAgent, log }
+  // Fix it for me (the button) may open the app-password window; the automatic passes never do.
+  let repairInteractive = false
+  const repairDeps = {
+    db,
+    secrets,
+    userData,
+    startAgent,
+    log,
+    interactive: () => repairInteractive,
+    startAppPasswordWindow: (provider: AppPasswordProvider, email: string) => (agent.isBusy() ? { ok: false, message: 'the assistant is busy' } : appPasswordWizard.start(provider, email))
+  }
   const reauthAccount = (accountId: string): Promise<{ ok: boolean; message: string }> => repairReauth(repairDeps, accountId)
   const healthCtx = createHealthContext({
     ...repairDeps,
@@ -237,8 +248,14 @@ export function registerIpc(ctx: IpcContext): IpcHooks {
     probeAi
   })
   const healthStatus = (): HealthReport => runHealth(healthCtx, CHECKS)
-  const healthRepair = async (): Promise<HealthReport> => {
-    const report = await runRepairs(healthCtx, CHECKS)
+  const healthRepair = async (opts: { interactive?: boolean } = {}): Promise<HealthReport> => {
+    repairInteractive = !!opts.interactive
+    let report: HealthReport
+    try {
+      report = await runRepairs(healthCtx, CHECKS)
+    } finally {
+      repairInteractive = false
+    }
     const fixed = report.items.filter((i) => i.status === 'fixed')
     const wrong = report.items.filter((i) => i.status === 'warn' || i.status === 'fail')
     if (fixed.length || wrong.length) {
@@ -251,8 +268,12 @@ export function registerIpc(ctx: IpcContext): IpcHooks {
     return report
   }
   ipcMain.handle('health:status', () => healthStatus())
-  ipcMain.handle('health:repair', () => healthRepair())
+  ipcMain.handle('health:repair', () => healthRepair({ interactive: true }))
   ipcMain.handle('diagnostics:text', () => readTail(200))
+  ipcMain.handle('app:info', () => ({
+    version: app.getVersion(),
+    platform: `${process.platform === 'win32' ? 'Windows' : process.platform === 'darwin' ? 'macOS' : 'Linux'} ${release()}`
+  }))
   ipcMain.handle('diagnostics:open', () => openInFolder())
 
   // ---- Conversation (v1.4, Part B): "Ask about your mail…" — local answer first, AI answer later ----

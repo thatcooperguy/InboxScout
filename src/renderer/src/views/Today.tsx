@@ -626,6 +626,11 @@ export default function Today({ running, onRun, level = 'standard', status = '',
               ⏳ {status}
             </p>
           )}
+          {running && !brief && (
+            <p className="hint" role="status" style={{ marginTop: 6 }}>
+              {t('hero.firstRun', level)}
+            </p>
+          )}
           {!running && when && (
             <p className="hint" style={{ marginTop: 6 }}>
               {lastChecked(when, level, pro && inboxes.length ? `${inboxes.reduce((n: number, i: any) => n + i.newCount, 0)} new · ${inboxes.length} inbox${inboxes.length === 1 ? '' : 'es'}` : undefined)}

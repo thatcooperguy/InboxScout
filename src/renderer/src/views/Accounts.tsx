@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLevel } from '../useLevel'
-import { appPasswordShape, cleanIpcError } from '../../../shared/appPassword'
+import { appPasswordShape, cleanIpcError, providerForEmail } from '../../../shared/appPassword'
 
 type SetupInfo = { google: { configured: boolean }; microsoft: { configured: boolean } }
 
@@ -370,7 +370,21 @@ export default function Accounts(): JSX.Element {
             <>
               <label className="field">
                 <span>Email address</span>
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" autoComplete="off" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    const known = providerForEmail(e.target.value)
+                    if (known && known !== provider) {
+                      setProvider(known)
+                      setError('')
+                      setShapeHint('')
+                    }
+                  }}
+                  placeholder="you@example.com"
+                  autoComplete="off"
+                />
               </label>
 
               {serviceOwner && (

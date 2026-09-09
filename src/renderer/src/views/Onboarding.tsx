@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import ProfilePicker from './ProfilePicker'
 import { useLevel } from '../useLevel'
-import { appPasswordShape, cleanIpcError } from '../../../shared/appPassword'
+import { appPasswordShape, cleanIpcError, providerForEmail } from '../../../shared/appPassword'
 
 interface Props {
   onDone: () => void
@@ -34,6 +34,31 @@ function providerName(provider: string): string {
 }
 
 const cleanError = cleanIpcError
+
+/** A made-up morning brief (v1.5.7) so a cautious person sees what they get before handing over anything. */
+function SampleBrief({ simple }: { simple: boolean }): JSX.Element {
+  const row = (icon: string, text: string): JSX.Element => (
+    <li style={{ display: 'flex', gap: 8, alignItems: 'flex-start', margin: '6px 0' }}>
+      <span aria-hidden="true">{icon}</span>
+      <span>{text}</span>
+    </li>
+  )
+  return (
+    <div id="sample-brief" className="card" style={{ background: 'var(--blue-soft)', borderColor: 'var(--blue)', marginBottom: 12 }} aria-label="Example brief">
+      <p className="hint" style={{ margin: '0 0 6px' }}>
+        {simple ? 'An example. Names and emails are made up.' : 'An example of a morning brief. The people and emails are made up.'}
+      </p>
+      <strong style={{ fontSize: 17 }}>Good morning. 3 things need you today.</strong>
+      <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0' }}>
+        {row('📌', "Dr. Patel's office asks you to confirm Thursday at 10:00. Reply yes or call 555-0142.")}
+        {row('💳', 'The electric bill, $84.20, is due Friday. Pay it online or by phone.')}
+        {row('✉️', 'Sarah asked about the weekend plans on Monday and is still waiting on you.')}
+        {row('🏠', "Tom sent photos from the birthday party. Nothing to do, just nice.")}
+        {row('🗑️', simple ? '14 ads and newsletters were set aside for you.' : '14 promotions and newsletters were set aside; nothing in them needs you.')}
+      </ul>
+    </div>
+  )
+}
 
 /**
  * First-run wizard: three plain-language steps a non-technical person can
@@ -71,6 +96,7 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
   const [wizardNote, setWizardNote] = useState('')
   // The password looks like an everyday password, not an app password; Connect asks once before trying it.
   const [shapeHint, setShapeHint] = useState('')
+  const [showSample, setShowSample] = useState(false)
   // Trusted helpers (v1.4): "Who is setting this up?" on step 0; a pre-filled helper on the last step.
   const [setupBy, setSetupBy] = useState<'me' | 'someone_else'>('me')
   const [trusted, setTrusted] = useState({ name: '', relationship: '', email: '', phone: '', carrier: '' })
@@ -314,6 +340,11 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
             </>
           )}
 
+          <button className="ghost" aria-expanded={showSample} aria-controls="sample-brief" onClick={() => setShowSample((v) => !v)} style={{ marginBottom: 12 }}>
+            {showSample ? 'Hide the example' : 'See an example brief'} {showSample ? '▾' : '▸'}
+          </button>
+          {showSample && <SampleBrief simple={simple} />}
+
           <fieldset style={{ border: '1px solid var(--line, #dde2ea)', borderRadius: 8, padding: '10px 12px', margin: '12px 0 16px' }}>
             <legend style={{ fontWeight: 600, padding: '0 4px' }}>Text size</legend>
             <p className="hint" style={{ margin: '0 0 8px' }}>
@@ -533,7 +564,16 @@ export default function Onboarding({ onDone }: Props): JSX.Element {
                   type="email"
                   autoComplete="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    const known = providerForEmail(e.target.value)
+                    if (known && known !== provider) {
+                      setProvider(known)
+                      setError('')
+                      setShapeHint('')
+                      setWizardNote('')
+                    }
+                  }}
                   placeholder="you@example.com"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') void connectAccount()

@@ -29,7 +29,10 @@ detail, and whether InboxScout can repair it by itself.
 These repairs are safe — they never delete anything, never send anything, and never touch settings you chose —
 so InboxScout applies them without asking, then re-checks:
 
-- **Reconnecting an account** that has a saved sign-in whose token or session expired.
+- **Reconnecting an account** that has a saved sign-in whose token or session expired. When there is no saved
+  sign-in and you press **Fix it for me** yourself (v1.5.7), InboxScout opens the service's own app-password page
+  in its window instead; you sign in and press Create, and it connects the new password. The automatic check before
+  a scan never opens a window on its own.
 - **Falling back to the built-in engine** for the current run when the AI helper is down, out of quota, or
   rejecting the key. Your chosen helper stays selected and is tried again next time.
 - **Moving the reports folder** to a `Reports` folder inside InboxScout's data folder when the folder you chose
@@ -78,6 +81,8 @@ Under **Settings → Health → Details ▸**:
 - **Copy diagnostics** puts the last ~200 lines of the local diagnostics log plus the app, engine, and OS
   versions on the clipboard — paste it into a message to whoever helps you. It contains no email content and
   no passwords.
+- **Email us for help** copies the same diagnostics and opens a message to hello@inboxscout.ai in your mail app with a
+  "press Paste here" note (v1.5.7). Nothing is sent until you press Send.
 - **Show the log file** reveals the log in your file manager. It is `diagnostics.log` in InboxScout's data folder
   (`%APPDATA%\inboxscout` on Windows, `~/Library/Application Support/inboxscout` on macOS,
   `~/.config/inboxscout` on Linux), capped at 1 MB with one older copy kept as `diagnostics.log.1`.

@@ -12,3 +12,19 @@ export function replyMailto(to: string, subject: string, counterpart: string): s
   const params = new URLSearchParams({ subject: /^re:/i.test(subject) ? subject : `Re: ${subject}`, body })
   return `mailto:${encodeURIComponent(to)}?${params.toString().replace(/\+/g, '%20')}`
 }
+
+export const SUPPORT_EMAIL = 'hello@inboxscout.ai'
+
+/**
+ * "Email us" from the Health section (v1.5.7): opens the person's own mail app addressed to support with a
+ * short, fill-in-the-blank body. The diagnostics themselves are put on the clipboard by the caller (mail
+ * links cannot carry a long text), so the body says where to paste.
+ */
+export function supportMailto(version: string, platform: string): string {
+  const body =
+    'What I was trying to do:\n\n\nWhat happened instead:\n\n\n' +
+    '(The diagnostics are already copied. Click below this line and press Paste. They hold no email text and no passwords.)\n\n' +
+    `InboxScout ${version} on ${platform}\n`
+  const params = new URLSearchParams({ subject: `InboxScout help (${version})`, body })
+  return `mailto:${SUPPORT_EMAIL}?${params.toString().replace(/\+/g, '%20')}`
+}

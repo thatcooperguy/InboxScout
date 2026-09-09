@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { appPasswordShape, cleanIpcError, explainConnectError } from '../src/shared/appPassword'
+import { appPasswordShape, cleanIpcError, explainConnectError, providerForEmail } from '../src/shared/appPassword'
+import { supportMailto } from '../src/shared/mailto'
 
 describe('appPasswordShape', () => {
   it('accepts the 16 letters Google shows as four groups and joins them', () => {
@@ -63,5 +64,33 @@ describe('app-password window helpers', () => {
     expect(out).toMatch(/Chrome\/132/)
     expect(startUrlFor('gmail', 'a@b.com')).toMatch(/^https:\/\/accounts\.google\.com\/AccountChooser\?Email=a%40b\.com&continue=https%3A%2F%2Fmyaccount\.google\.com%2Fapppasswords/)
     expect(startUrlFor('yahoo', 'a@b.com')).toMatch(/^https:\/\/login\.yahoo\.com/)
+  })
+})
+
+describe('providerForEmail', () => {
+  it('picks the service from the address as the person types', () => {
+    expect(providerForEmail('Someone@Gmail.com')).toBe('gmail')
+    expect(providerForEmail('a@ymail.com')).toBe('yahoo')
+    expect(providerForEmail('a@aol.com')).toBe('yahoo')
+    expect(providerForEmail('a@me.com')).toBe('icloud')
+    expect(providerForEmail('a@hotmail.co.uk')).toBe('outlook')
+  })
+  it('stays quiet for unknown or half-typed addresses', () => {
+    expect(providerForEmail('a@work.example')).toBeNull()
+    expect(providerForEmail('a@gmail')).toBeNull()
+    expect(providerForEmail('nothing')).toBeNull()
+    expect(providerForEmail('')).toBeNull()
+  })
+})
+
+describe('supportMailto', () => {
+  it('addresses support with the version and a paste-here note, never the diagnostics themselves', () => {
+    const url = supportMailto('1.5.7', 'Windows 11')
+    expect(url.startsWith('mailto:hello@inboxscout.ai?')).toBe(true)
+    const q = new URLSearchParams(url.slice(url.indexOf('?') + 1))
+    expect(q.get('subject')).toBe('InboxScout help (1.5.7)')
+    expect(q.get('body')).toMatch(/press Paste/)
+    expect(q.get('body')).toMatch(/InboxScout 1\.5\.7 on Windows 11/)
+    expect(url.length).toBeLessThan(700)
   })
 })

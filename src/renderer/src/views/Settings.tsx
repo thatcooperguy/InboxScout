@@ -4,6 +4,7 @@ import { SETTING_GROUPS, defaultOf, getSetting, isDefault, searchSettings, setSe
 import { LEVEL_LABEL } from '../../../shared/adapt'
 import { EULA_VERSION } from '../../../shared/eula'
 import Eula from './Eula'
+import { SUPPORT_EMAIL, supportMailto } from '../../../shared/mailto'
 
 type Level = 'simple' | 'standard' | 'pro'
 
@@ -214,6 +215,18 @@ function HealthSection({ level }: { level: Level }): JSX.Element {
       setFixing(false)
     }
   }
+  // v1.5.7: one press puts the diagnostics on the clipboard and opens a message to support with a paste-here note.
+  const emailUs = async (): Promise<void> => {
+    try {
+      await navigator.clipboard.writeText(await window.inboxScout.diagnosticsText())
+    } catch {
+      // The message still opens; the person can press Copy diagnostics afterwards.
+    }
+    const info = await window.inboxScout.appInfo().catch(() => ({ version: '', platform: '' }))
+    await window.inboxScout.openExternal(supportMailto(info.version, info.platform))
+    setNote(`A message to ${SUPPORT_EMAIL} is opening in your mail app. The diagnostics are copied — click in the message and press Paste.`)
+    window.setTimeout(() => setNote(''), 8000)
+  }
   const copyDiagnostics = async (): Promise<void> => {
     try {
       await navigator.clipboard.writeText(await window.inboxScout.diagnosticsText())
@@ -273,6 +286,9 @@ function HealthSection({ level }: { level: Level }): JSX.Element {
                 </button>
                 <button className="ghost" onClick={() => void window.inboxScout.diagnosticsOpen()}>
                   Show the log file
+                </button>
+                <button className="ghost" onClick={() => void emailUs()}>
+                  Email us for help
                 </button>
                 <span className="hint">Last checked {new Date(report.checkedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}.</span>
               </div>

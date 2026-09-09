@@ -16,6 +16,7 @@ const api = {
   removeAccount: (id: string) => ipcRenderer.invoke('accounts:remove', id),
   appPasswordStart: (provider: string, email: string) => ipcRenderer.invoke('appPassword:start', { provider, email }),
   appPasswordStop: () => ipcRenderer.invoke('appPassword:stop'),
+  appInfo: () => ipcRenderer.invoke('app:info'),
   onAppPasswordEvent: (cb: (e: unknown) => void) => {
     const listener = (_e: unknown, p: unknown): void => cb(p)
     ipcRenderer.on('appPassword:event', listener)

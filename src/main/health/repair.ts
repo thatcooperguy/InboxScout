@@ -24,6 +24,13 @@ export interface RepairDeps {
   userData: string
   /** Start the Assistant browser on a recipe (mints an app password and connects the account when done). */
   startAgent: (input: { recipeId?: string; params?: Record<string, string> }) => { ok: boolean; summary?: string }
+  /**
+   * v1.5.7: open the service's own app-password page in an InboxScout window and connect when the password appears
+   * (no AI needed). Only used when the person pressed Fix it for me themselves — a window must never pop up on its own.
+   */
+  startAppPasswordWindow?: (provider: 'gmail' | 'yahoo' | 'icloud', email: string) => { ok: boolean; message?: string }
+  /** True while the person is pressing Fix it for me (as opposed to the automatic pass before a scan). */
+  interactive?: () => boolean
   log?: RepairLog
 }
 
@@ -55,16 +62,32 @@ export async function reauthAccount(deps: RepairDeps, accountId: string): Promis
   const account = repo.listAccounts(deps.db).find((a) => a.id === accountId)
   if (!account) return { ok: false, message: 'that account is no longer connected' }
   const who = account.label || account.email
-  if (!APP_PASSWORD_PROVIDERS.has(account.provider) || !getSignin(deps.db, deps.secrets, account.email)) {
+  if (!APP_PASSWORD_PROVIDERS.has(account.provider)) {
     return { ok: false, message: `needs you: reconnect ${who} in Setup → Email accounts` }
   }
-  const r = deps.startAgent({ recipeId: `${account.provider}-app-password`, params: { email: account.email } })
-  if (!r.ok) {
+  const provider = account.provider as 'gmail' | 'yahoo' | 'icloud'
+  if (getSignin(deps.db, deps.secrets, account.email)) {
+    const r = deps.startAgent({ recipeId: `${provider}-app-password`, params: { email: account.email } })
+    if (r.ok) {
+      deps.log?.('info', 'health', 'reauth started through the Assistant', { accountId, provider })
+      return { ok: true, message: `Reconnecting ${account.email} on its own…` }
+    }
     deps.log?.('warn', 'health', 'reauth could not start', { accountId, why: r.summary })
-    return { ok: false, message: r.summary ? `could not reconnect ${who} yet: ${r.summary}` : `could not reconnect ${who} yet` }
+    if (!deps.interactive?.() || !deps.startAppPasswordWindow) {
+      return { ok: false, message: r.summary ? `could not reconnect ${who} yet: ${r.summary}` : `could not reconnect ${who} yet` }
+    }
   }
-  deps.log?.('info', 'health', 'reauth started through the Assistant', { accountId, provider: account.provider })
-  return { ok: true, message: `Reconnecting ${account.email} on its own…` }
+  // No saved sign-in (or the Assistant is unavailable): when the person is right here, open the service's page for them.
+  if (deps.interactive?.() && deps.startAppPasswordWindow) {
+    const w = deps.startAppPasswordWindow(provider, account.email)
+    if (w.ok) {
+      deps.log?.('info', 'health', 'reauth started through the app-password window', { accountId, provider })
+      const service = provider === 'gmail' ? 'Google' : provider === 'yahoo' ? 'Yahoo' : 'Apple'
+      return { ok: true, message: `Opened ${service}'s page to reconnect ${account.email} — sign in there and press Create` }
+    }
+    return { ok: false, message: w.message ? `could not reconnect ${who} yet: ${w.message}` : `could not reconnect ${who} yet` }
+  }
+  return { ok: false, message: `needs you: press Fix it for me under Settings → Health, or reconnect ${who} in Setup → Email accounts` }
 }
 
 /** After a fresh password worked: the account's failure streak is over. */

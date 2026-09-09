@@ -17,6 +17,11 @@ export const COPY: Record<string, Variants> = {
     standard: 'Connect an email account, then check your email to get your first brief.',
     pro: 'No inbox connected. Setup → Email accounts.'
   },
+  'hero.firstRun': {
+    simple: 'Your first brief takes about a minute. It shows up here when it is ready.',
+    standard: 'Your first brief takes about a minute. It appears here the moment it is ready.',
+    pro: 'First run: ~1 min.'
+  },
   'hero.empty.noBrief': {
     simple: 'Press the big blue button and I will check your email.',
     standard: 'Press the button to check your email and get your first brief.',

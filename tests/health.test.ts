@@ -433,8 +433,17 @@ describe('repairs with a real database', () => {
     const deps = { db, secrets, userData: '/data', startAgent: (i: { recipeId?: string; params?: Record<string, string> }) => (started.push(`${i.recipeId}:${i.params?.email}`), { ok: true }) }
     repo.upsertAccount(db, account('g1', 'gmail'))
     repo.upsertAccount(db, account('o1', 'outlook'))
-    // No saved sign-in yet → the person has to do it.
-    expect(await reauthAccount(deps, 'g1')).toEqual({ ok: false, message: 'needs you: reconnect g1@example.com in Setup → Email accounts' })
+    // No saved sign-in yet and nobody at the keyboard (automatic pass) → the person has to do it.
+    expect(await reauthAccount(deps, 'g1')).toEqual({ ok: false, message: 'needs you: press Fix it for me under Settings → Health, or reconnect g1@example.com in Setup → Email accounts' })
+    // v1.5.7: with the person pressing Fix it for me, the Get-it-for-me window opens instead (no AI needed).
+    const opened: string[] = []
+    const interactive = { ...deps, interactive: () => true, startAppPasswordWindow: (provider: string, email: string) => (opened.push(`${provider}:${email}`), { ok: true }) }
+    expect(await reauthAccount(interactive, 'g1')).toEqual({ ok: true, message: "Opened Google's page to reconnect g1@example.com — sign in there and press Create" })
+    expect(opened).toEqual(['gmail:g1@example.com'])
+    // The automatic pass never opens a window, even when it could.
+    const quiet = { ...interactive, interactive: () => false }
+    expect((await reauthAccount(quiet, 'g1')).ok).toBe(false)
+    expect(opened).toHaveLength(1)
     saveSignin(db, secrets, 'g1@example.com', 'hunter2')
     expect(await reauthAccount(deps, 'g1')).toEqual({ ok: true, message: 'Reconnecting g1@example.com on its own…' })
     expect(started).toEqual(['gmail-app-password:g1@example.com'])

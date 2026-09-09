@@ -112,3 +112,36 @@ export function explainConnectError(provider: AppPasswordProvider, err: unknown,
   const first = (e.message ?? String(err ?? '')).split('\n')[0].trim()
   return first ? `Could not connect to ${service}: ${first}` : `Could not connect to ${service}. Please try again.`
 }
+
+const DOMAIN_PROVIDERS: Record<string, 'gmail' | 'yahoo' | 'icloud' | 'outlook'> = {
+  'gmail.com': 'gmail',
+  'googlemail.com': 'gmail',
+  'yahoo.com': 'yahoo',
+  'yahoo.co.uk': 'yahoo',
+  'yahoo.ca': 'yahoo',
+  'yahoo.com.au': 'yahoo',
+  'ymail.com': 'yahoo',
+  'rocketmail.com': 'yahoo',
+  'aol.com': 'yahoo',
+  'icloud.com': 'icloud',
+  'me.com': 'icloud',
+  'mac.com': 'icloud',
+  'outlook.com': 'outlook',
+  'hotmail.com': 'outlook',
+  'hotmail.co.uk': 'outlook',
+  'live.com': 'outlook',
+  'msn.com': 'outlook'
+}
+
+/**
+ * Which service an address belongs to, from its domain (v1.5.7): the setup screens pick the right path
+ * as the person types, so "Where is your email?" is only a fallback. Null for anything unknown.
+ * AOL mail is Yahoo's system underneath, so it takes the Yahoo path.
+ */
+export function providerForEmail(email: string): 'gmail' | 'yahoo' | 'icloud' | 'outlook' | null {
+  const at = String(email ?? '').trim().toLowerCase().lastIndexOf('@')
+  if (at < 0) return null
+  const domain = email.trim().toLowerCase().slice(at + 1)
+  if (!domain || domain.indexOf('.') < 0) return null
+  return DOMAIN_PROVIDERS[domain] ?? null
+}
