@@ -256,6 +256,22 @@ export interface Brief {
   inboxes?: InboxSummary[]
   /** Trusted helpers (v1.4): replies from helpers found in the inbox ("Notes from your helpers"). */
   helperNotes?: HelperNote[]
+  /** Scam guard (v1.6): messages that look like scams, likely ones first. Always computed by rules, never by the AI. */
+  scamWarnings?: ScamWarning[]
+}
+
+/** One message the scam guard flagged, with the reasons in plain words. */
+export interface ScamWarning {
+  messageId: string
+  subject: string
+  /** "Name <address>" or the address alone. */
+  from: string
+  fromAddress: string
+  /** `likely` is kept out of "Needs you" and the reply tracker; `possible` is shown with a warning. */
+  level: 'likely' | 'possible'
+  reasons: string[]
+  /** What to do instead, one sentence. */
+  advice: string
 }
 
 export interface ScheduleSettings {

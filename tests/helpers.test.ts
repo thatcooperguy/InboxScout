@@ -270,6 +270,19 @@ describe('detectHeadsups', () => {
     expect(out.filter((x) => x.kind === 'sensitive')).toHaveLength(1)
   })
 
+  it('#0 scam guard (v1.6): a likely scam gets its own heads-up and silences the generic pressure one for that message', () => {
+    const warning = { messageId: 'm1', subject: 'Verify your account today', from: 'Account Team <stranger@scam.example>', fromAddress: 'stranger@scam.example', level: 'likely' as const, reasons: ['It says it is from PayPal, but the address is not a PayPal address.'], advice: 'Open the website yourself.' }
+    const brief = { headline: '', topIssues: [], pulse: [], waitingOnYou: [], waitingOnThem: [], deadlines: [], personal: [], sensitiveNotices: [], skillSections: [], scamWarnings: [warning] }
+    const out = detectHeadsups(base({ messages: [message()], newClassifications: [classification()], brief }))
+    expect(out.map((x) => x.kind)).toEqual(['scam'])
+    expect(out[0].triggerKey).toBe('scam:m1')
+    expect(out[0].text).toBe('An email to Mom looks like a scam ("Account Team", subject "Verify your account today"): It says it is from PayPal, but the address is not a PayPal address. Please check with Mom before they act on it.')
+    noLeaks(out[0].text)
+    // A merely possible scam keeps the generic pressure heads-up instead.
+    const possible = detectHeadsups(base({ messages: [message()], newClassifications: [classification()], brief: { ...brief, scamWarnings: [{ ...warning, level: 'possible' as const }] } }))
+    expect(possible.map((x) => x.kind)).toEqual([])
+  })
+
   it('#2 pressure from a stranger fires once (PRESSURE or URGENT), ignores known senders for #1/#2', () => {
     const out = detectHeadsups(base({ messages: [message()], newClassifications: [classification({ sensitivity: ['personal_private'] })] }))
     const h = out.find((x) => x.kind === 'pressure')!

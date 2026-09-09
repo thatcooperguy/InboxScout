@@ -28,3 +28,17 @@ export function supportMailto(version: string, platform: string): string {
   const params = new URLSearchParams({ subject: `InboxScout help (${version})`, body })
   return `mailto:${SUPPORT_EMAIL}?${params.toString().replace(/\+/g, '%20')}`
 }
+
+/**
+ * Where a newsletter's List-Unsubscribe header points (v1.6): a web link is preferred over a mailto,
+ * since opening a page needs no message to be sent. Null when the header has neither.
+ */
+export function unsubscribeTarget(header: string | null | undefined): { url: string; kind: 'link' | 'mail' } | null {
+  if (!header) return null
+  const bracketed = [...header.matchAll(/<([^>]+)>/g)].map((m) => m[1].trim())
+  const candidates = bracketed.length ? bracketed : header.split(',').map((s) => s.trim())
+  const link = candidates.find((u) => /^https?:\/\//i.test(u))
+  if (link) return { url: link, kind: 'link' }
+  const mail = candidates.find((u) => /^mailto:/i.test(u))
+  return mail ? { url: mail, kind: 'mail' } : null
+}

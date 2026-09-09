@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useLevel } from '../useLevel'
+import { unsubscribeTarget } from '../../../shared/mailto'
 import type { AttachmentInfo } from '../../../shared/types'
 
 const CATEGORIES = ['work', 'personal', 'promotions_noise'] as const
@@ -267,6 +268,18 @@ export default function Review(): JSX.Element {
                       )}
                     </div>
                     <div className="hint">{m.snippet?.slice(0, 140)}</div>
+                    {(m.category === 'promotions_noise' || m.screening === 'newsletter') && unsubscribeTarget(m.list_unsubscribe) && (
+                      <div style={{ marginTop: 4 }}>
+                        <button
+                          className="ghost"
+                          style={{ minHeight: 32, padding: '4px 10px' }}
+                          title={unsubscribeTarget(m.list_unsubscribe)!.kind === 'link' ? "Opens this sender's unsubscribe page in your browser. InboxScout never sends anything." : 'Opens your mail app with the unsubscribe message ready; you press Send.'}
+                          onClick={() => void window.inboxScout.openExternal(unsubscribeTarget(m.list_unsubscribe)!.url)}
+                        >
+                          Stop these emails
+                        </button>
+                      </div>
+                    )}
                     {(attachments.get(m.id) ?? []).map((a) => (
                       <div key={a.id} className="hint" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }} data-attachment>
                         <span>

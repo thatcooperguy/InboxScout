@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { appPasswordShape, cleanIpcError, explainConnectError, providerForEmail } from '../src/shared/appPassword'
-import { supportMailto } from '../src/shared/mailto'
+import { supportMailto, unsubscribeTarget } from '../src/shared/mailto'
 
 describe('appPasswordShape', () => {
   it('accepts the 16 letters Google shows as four groups and joins them', () => {
@@ -92,5 +92,15 @@ describe('supportMailto', () => {
     expect(q.get('body')).toMatch(/press Paste/)
     expect(q.get('body')).toMatch(/InboxScout 1\.5\.7 on Windows 11/)
     expect(url.length).toBeLessThan(700)
+  })
+})
+
+describe('unsubscribeTarget', () => {
+  it('prefers the web link, falls back to mailto, and ignores junk', () => {
+    expect(unsubscribeTarget('<mailto:u@list.example?subject=unsub>, <https://list.example/u/123>')).toEqual({ url: 'https://list.example/u/123', kind: 'link' })
+    expect(unsubscribeTarget('<mailto:u@list.example>')).toEqual({ url: 'mailto:u@list.example', kind: 'mail' })
+    expect(unsubscribeTarget('https://a.example/x')).toEqual({ url: 'https://a.example/x', kind: 'link' })
+    expect(unsubscribeTarget('nonsense')).toBeNull()
+    expect(unsubscribeTarget(null)).toBeNull()
   })
 })

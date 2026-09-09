@@ -3,6 +3,11 @@ import type { Brief } from './types'
 /** Plain-language script for a spoken brief - shared by the app and the OS voice. */
 export function briefToSpeech(brief: Brief, opts: { short?: boolean } = {}): string {
   const parts: string[] = [brief.headline]
+  const scams = brief.scamWarnings ?? []
+  if (scams.length > 0) {
+    parts.push(`Careful: ${scams.length} email${scams.length === 1 ? '' : 's'} look${scams.length === 1 ? 's' : ''} like a scam.`)
+    for (const w of scams.slice(0, opts.short ? 1 : 3)) parts.push(`One from ${w.from.split(' <')[0]}, subject ${w.subject}. ${w.reasons[0]} ${w.advice}`)
+  }
   const n = brief.topIssues.length
   if (n > 0) {
     parts.push(`${n} thing${n === 1 ? '' : 's'} need${n === 1 ? 's' : ''} you.`)

@@ -23,6 +23,12 @@ export function renderMarkdown(
     lines.push('')
   }
 
+  if ((brief.scamWarnings ?? []).length > 0) {
+    lines.push('## 🛑 Looks like a scam', '', '_Flagged by rules on this computer. Nothing was deleted or moved._', '')
+    for (const w of brief.scamWarnings!) lines.push(`- **${w.subject}** — from ${w.from}. ${w.reasons.join(' ')} _${w.advice}_`)
+    lines.push('')
+  }
+
   lines.push('## ⚠ Top Emerging Issues', '')
   if (brief.topIssues.length === 0) lines.push('Nothing urgent right now.', '')
   brief.topIssues.forEach((issue, i) => {

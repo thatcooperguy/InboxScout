@@ -116,6 +116,11 @@
 
 - **Reads what is inside attachments**: PDFs, Word files, spreadsheets, and plain-text files are read on the computer; photos, screenshots, and scans go to the AI helper when it can see images and to a bundled offline OCR reader otherwise. Each file gets a one-line summary and facts (amounts, dates, people, what kind of document), and what it says feeds the classifier, the built-in engine (an invoice in a PDF becomes a bill with the amount and due date; a photographed W-2 is flagged private), and the brief ("from the attached invoice.pdf" on the item, 📎 on Today). Inbox review shows 📎 file — summary with **Open**; **Ask** answers "what was in the pdf from Ron?" and the AI gets `read_attachment`. Files are kept 90 days (setting) and cleared by the **Attachment files** health check; the text stays searchable. Bridge ops `list_attachments` / `read_attachment` / `open_attachment`; the phone gets the two read ops. Off switch: *Read attachments and photos*. `docs/ATTACHMENTS.md`.
 
+## ✅ v1.6 — shipped (scam guard, unsubscribe)
+
+- **Scam guard** (`src/main/pipeline/scams.ts`): rules, no model, so every install is protected. Brand impersonation (35 brands and institutions with their real domains), lookalike domains, "banks" on free mail, credential fishing, pressure, gift cards/wire/crypto, the grandparent emergency, prizes with a fee, tech-support renewals with a number to call, blackmail, shortened/IP/punycode links. *Likely* scams are filed as noise and never become "Needs you" or a reply owed; *possible* ones are shown with the warning. First card on Today (Simple: first of three), read aloud first, in the report and the helper digest, and a helper heads-up of its own. Senders the person replies to soften the verdict.
+- **Stop these emails**: Inbox review shows a button for newsletters and promotions that carry a List-Unsubscribe header; it opens the sender's page (or a ready mailto) — InboxScout still never sends.
+
 ## ✅ v1.5.1 – v1.5.7 — shipped (release, legal, and runtime plumbing)
 
 - **v1.5.1** — code-signing pipeline for Windows (Azure Trusted Signing) and macOS (Developer ID + notarization), inactive until the repository secrets exist; Cooper Studios LLC in build metadata; the InboxScout Source-Available License 1.0, `TRADEMARK.md`, `SECURITY.md`, contributor assignment in `CONTRIBUTING.md`. `docs/SIGNING.md`.

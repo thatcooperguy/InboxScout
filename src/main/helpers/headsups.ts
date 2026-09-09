@@ -12,7 +12,7 @@ import type { AccountConfig, Brief, Classification, MessageRecord } from '../../
 export interface Headsup {
   /** Stable key for the 7-day dedupe: `helper:sent:<triggerKey>` in meta. */
   triggerKey: string
-  kind: 'sensitive' | 'pressure' | 'account' | 'quiet' | 'promise' | 'urgent'
+  kind: 'sensitive' | 'pressure' | 'account' | 'quiet' | 'promise' | 'urgent' | 'scam'
   text: string
 }
 
@@ -89,6 +89,18 @@ export function detectHeadsups(input: HeadsupInput): Headsup[] {
   }
   const byId = new Map(input.messages.map((m) => [m.id, m]))
 
+  // #0 scam guard (v1.6): a likely scam gets its own, more specific heads-up; #2 below skips those messages.
+  const flagged = new Set<string>()
+  for (const w of input.brief?.scamWarnings ?? []) {
+    flagged.add(w.messageId)
+    if (w.level !== 'likely') continue
+    add({
+      triggerKey: `scam:${w.messageId}`,
+      kind: 'scam',
+      text: `An email to ${person} looks like a scam ("${w.from.split(' <')[0]}", subject "${w.subject}"): ${w.reasons[0]} Please check with ${person} before they act on it.`
+    })
+  }
+
   // #1 sensitive request from a stranger · #2 pressure from a stranger
   for (const c of input.newClassifications) {
     const m = byId.get(c.messageId)
@@ -103,7 +115,7 @@ export function detectHeadsups(input: HeadsupInput): Headsup[] {
       })
     }
     const probe = `${m.subject}\n${m.snippet}`
-    if (URGENT.test(probe) || PRESSURE.test(probe)) {
+    if (!flagged.has(m.id) && (URGENT.test(probe) || PRESSURE.test(probe))) {
       add({
         triggerKey: `pressure:${m.id}`,
         kind: 'pressure',

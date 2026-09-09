@@ -33,6 +33,7 @@ export const COPY: Record<string, Variants> = {
     pro: 'Clear · 0 need you · 0 waiting'
   },
   'card.needs_you': { standard: 'Needs you' },
+  'card.scams': { simple: 'Careful. These look like scams', standard: 'Careful — these look like scams', pro: 'Scam guard' },
   'card.waiting_on_you': { simple: 'People waiting to hear back', standard: "They're waiting on you", pro: 'Waiting on you' },
   'card.waiting_on_you.hint': {
     simple: 'These people wrote to you and are waiting to hear back.',

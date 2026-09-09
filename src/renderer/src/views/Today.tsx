@@ -41,6 +41,7 @@ function Why({ text, level }: { text: string; level: Level }): JSX.Element {
 
 const WHY: Record<string, string> = {
   decide: 'Urgent items, dates within two days, overdue promises, and replies owed to people who matter — the decisions for today, pulled from everything below.',
+  scams: 'Emails that look like scams: a sender pretending to be a company, pressure to act now, odd ways to pay, or links that hide where they go. Found by rules on this computer, never sent anywhere. Nothing was deleted.',
   needs_you: 'Emails that look like they need a decision or action from you, most urgent first. Press Done when it is handled.',
   waiting_on_you: 'Someone wrote to you and you have not replied yet.',
   promises: 'Sentences in your own sent mail that read like a commitment, with the date you gave. They disappear once you write again in that thread.',
@@ -358,6 +359,31 @@ export default function Today({ running, onRun, level = 'standard', status = '',
           { full: true, attention: true }
         )
       }
+    }
+
+    const scams: any[] = brief.scamWarnings ?? []
+    if (scams.length) {
+      const shown = simple ? scams.slice(0, 3) : scams
+      card(
+        'scams',
+        `🛑 ${t('card.scams', level)}`,
+        scams.length,
+        <ul>
+          {shown.map((w: any) => (
+            <li key={w.messageId} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              <strong>
+                {w.level === 'likely' ? 'Looks like a scam' : 'Could be a scam'}: “{w.subject}”
+              </strong>
+              <div className="hint">From {w.from}</div>
+              <div className="next">{simple ? w.reasons[0] : w.reasons.slice(0, 2).join(' ')}</div>
+              <div className="next">
+                <strong>{w.advice}</strong>
+              </div>
+            </li>
+          ))}
+        </ul>,
+        { attention: true, full: true, hint: simple ? 'I did not delete anything. When in doubt, ask someone you trust.' : 'Nothing was deleted or moved. If you are unsure, ask someone you trust to look at it with you.' }
+      )
     }
 
     if (brief.topIssues.length) {

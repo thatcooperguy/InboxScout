@@ -99,7 +99,7 @@ export function getMessages(db: DB, ids: string[]): MessageRecord[] {
 export function recentMessagesWithClassification(db: DB, limit: number): any[] {
   return db
     .prepare(
-      `SELECT m.id, m.subject, m.from_address, m.from_name, m.date, m.snippet, m.account_id,
+      `SELECT m.id, m.subject, m.from_address, m.from_name, m.date, m.snippet, m.account_id, m.list_unsubscribe,
               c.category, c.importance, c.screening, c.action_summary, c.sensitivity
        FROM messages m LEFT JOIN classifications c ON c.message_id = m.id
        ORDER BY m.date DESC LIMIT ?`

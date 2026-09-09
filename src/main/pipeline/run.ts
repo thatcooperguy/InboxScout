@@ -19,6 +19,7 @@ import { applyAutoProfile } from '../profiles/auto'
 import { buildPeople, inferOwnerName, inferVipAddresses, summarizePeople } from '../people/engine'
 import { buildSchedule, type ScheduleItem } from '../schedule/engine'
 import { extractPromises } from './promises'
+import { detectScams, trustedSendersFrom } from './scams'
 import { dedupeAcrossAccounts, summarizeInboxes } from './inboxes'
 import { loadSettings, markLastRunAt } from '../settings'
 import { afterRun as helpersAfterRun, findHelperNotes } from '../helpers/index'
@@ -371,6 +372,20 @@ export async function runPipeline(
         classifications.push(c)
       }
     }
+    // 2b. Scam guard (v1.6): rules only, so it protects every install. A likely scam is filed as noise and
+    // never becomes a "Needs you" item or a reply owed; the warning itself rides on the brief.
+    const scamWarnings = detectScams(toClassify, { trustedSenders: trustedSendersFrom(people) })
+    const likelyScam = new Set(scamWarnings.filter((w) => w.level === 'likely').map((w) => w.messageId))
+    for (const c of classifications) {
+      if (!likelyScam.has(c.messageId)) continue
+      c.category = 'promotions_noise'
+      c.screening = 'other'
+      c.isActionable = false
+      c.actionSummary = null
+      c.deadline = null
+      c.importance = Math.min(c.importance, 1)
+      repo.upsertClassification(db, c)
+    }
     const messageById = new Map(toClassify.map((m) => [m.id, m]))
     const pair = (c: Classification) => ({ message: messageById.get(c.messageId)!, classification: c })
 
@@ -450,6 +465,7 @@ export async function runPipeline(
         : buildBasicBrief(briefInputs)
     // The AI helper answered every time this run: its failure streak is over.
     if (model && !aiDown) repo.setMeta(db, META_AI_FAILS, '0')
+    if (scamWarnings.length) brief.scamWarnings = scamWarnings
 
     // 4b. Quiet intelligence: circle, unified schedule, promises, per-inbox view. Computed always, shown only when useful.
     if (settings.insightsEnabled) {

@@ -172,6 +172,7 @@ function plainBrief(brief: Brief): string[] {
     if (!lines.length) return
     out.push(`${title}:`, ...lines.map((l) => `- ${l}`), '')
   }
+  section('Looks like a scam', (brief.scamWarnings ?? []).map((w) => `"${w.subject}" from ${w.from} — ${w.reasons[0]} ${w.advice}`))
   section('Needs you', brief.topIssues.map((i) => `${i.title}${i.nextStep ? ` — ${i.nextStep}` : ''}`))
   section('Waiting on a reply', brief.waitingOnYou)
   section('Coming up', scheduleLines(brief).length ? scheduleLines(brief) : brief.deadlines)
