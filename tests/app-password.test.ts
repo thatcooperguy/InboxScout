@@ -57,7 +57,7 @@ describe('explainConnectError', () => {
 
 describe('app-password window helpers', () => {
   it('presents as plain Chrome so sign-in pages do not refuse the window', async () => {
-    const { chromeUserAgent, startUrlFor } = await import('../src/main/setup/appPasswordWindow')
+    const { chromeUserAgent, startUrlFor } = await import('../src/main/setup/appPasswordPure')
     const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) inboxscout/1.5.6 Chrome/132.0.0.0 Electron/44.2.0 Safari/537.36'
     const out = chromeUserAgent(ua, 'inboxscout')
     expect(out).not.toMatch(/Electron|inboxscout/)

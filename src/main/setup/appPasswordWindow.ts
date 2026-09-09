@@ -1,6 +1,7 @@
 import { BrowserWindow, app } from 'electron'
 import { RECIPES } from '../agent/policy'
 import { extractAppPassword } from './capture'
+import { chromeUserAgent, startUrlFor } from './appPasswordPure'
 
 /**
  * "Get it for me" without an AI helper (v1.5.6).
@@ -12,7 +13,8 @@ import { extractAppPassword } from './capture'
  * Deterministic: no model in the loop, so it works on a fresh install with no AI key.
  */
 
-export type AppPasswordProvider = 'gmail' | 'yahoo' | 'icloud'
+export type { AppPasswordProvider } from './appPasswordPure'
+import type { AppPasswordProvider } from './appPasswordPure'
 
 export interface AppPasswordEvent {
   status: 'opened' | 'captured' | 'done' | 'failed' | 'closed'
@@ -37,16 +39,6 @@ const FORM_PAGES: Record<AppPasswordProvider, RegExp> = {
   gmail: /^https:\/\/myaccount\.google\.com\/(u\/\d+\/)?apppasswords/i,
   yahoo: /^https:\/\/login\.yahoo\.com\/myaccount\/security\/app-password/i,
   icloud: /^https:\/\/account\.apple\.com\/account\/manage/i
-}
-
-export function startUrlFor(provider: AppPasswordProvider, email: string): string {
-  const recipe = RECIPES.find((r) => r.id === `${provider}-app-password`)
-  const base = recipe?.startUrl({ email }) ?? ''
-  if (provider === 'gmail') {
-    // Google's chooser lands on the right account when the person has several signed in.
-    return `https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(email)}&continue=${encodeURIComponent(base)}`
-  }
-  return base
 }
 
 /** Reads the page and fills the app name once so the person only has to press Create. */
@@ -205,13 +197,4 @@ function isAllowed(url: string, domains: string[]): boolean {
   } catch {
     return false
   }
-}
-
-/** Exported for tests: drop the Electron and app tokens from the user agent, leaving plain Chrome. */
-export function chromeUserAgent(ua: string, name = 'inboxscout'): string {
-  return ua
-    .replace(/\s?Electron\/\S+/g, '')
-    .replace(new RegExp(`\\s?${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\/\\S+`, 'gi'), '')
-    .replace(/\s{2,}/g, ' ')
-    .trim()
 }
